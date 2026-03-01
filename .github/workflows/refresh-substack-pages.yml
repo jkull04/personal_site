@@ -1,8 +1,8 @@
-name: Deploy GitHub Pages
+name: Refresh Substack And Deploy Pages
 
 on:
-  push:
-    branches: ["main"]
+  schedule:
+    - cron: "17 */6 * * *"
   workflow_dispatch:
 
 permissions:
@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  refresh_and_deploy:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -36,6 +36,15 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install pillow
+
+      - name: Sync Substack content
+        run: |
+          python scripts/sync_substack_content.py \
+            --diagnostics \
+            --retries 6 \
+            --timeout 30 \
+            --source-order posts,archive \
+            --min-public-posts 1
 
       - name: Validate optimized runtime assets
         run: python scripts/optimize_runtime_images.py --check

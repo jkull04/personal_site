@@ -1,8 +1,6 @@
 name: Verify Substack Sync
 
 on:
-  schedule:
-    - cron: "27 */6 * * *"
   workflow_dispatch:
 
 permissions:
@@ -24,4 +22,10 @@ jobs:
         run: python --version
 
       - name: Verify Substack sync with diagnostics
-        run: python scripts/sync_substack_content.py --diagnostics --retries 6 --timeout 30
+        run: |
+          python scripts/sync_substack_content.py \
+            --diagnostics \
+            --retries 6 \
+            --timeout 30 \
+            --source-order posts,archive \
+            --min-public-posts 1

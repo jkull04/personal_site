@@ -17,7 +17,7 @@ import socket
 import sys
 import tempfile
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from html import unescape
 from html.parser import HTMLParser
@@ -36,6 +36,8 @@ DEFAULT_RETRIES = 3
 DEFAULT_TIMEOUT_SECONDS = 20.0
 DEFAULT_BACKOFF_BASE_SECONDS = 2.0
 DEFAULT_MAX_BACKOFF_SECONDS = 15.0
+DEFAULT_SOURCE_ORDER = "posts,archive"
+DEFAULT_MIN_PUBLIC_POSTS = 1
 TRANSIENT_HTTP_CODES = {403, 408, 425, 429}
 REDACT_QUERY_KEY_PATTERN = re.compile(r"(token|key|secret|pass|auth)", flags=re.IGNORECASE)
 LOG_PREFIX = "[substack-sync]"
@@ -46,9 +48,14 @@ class SyncStats:
     fetch_attempts: int = 0
     pages_fetched: int = 0
     posts_received: int = 0
+    public_posts: int = 0
     writings_entries: int = 0
     project_entries: int = 0
     outputs_written: int = 0
+    source_selected: str = ""
+    source_order: str = ""
+    fallback_used: bool = False
+    source_failures: list[str] = field(default_factory=list)
     started_at: float = 0.0
 
 
@@ -351,7 +358,7 @@ def fetch_json(
     raise last_error
 
 
-def fetch_posts(
+def fetch_posts_from_posts_api(
     config: SyncConfig,
     *,
     retries: int,
@@ -359,7 +366,7 @@ def fetch_posts(
     diagnostics: bool,
     stats: SyncStats,
 ) -> list[dict[str, Any]]:
-    base = f"https://{config.publication_host}/api/v1/posts"
+    base_url = f"https://{config.publication_host}/api/v1/posts"
     posts: list[dict[str, Any]] = []
 
     for page in range(config.max_pages):
@@ -367,7 +374,7 @@ def fetch_posts(
             "limit": config.page_limit,
             "offset": page * config.page_limit,
         }
-        url = f"{base}?{urlencode(params)}"
+        url = f"{base_url}?{urlencode(params)}"
         page_data = fetch_json(
             url,
             retries=retries,
@@ -385,7 +392,7 @@ def fetch_posts(
         log_diagnostic(
             diagnostics,
             (
-                f"event=page_received page={page + 1} page_size={len(page_data)} "
+                f"event=posts_page_received page={page + 1} page_size={len(page_data)} "
                 f"total_posts={len(posts)}"
             ),
         )
@@ -401,8 +408,154 @@ def fetch_posts(
     return posts
 
 
+def fetch_posts_from_archive_api(
+    config: SyncConfig,
+    *,
+    retries: int,
+    timeout_seconds: float,
+    diagnostics: bool,
+    stats: SyncStats,
+) -> list[dict[str, Any]]:
+    archive_base = f"https://{config.publication_host}/api/v1/archive"
+    detail_base = f"https://{config.publication_host}/api/v1/posts"
+    posts: list[dict[str, Any]] = []
+    seen_slugs: set[str] = set()
+
+    for page in range(config.max_pages):
+        params = {
+            "sort": "new",
+            "limit": config.page_limit,
+            "offset": page * config.page_limit,
+        }
+        archive_url = f"{archive_base}?{urlencode(params)}"
+        page_data = fetch_json(
+            archive_url,
+            retries=retries,
+            timeout_seconds=timeout_seconds,
+            diagnostics=diagnostics,
+            stats=stats,
+        )
+        if not isinstance(page_data, list):
+            raise RuntimeError(f"Unexpected archive payload shape at {archive_url}")
+        if not page_data:
+            break
+
+        stats.pages_fetched += 1
+        log_diagnostic(
+            diagnostics,
+            (
+                f"event=archive_page_received page={page + 1} page_size={len(page_data)} "
+                f"detail_posts={len(posts)}"
+            ),
+        )
+
+        for row in page_data:
+            if not isinstance(row, dict):
+                continue
+            slug = str(row.get("slug") or "").strip()
+            if not slug or slug in seen_slugs:
+                continue
+
+            detail_url = f"{detail_base}/{slug}"
+            detail_post = fetch_json(
+                detail_url,
+                retries=retries,
+                timeout_seconds=timeout_seconds,
+                diagnostics=diagnostics,
+                stats=stats,
+            )
+            if not isinstance(detail_post, dict):
+                raise RuntimeError(f"Unexpected post detail payload shape at {detail_url}")
+
+            posts.append(detail_post)
+            seen_slugs.add(slug)
+            stats.posts_received += 1
+
+        if len(page_data) < config.page_limit:
+            break
+    else:
+        print(
+            f"Reached max_pages={config.max_pages} while fetching archive entries; truncating results.",
+            file=sys.stderr,
+        )
+
+    return posts
+
+
+def fetch_posts_with_failover(
+    config: SyncConfig,
+    *,
+    source_order: list[str],
+    retries: int,
+    timeout_seconds: float,
+    diagnostics: bool,
+    stats: SyncStats,
+    min_public_posts: int,
+) -> list[dict[str, Any]]:
+    errors: list[str] = []
+
+    for index, source in enumerate(source_order):
+        pages_before = stats.pages_fetched
+        posts_before = stats.posts_received
+        log_diagnostic(diagnostics, f"event=source_attempt source={source!r} order={index + 1}/{len(source_order)}")
+
+        try:
+            if source == "posts":
+                posts = fetch_posts_from_posts_api(
+                    config,
+                    retries=retries,
+                    timeout_seconds=timeout_seconds,
+                    diagnostics=diagnostics,
+                    stats=stats,
+                )
+            elif source == "archive":
+                posts = fetch_posts_from_archive_api(
+                    config,
+                    retries=retries,
+                    timeout_seconds=timeout_seconds,
+                    diagnostics=diagnostics,
+                    stats=stats,
+                )
+            else:
+                raise RuntimeError(f"Unsupported source {source!r}")
+
+            public_posts = sum(1 for post in posts if post_is_public(post))
+            log_diagnostic(
+                diagnostics,
+                (
+                    f"event=source_result source={source!r} posts={len(posts)} "
+                    f"public_posts={public_posts}"
+                ),
+            )
+            if public_posts < min_public_posts:
+                raise RuntimeError(
+                    (
+                        f"Source {source!r} returned only {public_posts} public posts "
+                        f"(minimum required: {min_public_posts})"
+                    )
+                )
+
+            stats.source_selected = source
+            stats.fallback_used = index > 0
+            stats.public_posts = public_posts
+            return posts
+        except (SyncRequestError, RuntimeError, OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
+            stats.pages_fetched = pages_before
+            stats.posts_received = posts_before
+            reason = f"{source}: {exc}"
+            errors.append(reason)
+            stats.source_failures.append(reason)
+            log_diagnostic(diagnostics, f"event=source_failure source={source!r} reason={str(exc)!r}")
+
+    raise RuntimeError(f"All sources failed: {' | '.join(errors)}")
+
+
 def post_is_public(post: dict[str, Any]) -> bool:
     return post.get("is_published") is True and str(post.get("audience", "")).lower() == "everyone"
+
+
+def count_public_posts(posts: list[dict[str, Any]]) -> int:
+    return sum(1 for post in posts if post_is_public(post))
 
 
 def extract_tags(post: dict[str, Any]) -> list[str]:
@@ -728,26 +881,35 @@ def emit_run_summary(status: str, stats: SyncStats, message: str) -> None:
     duration_ms = int((time.monotonic() - stats.started_at) * 1000) if stats.started_at else 0
     summary_line = (
         f"event=run_summary status={status} attempts={stats.fetch_attempts} pages={stats.pages_fetched} "
-        f"posts={stats.posts_received} writings={stats.writings_entries} projects={stats.project_entries} "
-        f"outputs={stats.outputs_written} duration_ms={duration_ms} message={message!r}"
+        f"posts={stats.posts_received} public_posts={stats.public_posts} writings={stats.writings_entries} "
+        f"projects={stats.project_entries} outputs={stats.outputs_written} source={stats.source_selected!r} "
+        f"source_order={stats.source_order!r} fallback_used={str(stats.fallback_used).lower()} "
+        f"duration_ms={duration_ms} message={message!r}"
     )
     print(f"{LOG_PREFIX} {summary_line}")
 
-    write_step_summary(
-        [
-            "### Substack Sync Summary",
-            "",
-            f"- Status: `{status}`",
-            f"- Message: `{message}`",
-            f"- Fetch attempts: `{stats.fetch_attempts}`",
-            f"- Pages fetched: `{stats.pages_fetched}`",
-            f"- Posts received: `{stats.posts_received}`",
-            f"- Writings entries: `{stats.writings_entries}`",
-            f"- Project entries: `{stats.project_entries}`",
-            f"- Outputs written: `{stats.outputs_written}`",
-            f"- Duration (ms): `{duration_ms}`",
-        ]
-    )
+    summary_lines = [
+        "### Substack Sync Summary",
+        "",
+        f"- Status: `{status}`",
+        f"- Message: `{message}`",
+        f"- Fetch attempts: `{stats.fetch_attempts}`",
+        f"- Pages fetched: `{stats.pages_fetched}`",
+        f"- Posts received: `{stats.posts_received}`",
+        f"- Public posts: `{stats.public_posts}`",
+        f"- Source selected: `{stats.source_selected or 'n/a'}`",
+        f"- Source order: `{stats.source_order or 'n/a'}`",
+        f"- Fallback used: `{str(stats.fallback_used).lower()}`",
+        f"- Writings entries: `{stats.writings_entries}`",
+        f"- Project entries: `{stats.project_entries}`",
+        f"- Outputs written: `{stats.outputs_written}`",
+        f"- Duration (ms): `{duration_ms}`",
+    ]
+    if stats.source_failures:
+        summary_lines.append(f"- Source failures: `{len(stats.source_failures)}`")
+        summary_lines.append(f"- Last source failure: `{stats.source_failures[-1]}`")
+
+    write_step_summary(summary_lines)
 
 
 def load_posts_from_file(path: Path, *, diagnostics: bool, stats: SyncStats) -> list[dict[str, Any]]:
@@ -761,6 +923,22 @@ def load_posts_from_file(path: Path, *, diagnostics: bool, stats: SyncStats) -> 
     stats.fetch_attempts = 0
     log_diagnostic(diagnostics, f"event=file_loaded posts={len(posts)}")
     return posts
+
+
+def parse_source_order(raw_value: str) -> list[str]:
+    allowed = {"posts", "archive"}
+    order: list[str] = []
+    for raw in str(raw_value).split(","):
+        source = raw.strip().lower()
+        if not source:
+            continue
+        if source not in allowed:
+            raise ValueError(f"Unsupported source in --source-order: {source!r}")
+        if source not in order:
+            order.append(source)
+    if not order:
+        raise ValueError("--source-order must include at least one source.")
+    return order
 
 
 def parse_args() -> argparse.Namespace:
@@ -789,6 +967,24 @@ def parse_args() -> argparse.Namespace:
         default="",
         help="Read posts from a local JSON file instead of fetching from the Substack API.",
     )
+    parser.add_argument(
+        "--source-order",
+        type=str,
+        default=DEFAULT_SOURCE_ORDER,
+        help=(
+            "Comma-separated source preference order for API fetches. "
+            "Supported values: posts,archive (default: posts,archive)."
+        ),
+    )
+    parser.add_argument(
+        "--min-public-posts",
+        type=int,
+        default=DEFAULT_MIN_PUBLIC_POSTS,
+        help=(
+            "Minimum number of public posts required before writing outputs. "
+            f"Default: {DEFAULT_MIN_PUBLIC_POSTS}."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -798,6 +994,7 @@ def main() -> int:
     timeout_seconds = max(1.0, float(args.timeout))
     diagnostics = bool(args.diagnostics)
     input_file = str(args.input_file).strip()
+    raw_source_order = str(args.source_order)
     stats = SyncStats(started_at=time.monotonic())
 
     log_diagnostic(
@@ -806,24 +1003,40 @@ def main() -> int:
     )
 
     try:
+        source_order = parse_source_order(raw_source_order)
+        min_public_posts = max(0, int(args.min_public_posts))
+        stats.source_order = ",".join(source_order)
         config = load_config(CONFIG_PATH)
         log_diagnostic(
             diagnostics,
             (
                 f"event=run_start host={config.publication_host!r} retries={retries} "
-                f"timeout_s={timeout_seconds} input_file={input_file!r}"
+                f"timeout_s={timeout_seconds} input_file={input_file!r} "
+                f"source_order={stats.source_order!r} min_public_posts={min_public_posts}"
             ),
         )
 
         if input_file:
             posts = load_posts_from_file(Path(input_file), diagnostics=diagnostics, stats=stats)
+            stats.source_selected = "input-file"
         else:
-            posts = fetch_posts(
+            posts = fetch_posts_with_failover(
                 config,
+                source_order=source_order,
                 retries=retries,
                 timeout_seconds=timeout_seconds,
                 diagnostics=diagnostics,
                 stats=stats,
+                min_public_posts=min_public_posts,
+            )
+        public_posts = count_public_posts(posts)
+        stats.public_posts = public_posts
+        if public_posts < min_public_posts:
+            raise RuntimeError(
+                (
+                    f"Refusing to overwrite outputs: fetched {public_posts} public posts, "
+                    f"minimum required is {min_public_posts}."
+                )
             )
         writings = to_writings_entries(posts, config)
         projects = to_project_entries(posts, config)

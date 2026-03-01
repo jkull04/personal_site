@@ -14,6 +14,7 @@ Static personal website with a classical editorial visual language, Substack-syn
 - [Local Development](#local-development)
 - [Maintenance Scripts](#maintenance-scripts)
 - [Deployment](#deployment)
+- [Scheduled Substack Refresh Workflow](#scheduled-substack-refresh-workflow)
 - [Substack Sync Verification Workflow](#substack-sync-verification-workflow)
 - [Accessibility And Performance](#accessibility-and-performance)
 - [Troubleshooting](#troubleshooting)
@@ -215,6 +216,15 @@ Rules:
 
 `sync_substack_content.py` writes JSON atomically and only replaces output files after full payload generation, preserving last-good data on partial failures.
 
+Fetch strategy is source-failover aware:
+
+- Primary source: `api/v1/posts`
+- Fallback source: `api/v1/archive` + per-slug detail fetch from `api/v1/posts/{slug}`
+
+Safety guard:
+
+- `--min-public-posts` (default `1`) prevents output overwrite when upstream responses are unexpectedly empty.
+
 ## Front-End Runtime Behavior
 
 ### `js/content.js`
@@ -276,7 +286,7 @@ Important:
 ### 1) Sync Substack content
 
 ```bash
-python scripts/sync_substack_content.py
+python scripts/sync_substack_content.py --diagnostics --source-order posts,archive --min-public-posts 1
 ```
 
 Writes:
@@ -349,7 +359,6 @@ Workflow file: `.github/workflows/deploy-pages.yml`
 Triggers:
 
 - Push to `main`
-- Scheduled run every 6 hours at `:17` (`00:17`, `06:17`, `12:17`, `18:17` UTC)
 - Manual `workflow_dispatch`
 
 Pipeline steps:
@@ -357,11 +366,32 @@ Pipeline steps:
 1. Checkout repository.
 2. Setup Python 3.13.
 3. Install Pillow (`python -m pip install --upgrade pip pillow`).
-4. Run `python scripts/sync_substack_content.py --diagnostics --retries 6 --timeout 30`.
-5. Run `python scripts/optimize_runtime_images.py --check`.
-6. Configure Pages.
-7. Upload full repository artifact.
-8. Deploy to GitHub Pages.
+4. Run `python scripts/optimize_runtime_images.py --check`.
+5. Configure Pages.
+6. Upload full repository artifact.
+7. Deploy to GitHub Pages.
+
+## Scheduled Substack Refresh Workflow
+
+Workflow file: `.github/workflows/refresh-substack-pages.yml`
+
+Purpose:
+
+- Refresh Substack content and deploy it to Pages on a schedule.
+- Keep push-based deploys isolated from Substack API availability.
+
+Triggers:
+
+- Scheduled run every 6 hours at `:17` (`00:17`, `06:17`, `12:17`, `18:17` UTC)
+- Manual `workflow_dispatch`
+
+Refresh steps:
+
+1. Checkout repository.
+2. Setup Python 3.13.
+3. Run `python scripts/sync_substack_content.py --diagnostics --retries 6 --timeout 30 --source-order posts,archive --min-public-posts 1`.
+4. Run `python scripts/optimize_runtime_images.py --check`.
+5. Configure Pages and deploy.
 
 ## Substack Sync Verification Workflow
 
@@ -369,19 +399,17 @@ Workflow file: `.github/workflows/verify-substack-sync.yml`
 
 Purpose:
 
-- Run Substack sync health checks on a schedule without doing a Pages deploy.
-- Fail fast when API/request issues occur, with structured diagnostics in logs and step summary.
+- Manually run Substack sync diagnostics without deploying.
 
 Triggers:
 
-- Scheduled run every 6 hours at `:27` (`00:27`, `06:27`, `12:27`, `18:27` UTC)
 - Manual `workflow_dispatch`
 
 Verification steps:
 
 1. Checkout repository.
 2. Setup Python 3.13.
-3. Run `python scripts/sync_substack_content.py --diagnostics --retries 6 --timeout 30`.
+3. Run `python scripts/sync_substack_content.py --diagnostics --retries 6 --timeout 30 --source-order posts,archive --min-public-posts 1`.
 
 Notes:
 
@@ -422,7 +450,7 @@ Maintenance expectations:
 - Failing step: `Deploy GitHub Pages / deploy / Sync Substack content`
 - Failure time: `2026-03-01T21:37:16Z`
 - Check details: root cause happened in sync step before asset validation/deploy steps began.
-- Mitigation now in place: deterministic retries, structured diagnostics, and scheduled verification workflow.
+- Mitigation now in place: source failover, minimum-public-post guard, and a dedicated scheduled refresh-and-deploy workflow.
 
 ### Projects post missing after sync
 
