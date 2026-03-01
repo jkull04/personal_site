@@ -1,0 +1,10 @@
+{
+  "name": "James Kull",
+  "tagline": "Making things.",
+  "nav": [
+    { "label": "Home", "href": "./index.html" },
+    { "label": "Projects", "href": "./projects.html" },
+    { "label": "Writings", "href": "./writings.html" },
+    { "label": "Contact", "href": "./contact.html" }
+  ]
+}

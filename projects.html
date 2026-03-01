@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en" id="top">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>James Kull | Projects</title>
+    <meta name="description" content="Selected projects with concise problem framing, implementation approach, and outcomes." />
+    <link rel="icon" type="image/png" href="./assets/icons/laurel-circle.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./css/base.css" />
+    <link rel="stylesheet" href="./css/components.css" />
+    <link rel="stylesheet" href="./css/dinos.css" />
+    <script defer src="./js/dinos.js"></script>
+    <script defer src="./js/content.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="page-header site-shell">
+      <nav class="top-nav" aria-label="Primary">
+        <a class="brand" href="./index.html">
+          <img class="icon-endcap" src="./assets/icons/laurel-circle.png" width="16" height="16" alt="" />
+          <span>JFK</span>
+        </a>
+        <ul class="nav-links">
+          <li><a href="./index.html">Home</a></li>
+          <li><a class="is-active" href="./projects.html">Projects</a></li>
+          <li><a href="./writings.html">Writings</a></li>
+          <li><a href="./contact.html">Contact</a></li>
+        </ul>
+      </nav>
+    </header>
+
+    <main id="main" class="site-shell">
+      <section class="hero hero--monument" aria-labelledby="projects-title">
+        <div class="grid home-identity">
+          <h1 id="projects-title">Selected Projects</h1>
+          <p class="hero-lead">
+            Each entry is structured as a practical project: problem framing, implementation approach, and concrete output.
+          </p>
+        </div>
+        <div class="page-monument monument--runtime-pantheon" aria-hidden="true">
+          <div class="monument-structure"></div>
+        </div>
+      </section>
+
+      <div class="divider" aria-hidden="true">
+        Project Folio
+        <img class="icon-endcap" src="./assets/icons/ornament.svg" width="16" height="16" alt="" />
+      </div>
+
+      <div class="writings-controls" aria-label="Projects controls" role="group">
+        <div class="writings-control">
+          <label for="projects-search">Search</label>
+          <input id="projects-search" type="search" placeholder="Title, summary, sections, or tag" />
+        </div>
+        <div class="writings-control">
+          <label for="projects-topic">Topic</label>
+          <select id="projects-topic">
+            <option value="">All topics</option>
+          </select>
+        </div>
+        <div class="writings-control">
+          <label for="projects-sort">Sort</label>
+          <select id="projects-sort">
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+          </select>
+        </div>
+      </div>
+      <noscript>
+        <p class="meta-line">JavaScript is required to load, search, and sort project entries on this page.</p>
+      </noscript>
+
+      <section id="works-list" class="listing projects-list" aria-label="Detailed projects">
+        <article class="empty-state panel">
+          <h3>Loading projects...</h3>
+          <p class="meta-line">If this takes too long, refresh the page.</p>
+        </article>
+      </section>
+
+    </main>
+
+    <footer class="footer site-shell">
+      <p>James Kull | Classics and Economics, Washington and Lee University.</p>
+      <button class="footer-contact footer-copy copy-trigger" type="button" data-copy-email data-email="jkull@mail.wlu.edu">
+        Email
+      </button>
+    </footer>
+  </body>
+</html>

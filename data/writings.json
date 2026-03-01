@@ -1,0 +1,24 @@
+[
+  {
+    "id": "testing-blog",
+    "type": "blog",
+    "title": "testing blog",
+    "date": "2026-03-01",
+    "tags": [
+      "Blog"
+    ],
+    "abstract": "",
+    "href": "https://jameskull.substack.com/p/testing-blog"
+  },
+  {
+    "id": "testing",
+    "type": "essay",
+    "title": "testing",
+    "date": "2026-03-01",
+    "tags": [
+      "Writings"
+    ],
+    "abstract": "testing",
+    "href": "https://jameskull.substack.com/p/testing"
+  }
+]

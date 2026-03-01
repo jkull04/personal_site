@@ -1,0 +1,384 @@
+Below is a **Codex-ready implementation brief** you can paste directly into GPT-5.3-Codex (or similar). It encodes all structural, UX, motion, performance, and taste constraints we defined.
+
+---
+
+# CODEX IMPLEMENTATION PROMPT
+
+**Project:** Roman-themed personal site with restrained pixel dino guides
+**Stack:** Plain HTML + CSS + minimal vanilla JS (no frameworks)
+**Runtime:** Static, frontend-only
+
+---
+
+## 0. Core Concept
+
+Build a 3-page personal site:
+
+* `/projects.html`
+* `/writings.html`
+* `/contact.html`
+
+Design philosophy:
+
+* Roman = structure, typography, restraint.
+* Dinos = minimal pixel sprites used sparingly for delight.
+* Professional baseline first. Playful layer second.
+* No gimmicks. No scroll hijacking. No excessive animation.
+
+---
+
+## 1. Non-Negotiables
+
+### Accessibility
+
+* WCAG 2.1 AA contrast (4.5:1 for body text minimum).
+* Full keyboard navigability.
+* Strong visible focus states.
+* Respect `prefers-reduced-motion: reduce` (disable sprite animations and transitions).
+
+### Motion Rules
+
+* No scrolljacking.
+* No infinite animation loops.
+* All sprite animations ≤ 900ms.
+* Animations trigger once per interaction.
+* No autoplay beyond idle frame.
+
+### Performance
+
+* Max width images must define `width` and `height` attributes (avoid CLS).
+* Lazy-load non-hero images.
+* Sprite sheet loaded once and reused.
+* No heavy libraries.
+* Keep CSS lean and modular.
+* No layout thrashing JS.
+
+---
+
+## 2. File Structure
+
+```
+/projects.html
+/writings.html
+/contact.html
+
+/assets/
+  /sprites/dinos.png
+  /images/headshot.jpg
+  /icons/arch.svg
+  /icons/laurel.svg
+  /icons/scroll.svg
+  /icons/footprint.svg
+
+/css/
+  base.css
+  components.css
+  dinos.css
+
+/js/
+  dinos.js
+  transitions.js (optional, subtle only)
+```
+
+---
+
+## 3. Global Layout Rules
+
+* Max content width: 1040px
+* Centered single-column layout
+* 8px spacing system
+* Section spacing: 64px vertical
+* Card padding: 20px
+* Border radius: 12px
+* Hairline divider: 1px subtle border + tiny SVG endcap icon
+
+### Top Navigation
+
+Left: Name/Logo
+Right: Projects · Writings · Contact
+Active state: accent underline
+Hover: subtle color shift
+
+No sticky shrink effects. Keep stable.
+
+---
+
+## 4. Typography System
+
+Use system stack or Inter.
+
+Body:
+
+* 16px base
+* 1.6 line-height
+* Neutral charcoal text
+
+Headings:
+
+* Same font family
+* Small caps OR letter-spaced caps
+* Museum placard feel
+* Tight hierarchy (32 / 24 / 18 scale)
+
+Metadata blocks:
+
+* Small size
+* Muted gray-green
+* Format like:
+
+```
+Year · Tools · Outcome
+```
+
+---
+
+## 5. Color Role System (CSS Variables)
+
+Define semantic tokens:
+
+```
+--bg: bone/off-white
+--text: charcoal
+--muted: gray-green
+--accent: dino green
+--accent-2: darker green
+--border: subtle divider gray
+```
+
+Accent used sparingly:
+
+* Links
+* Active nav
+* Hover outlines
+* Dino color
+
+Avoid bright saturation outside accent.
+
+---
+
+## 6. Pages
+
+---
+
+# PROJECTS (Primary Landing)
+
+## Hero
+
+* Name
+* 1–2 line positioning statement
+* 2–3 featured project cards (large)
+* One idle dino in corner (random per load optional)
+* Dino does NOT animate automatically.
+
+## Project Grid
+
+6–12 cards:
+
+* Title
+* 1 sentence description
+* Tag pills
+* “Read more” link
+
+Clicking a card scrolls to in-page anchor section (no new page).
+
+## Project Detail Sections (Anchored)
+
+Structure:
+
+* Problem
+* Approach
+* Output
+* Links (GitHub/demo/writeup)
+
+Max 2 images per project.
+Lazy load.
+Include “Back to top”.
+
+---
+
+# WRITINGS
+
+Minimal clean index.
+
+Rows include:
+
+* Title
+* Date
+* Tags
+* 1-line abstract
+* External links open in new tab with icon
+
+Optional filter chips only if more than ~10 entries.
+
+If empty:
+
+* Small reading dino appears once, static.
+
+---
+
+# CONTACT
+
+* Email (with copy button)
+* LinkedIn
+* GitHub
+* Resume link
+
+Optional minimal form (frontend only).
+
+Copy email triggers:
+
+* Tiny dino “sent” pose for < 1s.
+* Then disappears.
+
+---
+
+## 7. Sprite System
+
+Sprite sheet already exists: `/assets/sprites/dinos.png`
+
+### Sprite Specs
+
+* 32x32 per frame
+* Integer scaling only
+* Use `image-rendering: pixelated`
+* Animate using `background-position` + `steps()`
+
+### Required States Per Dino
+
+* idle (1 frame)
+* walk (4 frames)
+* point or wave (2 frames)
+
+### Interaction Mapping
+
+Projects hero:
+
+* One idle only
+
+Project card hover:
+
+* Dino performs 0.6–0.9s walk cycle once
+
+Project detail first scroll into view:
+
+* Dino points toward “Links” section once
+
+Writings row hover:
+
+* Dino bookmark pose (static after 1–2 frames)
+
+Contact copy:
+
+* “Sent” pose < 1s
+
+### Reduced Motion
+
+If `prefers-reduced-motion: reduce`:
+
+* Disable sprite animations
+* Show idle frame only
+* Disable transitions
+
+---
+
+## 8. CSS Implementation Notes
+
+* Use CSS variables for theme tokens.
+* Use `steps(4)` animation for walk cycles.
+* No keyframe loops beyond interaction duration.
+* Sprite class structure:
+
+```
+.dino
+.dino--walk
+.dino--point
+.dino--sent
+```
+
+Reset to idle after animation ends.
+
+---
+
+## 9. Motion & Transitions
+
+Optional:
+
+* View Transition API for page navigation
+* 150–220ms crossfade or slight slide
+* No exaggerated movement
+* Must respect reduced motion
+
+No parallax.
+No scroll snapping.
+
+---
+
+## 10. Imagery
+
+Use `/assets/images/headshot.jpg`:
+
+* Modern, natural
+* 1–2 placements max
+* Rounded corners (12px)
+* Define width and height explicitly
+* No pixelation (only sprites pixelated)
+
+---
+
+## 11. Micro-Details That Matter
+
+* Hairline dividers with tiny Roman SVG icon at end
+* Tag pills neutral background
+* Accent border on hover
+* Underline on link hover
+* Strong focus ring (2px accent outline)
+* No shadow-heavy UI
+* No glassmorphism
+* No gradients beyond subtle background tint if needed
+
+---
+
+## 12. Deliverables
+
+Generate:
+
+1. All 3 HTML files complete.
+2. Modular CSS split into base, components, dinos.
+3. Minimal JS for:
+
+   * sprite state toggling
+   * intersection observer trigger (once)
+   * copy-to-clipboard
+   * reduced motion detection
+4. Clean semantic markup.
+5. No placeholder lorem ipsum.
+6. Sample realistic content blocks for demonstration.
+
+---
+
+## 13. Code Quality Constraints
+
+* No inline styles.
+* No inline JS.
+* Use semantic HTML5.
+* Keep JS under 200 lines.
+* No console noise.
+* Graceful degradation if JS disabled (site still works).
+
+---
+
+## Final Instruction to Codex
+
+Implement this as a production-ready static site with careful attention to:
+
+* Restraint
+* Typography polish
+* Spacing rhythm
+* Subtle interaction
+* Performance discipline
+* Accessibility compliance
+* Zero gimmicks
+
+The dinos are a light accent layer, not the main identity.
+
+Produce clean, organized output structured by file.

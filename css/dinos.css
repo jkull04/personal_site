@@ -1,0 +1,204 @@
+.dino {
+  --dino-size: 26px;
+  --dino-row: var(--dino-row-global, 0);
+  --dino-opacity: 1;
+  width: var(--dino-size);
+  height: var(--dino-size);
+  display: inline-block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  background-image: url("../assets/sprites/dinos-bronze.png");
+  background-repeat: no-repeat;
+  background-size: calc(var(--dino-size) * 8) calc(var(--dino-size) * 3);
+  background-position: 0 calc(var(--dino-row) * -1 * var(--dino-size));
+  vertical-align: middle;
+  opacity: var(--dino-opacity);
+}
+
+.dino--sheet {
+  --sheet-frame-w: 64px;
+  --sheet-frame-h: 36px;
+  --walk-frame-ms: 3600ms;
+  --dino-face: 1;
+  --walk-face: var(--dino-face);
+  width: var(--sheet-frame-w);
+  height: var(--sheet-frame-h);
+  background-position: 0 0;
+  background-size: calc(var(--sheet-frame-w) * 8) var(--sheet-frame-h);
+  filter: none;
+}
+
+.dino--sheet.dino--stego {
+  background-image: url("../assets/sprites/stegosaurus-walk-atlas.png?v=20260225d");
+}
+
+.dino--sheet.dino--raptor {
+  background-image: url("../assets/sprites/raptor-walk-atlas.png?v=20260225d");
+}
+
+.dino--sheet.dino--longneck {
+  background-image: url("../assets/sprites/marble-brach-walk-atlas.png?v=20260301a");
+  background-size: calc(var(--sheet-frame-w) * 8) var(--sheet-frame-h);
+}
+
+.dino.is-hidden {
+  visibility: hidden;
+}
+
+.dino--ambient {
+  --dino-size: 22px;
+  --dino-opacity: 1;
+}
+
+.dino--sent {
+  --dino-size: 28px;
+  --dino-opacity: 1;
+}
+
+.dino--sheet.dino--sent {
+  --sheet-frame-w: 56px;
+  --sheet-frame-h: 30px;
+}
+
+.dino--arena {
+  --dino-opacity: 1;
+}
+
+.dino--sheet.dino--stego.dino--lounge {
+  --sheet-frame-w: calc(74px * var(--arena-dino-scale, 1));
+  --sheet-frame-h: calc(46px * var(--arena-dino-scale, 1));
+}
+
+.dino--sheet.dino--stego.dino--route {
+  --sheet-frame-w: 74px;
+  --sheet-frame-h: 46px;
+}
+
+.dino--sheet.dino--raptor.dino--lounge {
+  --sheet-frame-w: calc(58px * var(--arena-dino-scale, 1));
+  --sheet-frame-h: calc(30px * var(--arena-dino-scale, 1));
+}
+
+.dino--sheet.dino--raptor.dino--route {
+  --sheet-frame-w: 56px;
+  --sheet-frame-h: 30px;
+}
+
+.dino--sheet.dino--longneck.dino--lounge {
+  --sheet-frame-w: calc(55px * var(--arena-dino-scale, 1));
+  --sheet-frame-h: calc(72px * var(--arena-dino-scale, 1));
+}
+
+.dino--sheet.dino--longneck.dino--route {
+  --sheet-frame-w: 54px;
+  --sheet-frame-h: 72px;
+}
+
+.dino[data-dino-state="hidden"] {
+  visibility: hidden;
+}
+
+.dino[data-dino-state="lounge"],
+.dino[data-dino-state="entering"],
+.dino[data-dino-state="idle"],
+.dino[data-dino-state="statue"],
+.dino[data-dino-state="moving"] {
+  visibility: visible;
+}
+
+.dino--lounge {
+  position: absolute;
+  left: var(--lounge-x, 0px);
+  top: var(--lounge-y, 0px);
+  transform: scaleX(var(--dino-face, 1));
+}
+
+.dino--route {
+  transform: translate(var(--walk-dx, 0px), var(--walk-dy, 0px)) scaleX(var(--dino-face, 1));
+}
+
+.dino.is-idle:not(.dino--sheet) {
+  background-position: 0 calc(var(--dino-row) * -1 * var(--dino-size));
+}
+
+.dino--sheet.is-idle {
+  background-position: 0 0;
+}
+
+.dino.play-sent {
+  animation: dino-sent 650ms steps(1) 1 both;
+}
+
+.dino--sheet.play-sent {
+  animation: dino-sheet-sent 520ms steps(1) 1 both;
+}
+
+.dino.play-loop-walk {
+  animation: dino-sheet-walk-frames var(--walk-frame-ms) steps(1) infinite;
+}
+
+@keyframes dino-sent {
+  from {
+    background-position: calc(var(--dino-size) * -6) calc(var(--dino-row) * -1 * var(--dino-size));
+  }
+
+  to {
+    background-position: calc(var(--dino-size) * -7) calc(var(--dino-row) * -1 * var(--dino-size));
+  }
+}
+
+@keyframes dino-sheet-sent {
+  from {
+    background-position: 0 0;
+  }
+
+  to {
+    background-position: calc(var(--sheet-frame-w) * -3) 0;
+  }
+}
+
+@keyframes dino-sheet-walk-frames {
+  0% {
+    background-position: 0 0;
+  }
+
+  14% {
+    background-position: calc(var(--sheet-frame-w) * -1) 0;
+  }
+
+  28% {
+    background-position: calc(var(--sheet-frame-w) * -2) 0;
+  }
+
+  42% {
+    background-position: calc(var(--sheet-frame-w) * -3) 0;
+  }
+
+  56% {
+    background-position: calc(var(--sheet-frame-w) * -4) 0;
+  }
+
+  70% {
+    background-position: calc(var(--sheet-frame-w) * -5) 0;
+  }
+
+  84% {
+    background-position: calc(var(--sheet-frame-w) * -6) 0;
+  }
+
+  100% {
+    background-position: calc(var(--sheet-frame-w) * -7) 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dino {
+    background-position: 0 0 !important;
+    transform: none !important;
+  }
+
+  .dino.play-sent,
+  .dino.play-loop-walk {
+    animation: none !important;
+  }
+}

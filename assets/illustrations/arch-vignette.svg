@@ -1,0 +1,15 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 240" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M30 206h420"/>
+  <path d="M74 206V112h332v94"/>
+  <path d="M74 112h332"/>
+  <path d="M126 206v-52"/>
+  <path d="M182 206v-52"/>
+  <path d="M238 206v-52"/>
+  <path d="M294 206v-52"/>
+  <path d="M350 206v-52"/>
+  <path d="M156 112V78h168v34"/>
+  <path d="M196 206v-44a44 44 0 0 1 88 0v44"/>
+  <path d="M212 112V78"/>
+  <path d="M268 112V78"/>
+  <path d="M238 78V48"/>
+</svg>

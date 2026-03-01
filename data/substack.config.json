@@ -1,0 +1,16 @@
+{
+  "publication_host": "jameskull.substack.com",
+  "tags": {
+    "writings": "Writings",
+    "blog": "Blog",
+    "projects": "Projects"
+  },
+  "project_template": {
+    "required_sections": ["Problem", "Approach", "Output"],
+    "optional_sections": ["Tools", "Outcome"]
+  },
+  "pagination": {
+    "limit": 20,
+    "max_pages": 200
+  }
+}

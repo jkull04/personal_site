@@ -1,0 +1,27 @@
+[
+  {
+    "id": "testing-projects",
+    "title": "testing projects",
+    "date": "2026-03-01",
+    "summary": "Problem",
+    "tags": [
+      "Projects"
+    ],
+    "year": "2026",
+    "tools": "Substack",
+    "outcome": "Problem",
+    "metadata": {
+      "tools": "Substack",
+      "outcome": "Problem"
+    },
+    "problem": "Text",
+    "approach": "text",
+    "output": "text",
+    "links": [
+      {
+        "label": "Project Post",
+        "href": "https://jameskull.substack.com/p/testing-projects"
+      }
+    ]
+  }
+]

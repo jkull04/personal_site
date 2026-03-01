@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en" id="top">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>James Kull | Home</title>
+    <meta
+      name="description"
+      content="Classical museum-catalog personal site with selected projects, writings, and direct contact details."
+    />
+    <link rel="icon" type="image/png" href="./assets/icons/laurel-circle.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./css/base.css" />
+    <link rel="stylesheet" href="./css/components.css" />
+    <link rel="stylesheet" href="./css/dinos.css" />
+    <script defer src="./js/dinos.js"></script>
+    <script defer src="./js/content.js"></script>
+  </head>
+  <body class="home-page">
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="page-header site-shell">
+      <nav class="top-nav" aria-label="Primary">
+        <a class="brand" href="./index.html" aria-label="James Kull home">
+          <img class="icon-endcap" src="./assets/icons/laurel-circle.png" width="16" height="16" alt="" />
+          <span>JFK</span>
+        </a>
+        <ul class="nav-links">
+          <li><a class="is-active" href="./index.html">Home</a></li>
+          <li><a href="./projects.html">Projects</a></li>
+          <li><a href="./writings.html">Writings</a></li>
+          <li><a href="./contact.html">Contact</a></li>
+        </ul>
+      </nav>
+    </header>
+
+    <main id="main" class="site-shell">
+      <section class="hero hero--arena" aria-labelledby="home-title">
+        <div class="home-identity grid">
+          <h1 id="home-title" data-site-name>James Kull</h1>
+          <p class="hero-lead" data-site-tagline>
+            I build practical software, write clearly, and execute with discipline.
+          </p>
+        </div>
+
+        <section class="arena-stage" aria-label="Arena route selector">
+          <div class="arena-scene" aria-label="Interactive arena statues">
+            <div class="arena-colosseum" aria-hidden="true"></div>
+            <div class="arena-floor" aria-hidden="true"></div>
+            <button
+              class="arena-statue arena-roamer"
+              type="button"
+              data-dino-lounge="projects"
+              data-tooltip="Click me!"
+              aria-label="Amble Projects guide"
+            >
+              <span
+                class="dino dino--sheet dino--stego dino--arena dino--lounge"
+                data-dino
+                data-dino-lounge="projects"
+                data-dino-state="lounge"
+                aria-hidden="true"
+              ></span>
+            </button>
+            <button
+              class="arena-statue arena-roamer"
+              type="button"
+              data-dino-lounge="writings"
+              data-tooltip="Click me!"
+              aria-label="Amble Writings guide"
+            >
+              <span
+                class="dino dino--sheet dino--raptor dino--arena dino--lounge"
+                data-dino
+                data-dino-lounge="writings"
+                data-dino-state="lounge"
+                aria-hidden="true"
+              ></span>
+            </button>
+            <button
+              class="arena-statue arena-roamer"
+              type="button"
+              data-dino-lounge="contact"
+              data-tooltip="Click me!"
+              aria-label="Amble Contact guide"
+            >
+              <span
+                class="dino dino--sheet dino--longneck dino--arena dino--lounge"
+                data-dino
+                data-dino-lounge="contact"
+                data-dino-state="lounge"
+                aria-hidden="true"
+              ></span>
+            </button>
+          </div>
+          <div class="arena-controls">
+            <nav class="arena-routes" aria-label="Primary site routes">
+              <a class="arena-route" href="./projects.html">
+                <span class="arena-route-label">Projects</span>
+              </a>
+              <a class="arena-route" href="./writings.html">
+                <span class="arena-route-label">Writings</span>
+              </a>
+              <a class="arena-route" href="./contact.html">
+                <span class="arena-route-label">Contact</span>
+              </a>
+            </nav>
+          </div>
+        </section>
+      </section>
+
+    </main>
+
+    <footer class="footer site-shell">
+      <p>James Kull | Classics and Economics, Washington and Lee University.</p>
+      <button class="footer-contact footer-copy copy-trigger" type="button" data-copy-email data-email="jkull@mail.wlu.edu">
+        Email
+      </button>
+    </footer>
+  </body>
+</html>
