@@ -7,7 +7,7 @@
   display: inline-block;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
-  background-image: url("../assets/sprites/dinos-bronze.png");
+  background-image: none;
   background-repeat: no-repeat;
   background-size: calc(var(--dino-size) * 8) calc(var(--dino-size) * 3);
   background-position: 0 calc(var(--dino-row) * -1 * var(--dino-size));
@@ -29,16 +29,27 @@
 }
 
 .dino--sheet.dino--stego {
-  background-image: url("../assets/sprites/stegosaurus-walk-atlas.png?v=20260225d");
+  --dino-sheet-image: url("../assets/sprites/stegosaurus-walk-atlas-2x.webp?v=20260301b");
+  background-image: var(--dino-sheet-image);
 }
 
 .dino--sheet.dino--raptor {
-  background-image: url("../assets/sprites/raptor-walk-atlas.png?v=20260225d");
+  --dino-sheet-image: url("../assets/sprites/raptor-walk-atlas-2x.webp?v=20260301b");
+  background-image: var(--dino-sheet-image);
 }
 
 .dino--sheet.dino--longneck {
-  background-image: url("../assets/sprites/marble-brach-walk-atlas.png?v=20260301a");
+  --dino-sheet-image: url("../assets/sprites/marble-brach-walk-atlas-2x.webp?v=20260301b");
+  background-image: var(--dino-sheet-image);
   background-size: calc(var(--sheet-frame-w) * 8) var(--sheet-frame-h);
+}
+
+:root.defer-dino-atlases .dino--sheet {
+  background-image: none;
+}
+
+:root.defer-dino-atlases.dino-atlases-ready .dino--sheet {
+  background-image: var(--dino-sheet-image, none);
 }
 
 .dino.is-hidden {

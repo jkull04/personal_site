@@ -509,15 +509,23 @@
   }
 
   async function hydrateContent() {
+    const needsSiteContent =
+      document.querySelector("[data-site-name]") !== null ||
+      document.querySelector("[data-site-tagline]") !== null;
+    const needsProjectsContent = document.getElementById("works-list") !== null;
+    const needsWritingsContent =
+      document.getElementById("writings-essays") !== null ||
+      document.getElementById("writings-notes") !== null;
+
     const [site, projects, writings] = await Promise.all([
-      readJson("/data/site.json").catch(() => null),
-      readJson("/data/works-substack.json").catch(() => null),
-      readJson("/data/writings.json").catch(() => null)
+      needsSiteContent ? readJson("/data/site.json").catch(() => null) : Promise.resolve(null),
+      needsProjectsContent ? readJson("/data/works-substack.json").catch(() => null) : Promise.resolve(null),
+      needsWritingsContent ? readJson("/data/writings.json").catch(() => null) : Promise.resolve(null)
     ]);
 
-    renderSiteContent(site);
-    renderProjects(projects);
-    renderWritings(writings);
+    if (needsSiteContent) renderSiteContent(site);
+    if (needsProjectsContent) renderProjects(projects);
+    if (needsWritingsContent) renderWritings(writings);
 
     if (typeof window.initializeDinoInteractions === "function") {
       window.initializeDinoInteractions();

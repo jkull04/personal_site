@@ -1,69 +1,104 @@
 # Museum-Catalog Personal Site
 
-Static portfolio site with a classical editorial visual system and restrained interaction.
+Static personal website with a classical editorial visual language, Substack-synced content, and lightweight vanilla JS interactions.
 
-- `index.html`
-- `projects/index.html` (canonical `/projects/`)
-- `writings/index.html` (canonical `/writings/`)
-- `contact/index.html` (canonical `/contact/`)
-- `projects.html`, `writings.html`, `contact.html` (legacy redirect shims)
+## Table Of Contents
 
-## Style Philosophy
+- [Overview](#overview)
+- [Architecture](#architecture)
+- [Routes And Pages](#routes-and-pages)
+- [Repository Layout](#repository-layout)
+- [Data Model](#data-model)
+- [Substack Content Pipeline](#substack-content-pipeline)
+- [Front-End Runtime Behavior](#front-end-runtime-behavior)
+- [Local Development](#local-development)
+- [Maintenance Scripts](#maintenance-scripts)
+- [Deployment](#deployment)
+- [Accessibility And Performance](#accessibility-and-performance)
+- [Troubleshooting](#troubleshooting)
 
-- Classics first: travertine and bronze palette, inscription-like headings, measured spacing.
-- Dinos second: optional bronze pixel easter egg on Home plus one copy-confirmation sprite on Contact.
-- Motion restraint: no looping decorative motion after reveal.
+## Overview
 
-## Stack
+The site is a static HTML/CSS/JS project that renders:
 
-- Plain HTML
-- Modular CSS (`css/base.css`, `css/components.css`, `css/dinos.css`)
-- Minimal vanilla JS (`js/content.js`, `js/dinos.js`)
-- JSON content sources in `data/`
+- Home (`/`) with an interactive arena scene and route navigation.
+- Projects (`/projects/`) from Substack-derived project entries.
+- Writings (`/writings/`) split into Essays and Notes columns.
+- Contact (`/contact/`) with copy-email interaction, resume download, and socials.
 
-## Project Structure
+All content hydration is client-side from JSON files in `data/`.
 
-- `assets/images/headshot-square.png`: runtime portrait
-- `assets/sprites/dinos-bronze.png`: recolored runtime atlas
-- `assets/sprites/*-walk-atlas.png`: homepage dino walking atlases
-- `assets/illustrations/runtime/hero-home-arena.png`: homepage pixel arena art
-- `assets/illustrations/runtime/hero-writings-pantheon.png`: subpage monument art (used on Projects)
-- `assets/illustrations/runtime/hero-projects-forum.png`: subpage monument art (used on Writings)
-- `assets/illustrations/runtime/hero-contact-delphi.png`: subpage monument art (used on Contact)
-- `assets/icons/*.svg`: small Roman icon set for dividers and metadata
-- `assets/illustrations/*.svg`: monument vignettes for subpages
-- `assets/source-art/*.png`: high-resolution working/source PNG exports
-- `data/site.json`: site metadata and nav labels
-- `data/works.json`: empty placeholder (projects are Substack-driven)
-- `data/works-substack.json`: generated project entries from Substack
-- `data/writings.json`: generated writing entries from Substack
-- `data/substack.config.json`: Substack sync configuration
-- `scripts/sync_substack_content.py`: build-time Substack sync script
+## Architecture
 
-## Monument Vignettes
+- Markup: plain HTML pages (`index.html`, `projects/index.html`, `writings/index.html`, `contact/index.html`).
+- Styles: modular CSS files:
+  - `css/base.css` for tokens, typography, resets, global utilities.
+  - `css/components.css` for layout/components/page sections.
+  - `css/dinos.css` for sprite animation and dino-specific states.
+- Runtime JS:
+  - `js/content.js` loads JSON, renders listings, wires filtering/sorting/clamping.
+  - `js/dinos.js` handles dino interactions, arena roaming, tooltips, and email copy feedback.
+- Content sources:
+  - `data/site.json` for site-level text (name/tagline/nav labels).
+  - `data/writings.json` generated from Substack.
+  - `data/works-substack.json` generated from Substack.
+  - `data/works.json` is a placeholder and currently unused by runtime rendering.
 
-Page mappings:
+## Routes And Pages
 
-- Home: `assets/illustrations/runtime/hero-home-arena.png`
-- Projects: `assets/illustrations/runtime/hero-writings-pantheon.png`
-- Writings: `assets/illustrations/runtime/hero-projects-forum.png`
-- Contact: `assets/illustrations/runtime/hero-contact-delphi.png`
+Canonical routes use trailing slashes:
 
-## Dino Usage Policy
+- `/` -> `index.html`
+- `/projects/` -> `projects/index.html`
+- `/writings/` -> `writings/index.html`
+- `/contact/` -> `contact/index.html`
 
-- Allowed: one optional reveal sequence on Home (triggered by bronze seal), one sent animation on Contact copy action.
-- Disallowed: looping decorative animation on route cards, rows, or scroll.
+Compatibility redirect shims are maintained:
 
-## Content Authoring
+- `projects.html` redirects to `/projects/`
+- `writings.html` redirects to `/writings/`
+- `contact.html` redirects to `/contact/`
 
-### Update site metadata
+Additional pages:
 
-Edit `data/site.json`:
+- `404.html` custom not-found page.
+- `CNAME` is set to `www.jameskull.com`.
+- `.nojekyll` is included for GitHub Pages static serving behavior.
+
+## Repository Layout
+
+High-signal files and folders:
+
+- `.github/workflows/deploy-pages.yml`: GitHub Pages deploy workflow.
+- `assets/illustrations/runtime/*.png`: runtime hero monument art.
+- `assets/sprites/*-walk-atlas.png`: dino walk atlases used at runtime.
+- `assets/source-art/*.png`: source sprite sheets for atlas normalization.
+- `assets/images/headshot-square.png`: profile image.
+- `assets/documents/James F Kull Jr. Resume.pdf`: downloadable resume.
+- `assets/icons/*.svg` and `assets/icons/laurel-circle.png`: icon set and favicon source.
+- `css/`: styling system.
+- `js/`: runtime logic.
+- `data/`: JSON inputs for rendered content.
+- `scripts/sync_substack_content.py`: Substack sync generator.
+- `scripts/normalize_longneck_atlas.py`: sprite atlas normalizer (all dinos).
+- `scripts/validate_sprite_atlas.py`: sprite atlas validator.
+- `style.md`: visual direction, palette, and pixel-art constraints.
+
+## Data Model
+
+### `data/site.json`
+
+Used to hydrate:
+
+- `[data-site-name]`
+- `[data-site-tagline]`
+
+Expected shape:
 
 ```json
 {
-  "name": "Your Name",
-  "tagline": "Your positioning line",
+  "name": "James Kull",
+  "tagline": "Making things.",
   "nav": [
     { "label": "Home", "href": "/" },
     { "label": "Projects", "href": "/projects/" },
@@ -73,103 +108,307 @@ Edit `data/site.json`:
 }
 ```
 
-### Publish from Substack (no manual JSON editing)
+### `data/writings.json`
 
-This site syncs content from `jameskull.substack.com` into local JSON files at build time.
+Expected entry shape:
 
-Run the sync locally:
-
-```bash
-python scripts/sync_substack_content.py
+```json
+{
+  "id": "slug-like-id",
+  "type": "essay",
+  "title": "Entry Title",
+  "date": "YYYY-MM-DD",
+  "tags": ["Essays"],
+  "abstract": "Short summary text",
+  "href": "https://...substack.com/p/..."
+}
 ```
 
-The workflow also runs on:
-- every push to `main`
-- daily scheduled deploy
+`type` values used by runtime:
 
-### Tag routing rules
+- `essay` -> Essays column
+- `blog` -> Notes column
 
-Tag names are case-insensitive:
+### `data/works-substack.json`
 
-- `Projects`: excluded from Writings page and used for project card generation
-- `Notes`: appears in Writings page "Notes" column
-- `Essays`: appears in Writings page "Essays" column (unless `Notes` is also present)
-- Untagged posts: excluded
+Expected entry shape:
 
-All post tags are still displayed on rendered cards.
+```json
+{
+  "id": "slug-like-id",
+  "title": "Project Title",
+  "date": "YYYY-MM-DD",
+  "summary": "Short summary",
+  "tags": ["Projects"],
+  "year": "2026",
+  "tools": "Substack",
+  "outcome": "Outcome text",
+  "metadata": {
+    "tools": "Substack",
+    "outcome": "Outcome text",
+    "stack": "Optional",
+    "role": "Optional"
+  },
+  "problem": "Required section text",
+  "approach": "Required section text",
+  "output": "Required section text",
+  "links": [
+    { "label": "Project Post", "href": "https://..." },
+    { "label": "GitHub", "href": "https://..." }
+  ]
+}
+```
 
-### Substack project post template (required for auto project cards)
+## Substack Content Pipeline
 
-For posts tagged `Projects`, include these exact `H4` headings:
+Script: `python scripts/sync_substack_content.py`
 
-- `Problem` (required)
-- `Approach` (required)
-- `Output` (required)
+Config file: `data/substack.config.json`
 
-Posts missing any required section are skipped to keep the Projects layout clean.
+Current configured host:
 
-Add optional metadata and links in a footer-style `H6` line:
+- `publication_host`: `jameskull.substack.com`
 
-- `Tools: ... | Outcome: ... | Stack: ... | Role: ... | GitHub: https://... | Demo: https://... | Video: https://... | Docs: https://...`
+Generated outputs:
+
+- `data/writings.json`
+- `data/works-substack.json`
+
+### Tag Routing Rules
+
+Tag matching is case-insensitive:
+
+- `Projects`: treated as project entries and excluded from Writings list.
+- `Notes`: emitted as writings `type = "blog"`.
+- `Essays`: emitted as writings `type = "essay"` if not classified as Notes.
+- Untagged or unmatched posts are skipped.
+
+Only public posts (`audience == "everyone"` and published) are included.
+
+### Required Project Post Template
+
+For Substack posts tagged `Projects`, include these exact `H4` headings:
+
+- `Problem`
+- `Approach`
+- `Output`
+
+If any required `H4` section is missing, the post is skipped.
+
+### Optional Project Metadata (`H6`)
+
+Use a footer-style `H6` line with pipe-delimited `key: value` tokens. Example:
+
+```text
+Tools: ... | Outcome: ... | Stack: ... | Role: ... | GitHub: https://... | Demo: https://... | Video: https://... | Docs: https://... | Slides: https://...
+```
 
 Rules:
-- Use `|` as separator and `key: value` pairs.
-- Keys are case-insensitive.
+
+- Parser reads the last valid `H6` metadata line in the post body.
+- Supported keys: `tools`, `outcome`, `stack`, `role`, `github`, `demo`, `video`, `docs`, `slides`.
 - Unknown keys are ignored.
-- Parser reads the last valid `H6` metadata line.
-- Link values should be full `http://` or `https://` URLs.
+- URL values must begin with `http://` or `https://` to be emitted.
 
-### Projects page behavior
+### Reliability Behavior
 
-- Projects are Substack-only (`data/works-substack.json`).
-- Controls mirror Writings: search, topic filter, and newest/oldest sort.
-- Results are scroll-clamped to two cards.
-- Each Problem/Approach/Output block is line-clamped with `Read more`/`Show less`.
+`sync_substack_content.py` writes JSON atomically and only replaces output files after full payload generation, preserving last-good data on partial failures.
 
-## Accessibility + Performance
+## Front-End Runtime Behavior
 
-- Keep explicit `width` and `height` on portrait images.
-- Preserve keyboard accessibility and visible focus states.
-- Maintain WCAG AA contrast targets.
-- Respect `prefers-reduced-motion: reduce`.
-- Avoid heavy libraries and large background assets.
+### `js/content.js`
 
-## GitHub Pages Deployment
+- Loads only the JSON files needed by the current page (`site.json`, `works-substack.json`, `writings.json`) via `fetch`.
+- Hydrates site name/tagline text.
+- Renders Projects cards with:
+  - Search by title/summary/sections/tags/metadata fields.
+  - Topic filter from unique tags.
+  - Newest/oldest sort by date.
+  - Section text clamping with per-block `Read more`/`Show less`.
+  - Scroll clamp to 2 visible project cards.
+- Renders Writings columns with:
+  - Search by title/abstract/tags.
+  - Topic filter from unique tags.
+  - Newest/oldest sort by date.
+  - Scroll clamp to 3 visible cards per column.
 
-This repo includes `.github/workflows/deploy-pages.yml` for auto-deploy.
+### `js/dinos.js`
 
-1. Push to GitHub on `main`.
-2. Set Pages source to GitHub Actions.
-3. Publish under project path:
-   `https://<user>.github.io/<repo>/`
+- Initializes dino display variants and reduced-motion behavior.
+- Binds copy-email interactions for any `[data-copy-email]` button.
+- Home page arena roamers:
+  - Compute movement bounds from `.arena-colosseum` geometry and CSS variables.
+  - Roam with randomized targets, separation force, and edge bias.
+  - Set facing direction from velocity and maintain depth ordering.
+  - Show tooltips and rotate small tooltip messages on repeated interactions.
 
-Canonical internal routes use trailing slashes (`/projects/`, `/writings/`, `/contact/`).
-Legacy compatibility shims (`*.html`) should always redirect to trailing-slash routes to avoid `foo.html` and `/foo` collisions.
-Substack sync runs during the deploy workflow and updates generated content before artifact upload.
+## Local Development
 
-## Local Preview
+### Prerequisites
+
+- Python 3.10+ recommended.
+- No Node tooling required.
+- For sprite/image helper scripts: `Pillow` and `numpy`.
+
+Install optional script dependencies:
+
+```bash
+python -m pip install pillow numpy
+```
+
+### Run Local Server
 
 ```bash
 python -m http.server 8080
 ```
 
-Open `http://localhost:8080/index.html`.
+Open:
 
-## Dino Atlas Maintenance
+- `http://localhost:8080/`
 
-Source files:
+Important:
 
-- `assets/source-art/final-steg.png`
-- `assets/source-art/final-raptor.png`
-- `assets/source-art/final-longneck.png`
+- Do not open with `file://`; JSON fetches and route behavior require HTTP serving.
 
-Normalize all dino walk atlases and validate geometry plus runtime slicing:
+## Maintenance Scripts
+
+### 1) Sync Substack content
 
 ```bash
-python scripts/normalize_longneck_atlas.py
+python scripts/sync_substack_content.py
+```
+
+Writes:
+
+- `data/writings.json`
+- `data/works-substack.json`
+
+### 2) Normalize sprite atlases
+
+```bash
+python scripts/normalize_longneck_atlas.py --sprite all
+```
+
+Target options:
+
+- `all`
+- `stego`
+- `raptor`
+- `longneck`
+
+Outputs:
+
+- `assets/sprites/stegosaurus-walk-atlas.png`
+- `assets/sprites/raptor-walk-atlas.png`
+- `assets/sprites/marble-brach-walk-atlas.png`
+
+### 3) Validate sprite atlases
+
+```bash
 python scripts/validate_sprite_atlas.py --atlas assets/sprites/stegosaurus-walk-atlas.png
 python scripts/validate_sprite_atlas.py --atlas assets/sprites/raptor-walk-atlas.png
 python scripts/validate_sprite_atlas.py --atlas assets/sprites/marble-brach-walk-atlas.png
 ```
 
-The normalizer auto-detects per-frame boundaries from each final source sheet, removes disconnected artifacts, and emits anchored 8x1 runtime atlases.
+Useful options:
+
+- `--display-size WIDTHxHEIGHT` (repeatable)
+- `--skip-display-checks`
+- `--require-style-marble-palette`
+
+### 4) Optimize runtime image assets
+
+```bash
+python scripts/optimize_runtime_images.py
+python scripts/optimize_runtime_images.py --check
+```
+
+Expected outputs:
+
+- `assets/illustrations/runtime/hero-home-arena-960.webp`
+- `assets/illustrations/runtime/hero-home-arena-1536.webp`
+- `assets/illustrations/runtime/hero-projects-forum-960.webp`
+- `assets/illustrations/runtime/hero-projects-forum-1536.webp`
+- `assets/illustrations/runtime/hero-writings-pantheon-960.webp`
+- `assets/illustrations/runtime/hero-writings-pantheon-1536.webp`
+- `assets/illustrations/runtime/hero-contact-delphi-960.webp`
+- `assets/illustrations/runtime/hero-contact-delphi-1536.webp`
+- `assets/sprites/stegosaurus-walk-atlas-2x.webp`
+- `assets/sprites/raptor-walk-atlas-2x.webp`
+- `assets/sprites/marble-brach-walk-atlas-2x.webp`
+- `assets/images/headshot-square-640.webp`
+- `assets/icons/favicon-32.png`
+
+Re-run this script whenever runtime PNG sources are replaced or re-exported.
+
+## Deployment
+
+Workflow file: `.github/workflows/deploy-pages.yml`
+
+Triggers:
+
+- Push to `main`
+- Scheduled daily run at `06:17 UTC`
+- Manual `workflow_dispatch`
+
+Pipeline steps:
+
+1. Checkout repository.
+2. Setup Python 3.x.
+3. Install Pillow (`python -m pip install --upgrade pip pillow`).
+4. Run `python scripts/sync_substack_content.py` with `continue-on-error: true`.
+5. Run `python scripts/optimize_runtime_images.py --check`.
+6. Configure Pages.
+7. Upload full repository artifact.
+8. Deploy to GitHub Pages.
+
+Notes:
+
+- Because pages and assets use root-absolute paths (for example `/css/base.css`), deployment is intended for a custom domain root (current `CNAME`: `www.jameskull.com`).
+- If deploying under a repository subpath such as `https://<user>.github.io/<repo>/`, root-absolute links will need base-path adjustments.
+
+## Accessibility And Performance
+
+Current implementation includes:
+
+- Skip link to `#main`.
+- Visible focus states for keyboard navigation.
+- `prefers-reduced-motion` handling in global CSS and dino CSS/JS.
+- Explicit intrinsic dimensions on key portrait images.
+- Lightweight runtime stack with no heavy framework dependency.
+
+Maintenance expectations:
+
+- Keep contrast at WCAG AA minimum for text/UI.
+- Preserve keyboard reachability for interactive elements.
+- Keep sprite/hero assets optimized and bounded in size.
+- Avoid introducing decorative perpetual motion.
+
+## Troubleshooting
+
+### Projects/Writings show unavailable or empty
+
+- Confirm local server is running over HTTP, not `file://`.
+- Verify JSON files exist and parse:
+  - `data/writings.json`
+  - `data/works-substack.json`
+- Re-run Substack sync:
+  - `python scripts/sync_substack_content.py`
+
+### Projects post missing after sync
+
+- Confirm the post is public and tagged `Projects`.
+- Confirm exact `H4` headings are present:
+  - `Problem`
+  - `Approach`
+  - `Output`
+
+### Sprite animation looks clipped or unstable
+
+- Re-run normalization script.
+- Re-run validation script with default display checks.
+
+### GitHub Pages route issues
+
+- Keep canonical trailing-slash routes.
+- Ensure legacy `*.html` shims continue redirecting to canonical paths.

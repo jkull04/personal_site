@@ -310,6 +310,14 @@
   width: auto;
   aspect-ratio: 1536 / 1024;
   background-image: url("../assets/illustrations/runtime/hero-home-arena.png");
+  background-image: -webkit-image-set(
+    url("../assets/illustrations/runtime/hero-home-arena-960.webp") 1x,
+    url("../assets/illustrations/runtime/hero-home-arena-1536.webp") 2x
+  );
+  background-image: image-set(
+    url("../assets/illustrations/runtime/hero-home-arena-960.webp") 1x,
+    url("../assets/illustrations/runtime/hero-home-arena-1536.webp") 2x
+  );
   background-repeat: no-repeat;
   background-position: right bottom;
   background-size: 100% 100%;

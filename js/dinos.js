@@ -33,6 +33,15 @@
   const SHOW_DEBUG_BOUNDS = true;
   const TOOLTIP_MIN_VISIBLE_MS = 1250;
   const TOOLTIP_EMOTIONS = [":)", ":D", ";)", ":P", ":]"];
+  const ROOT_DEFER_CLASS = "defer-dino-atlases";
+  const ROOT_ATLAS_READY_CLASS = "dino-atlases-ready";
+  const ROOT_ATLAS_LOADING_CLASS = "dino-atlases-loading";
+  const ATLAS_PRELOAD_DELAY_MS = 120;
+  const DINO_ATLAS_URLS = [
+    "/assets/sprites/stegosaurus-walk-atlas-2x.webp?v=20260301b",
+    "/assets/sprites/raptor-walk-atlas-2x.webp?v=20260301b",
+    "/assets/sprites/marble-brach-walk-atlas-2x.webp?v=20260301b"
+  ];
 
   const copyResetTimers = new WeakMap();
   const roamerTooltipTimers = new WeakMap();
@@ -42,6 +51,8 @@
   const arenaMotion = new Map();
   let resizeRaf = 0;
   let resizeBound = false;
+  let atlasPreloadPromise = null;
+  let atlasPreloadScheduled = false;
 
   document.documentElement.style.setProperty(
     "--dino-row-global",
@@ -875,13 +886,95 @@
     });
   }
 
+  function pageUsesDinoAtlases() {
+    return document.querySelector("[data-dino]") !== null;
+  }
+
+  function preloadAtlas(url) {
+    return new Promise((resolve) => {
+      const image = new Image();
+      let settled = false;
+
+      const done = () => {
+        if (settled) return;
+        settled = true;
+        resolve();
+      };
+
+      image.addEventListener("load", done, { once: true });
+      image.addEventListener("error", done, { once: true });
+      image.src = url;
+
+      if (typeof image.decode === "function") {
+        image.decode().then(done).catch(done);
+      }
+    });
+  }
+
+  function startAtlasPreload() {
+    if (atlasPreloadPromise) return atlasPreloadPromise;
+
+    const root = document.documentElement;
+    root.classList.add(ROOT_ATLAS_LOADING_CLASS);
+
+    atlasPreloadPromise = Promise.all(DINO_ATLAS_URLS.map((url) => preloadAtlas(url)))
+      .catch(() => null)
+      .finally(() => {
+        root.classList.remove(ROOT_ATLAS_LOADING_CLASS);
+        root.classList.add(ROOT_ATLAS_READY_CLASS);
+        initializeDinoInteractions();
+      });
+
+    return atlasPreloadPromise;
+  }
+
+  function scheduleAtlasPreload() {
+    const root = document.documentElement;
+    if (!root.classList.contains(ROOT_DEFER_CLASS)) {
+      root.classList.add(ROOT_ATLAS_READY_CLASS);
+      return;
+    }
+    if (root.classList.contains(ROOT_ATLAS_READY_CLASS)) return;
+    if (!pageUsesDinoAtlases()) {
+      root.classList.add(ROOT_ATLAS_READY_CLASS);
+      return;
+    }
+    if (atlasPreloadScheduled || atlasPreloadPromise) return;
+
+    atlasPreloadScheduled = true;
+    const kickoff = () => {
+      atlasPreloadScheduled = false;
+      startAtlasPreload();
+    };
+
+    if (typeof window.requestIdleCallback === "function") {
+      window.requestIdleCallback(kickoff, { timeout: 1200 });
+      return;
+    }
+
+    window.setTimeout(kickoff, ATLAS_PRELOAD_DELAY_MS);
+  }
+
   function initializeDinoInteractions() {
     stopArenaMotion();
+    bindCopyEmail();
+
+    const root = document.documentElement;
+    const shouldDefer = root.classList.contains(ROOT_DEFER_CLASS);
+    const atlasesReady = !shouldDefer || root.classList.contains(ROOT_ATLAS_READY_CLASS);
+    if (shouldDefer && !atlasesReady) {
+      scheduleAtlasPreload();
+    }
 
     document.querySelectorAll("[data-dino]").forEach((dino) => {
       resetDinoClasses(dino);
       clearTravelVars(dino);
       dino.classList.add("is-idle");
+
+      if (!atlasesReady) {
+        hideDino(dino);
+        return;
+      }
 
       if (dino.hasAttribute("data-dino-lounge")) {
         setLoungeVisible(dino);
@@ -891,8 +984,9 @@
       hideDino(dino);
     });
 
+    if (!atlasesReady) return;
+
     remapArenaRoamers();
-    bindCopyEmail();
     bindRoamerTooltips();
     bindRoamerClicks();
   }
@@ -917,5 +1011,8 @@
 
   bindResizeRefresh();
   window.initializeDinoInteractions = initializeDinoInteractions;
-  document.addEventListener("DOMContentLoaded", initializeDinoInteractions);
+  document.addEventListener("DOMContentLoaded", () => {
+    initializeDinoInteractions();
+    scheduleAtlasPreload();
+  });
 })();

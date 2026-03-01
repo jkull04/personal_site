@@ -31,9 +31,17 @@ jobs:
         with:
           python-version: "3.x"
 
+      - name: Install image tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pillow
+
       - name: Sync Substack content
         continue-on-error: true
         run: python scripts/sync_substack_content.py
+
+      - name: Validate optimized runtime assets
+        run: python scripts/optimize_runtime_images.py --check
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
