@@ -1010,7 +1010,8 @@
     right: auto;
     bottom: auto;
     width: min(100%, 620px);
-    justify-self: start;
+    justify-self: center;
+    margin: 0 auto;
   }
 
   .monument-img {
