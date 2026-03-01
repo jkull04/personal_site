@@ -348,7 +348,7 @@ Workflow file: `.github/workflows/deploy-pages.yml`
 Triggers:
 
 - Push to `main`
-- Scheduled daily run at `06:17 UTC`
+- Scheduled run every 6 hours at `:17` (`00:17`, `06:17`, `12:17`, `18:17` UTC)
 - Manual `workflow_dispatch`
 
 Pipeline steps:
