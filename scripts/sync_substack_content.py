@@ -8,9 +8,12 @@ Outputs:
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
+import random
 import re
+import socket
 import sys
 import tempfile
 import time
@@ -29,6 +32,30 @@ ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = ROOT / "data" / "substack.config.json"
 WRITINGS_PATH = ROOT / "data" / "writings.json"
 WORKS_SUBSTACK_PATH = ROOT / "data" / "works-substack.json"
+DEFAULT_RETRIES = 3
+DEFAULT_TIMEOUT_SECONDS = 20.0
+DEFAULT_BACKOFF_BASE_SECONDS = 0.8
+DEFAULT_MAX_BACKOFF_SECONDS = 6.0
+TRANSIENT_HTTP_CODES = {408, 425, 429, 500, 502, 503, 504}
+REDACT_QUERY_KEY_PATTERN = re.compile(r"(token|key|secret|pass|auth)", flags=re.IGNORECASE)
+LOG_PREFIX = "[substack-sync]"
+
+
+@dataclass
+class SyncStats:
+    fetch_attempts: int = 0
+    pages_fetched: int = 0
+    posts_received: int = 0
+    writings_entries: int = 0
+    project_entries: int = 0
+    outputs_written: int = 0
+    started_at: float = 0.0
+
+
+class SyncRequestError(RuntimeError):
+    def __init__(self, message: str, *, transient: bool = False) -> None:
+        super().__init__(message)
+        self.transient = transient
 
 
 class TextExtractor(HTMLParser):
@@ -104,61 +131,260 @@ def load_config(path: Path) -> SyncConfig:
     )
 
 
-def fetch_json(url: str, retries: int = 3) -> Any:
-    last_error: Exception | None = None
+def log_diagnostic(enabled: bool, message: str) -> None:
+    if enabled:
+        print(f"{LOG_PREFIX} {message}")
+
+
+def sanitize_url(url: str) -> str:
+    parsed = urlparse(url)
+    if not parsed.query:
+        return url
+
+    sanitized_query_parts: list[str] = []
+    for token in parsed.query.split("&"):
+        if "=" not in token:
+            sanitized_query_parts.append(token)
+            continue
+        key, value = token.split("=", 1)
+        if REDACT_QUERY_KEY_PATTERN.search(key):
+            sanitized_query_parts.append(f"{key}=***")
+        else:
+            sanitized_query_parts.append(f"{key}={value}")
+
+    sanitized_query = "&".join(sanitized_query_parts)
+    return parsed._replace(query=sanitized_query).geturl()
+
+
+def sanitize_body_snippet(body: bytes, max_chars: int = 160) -> str:
+    text = body.decode("utf-8", errors="replace")
+    text = " ".join(text.split())
+    if len(text) > max_chars:
+        return f"{text[: max_chars - 3]}..."
+    return text
+
+
+def is_transient_network_error(exc: Exception) -> bool:
+    if isinstance(exc, TimeoutError):
+        return True
+    if isinstance(exc, URLError):
+        reason = exc.reason
+        if isinstance(reason, TimeoutError):
+            return True
+        if isinstance(reason, socket.timeout):
+            return True
+        if isinstance(reason, OSError):
+            if reason.errno in {101, 103, 104, 110, 111, 112, 113}:
+                return True
+            reason_text = str(reason).lower()
+            return "timed out" in reason_text or "temporary failure" in reason_text or "connection reset" in reason_text
+        reason_text = str(reason).lower()
+        return "timed out" in reason_text or "connection reset" in reason_text
+    if isinstance(exc, socket.timeout):
+        return True
+    if isinstance(exc, OSError):
+        if exc.errno in {101, 103, 104, 110, 111, 112, 113}:
+            return True
+        reason_text = str(exc).lower()
+        return "timed out" in reason_text or "temporary failure" in reason_text or "connection reset" in reason_text
+    return False
+
+
+def backoff_delay(
+    attempt: int,
+    *,
+    base_seconds: float,
+    max_seconds: float,
+    rng: random.Random,
+) -> float:
+    exponential = min(max_seconds, base_seconds * (2 ** max(0, attempt - 1)))
+    jitter_ceiling = min(0.5, exponential * 0.25)
+    jitter = rng.uniform(0.0, jitter_ceiling)
+    return min(max_seconds, exponential + jitter)
+
+
+def write_step_summary(lines: list[str]) -> None:
+    summary_path = os.getenv("GITHUB_STEP_SUMMARY", "").strip()
+    if not summary_path:
+        return
+    try:
+        with open(summary_path, "a", encoding="utf-8") as summary_file:
+            summary_file.write("\n".join(lines) + "\n")
+    except OSError:
+        # Summary output should not fail the sync operation.
+        return
+
+
+def fetch_json(
+    url: str,
+    *,
+    retries: int = DEFAULT_RETRIES,
+    timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
+    diagnostics: bool = False,
+    stats: SyncStats | None = None,
+    rng: random.Random | None = None,
+) -> Any:
+    last_error: SyncRequestError | None = None
+    backoff_rng = rng or random.Random(0)
+    safe_url = sanitize_url(url)
 
     for attempt in range(1, retries + 1):
+        if stats is not None:
+            stats.fetch_attempts += 1
+
         request = Request(
             url,
             headers={
                 "Accept": "application/json",
-                "Cache-Control": "no-cache",
-                "Pragma": "no-cache",
                 "User-Agent": "PersonalWebsiteSubstackSync/1.0",
             },
         )
+        started = time.monotonic()
 
         try:
-            with urlopen(request, timeout=20) as response:
+            with urlopen(request, timeout=timeout_seconds) as response:
+                status_code = int(getattr(response, "status", 200))
                 content_type = response.headers.get("Content-Type", "")
+                payload = response.read()
+                elapsed_ms = int((time.monotonic() - started) * 1000)
+                log_diagnostic(
+                    diagnostics,
+                    (
+                        f"event=fetch_ok attempt={attempt}/{retries} status={status_code} "
+                        f"content_type={content_type!r} elapsed_ms={elapsed_ms} url={safe_url}"
+                    ),
+                )
                 if "application/json" not in content_type.lower():
-                    raise RuntimeError(f"Unexpected content type for {url}: {content_type}")
-                body = response.read().decode("utf-8")
-            return json.loads(body)
+                    snippet = sanitize_body_snippet(payload)
+                    raise SyncRequestError(
+                        (
+                            f"Unexpected content type for {safe_url}: {content_type!r}; "
+                            f"body_snippet={snippet!r}"
+                        ),
+                        transient=False,
+                    )
+                return json.loads(payload.decode("utf-8"))
         except HTTPError as exc:
-            # Retry only transient HTTP classes; fail fast on persistent client errors.
-            if exc.code not in (408, 425, 429, 500, 502, 503, 504):
-                raise
-            last_error = exc
-        except (URLError, TimeoutError, json.JSONDecodeError, RuntimeError) as exc:
+            elapsed_ms = int((time.monotonic() - started) * 1000)
+            body_snippet = ""
+            try:
+                if exc.fp is not None:
+                    body_snippet = sanitize_body_snippet(exc.fp.read())
+            except OSError:
+                body_snippet = ""
+            transient = exc.code in TRANSIENT_HTTP_CODES
+            log_diagnostic(
+                diagnostics,
+                (
+                    f"event=fetch_http_error attempt={attempt}/{retries} status={exc.code} "
+                    f"transient={str(transient).lower()} elapsed_ms={elapsed_ms} url={safe_url}"
+                ),
+            )
+            message = f"HTTP {exc.code} for {safe_url}"
+            if body_snippet:
+                message = f"{message}; body_snippet={body_snippet!r}"
+            last_error = SyncRequestError(message, transient=transient)
+        except (TimeoutError, URLError, socket.timeout, OSError) as exc:
+            elapsed_ms = int((time.monotonic() - started) * 1000)
+            transient = is_transient_network_error(exc)
+            log_diagnostic(
+                diagnostics,
+                (
+                    f"event=fetch_network_error attempt={attempt}/{retries} transient={str(transient).lower()} "
+                    f"elapsed_ms={elapsed_ms} reason={type(exc).__name__} url={safe_url}"
+                ),
+            )
+            last_error = SyncRequestError(f"Network error for {safe_url}: {exc}", transient=transient)
+        except json.JSONDecodeError as exc:
+            elapsed_ms = int((time.monotonic() - started) * 1000)
+            log_diagnostic(
+                diagnostics,
+                (
+                    f"event=fetch_json_error attempt={attempt}/{retries} transient=false "
+                    f"elapsed_ms={elapsed_ms} reason={exc.msg!r} url={safe_url}"
+                ),
+            )
+            last_error = SyncRequestError(
+                f"Invalid JSON payload from {safe_url}: {exc.msg} (line {exc.lineno}, col {exc.colno})",
+                transient=False,
+            )
+        except SyncRequestError as exc:
+            elapsed_ms = int((time.monotonic() - started) * 1000)
+            log_diagnostic(
+                diagnostics,
+                (
+                    f"event=fetch_validation_error attempt={attempt}/{retries} transient={str(exc.transient).lower()} "
+                    f"elapsed_ms={elapsed_ms} url={safe_url}"
+                ),
+            )
             last_error = exc
 
-        if attempt < retries:
-            time.sleep(0.8 * attempt)
+        if last_error is None:
+            continue
+        if not last_error.transient or attempt >= retries:
+            break
+        delay = backoff_delay(
+            attempt,
+            base_seconds=DEFAULT_BACKOFF_BASE_SECONDS,
+            max_seconds=DEFAULT_MAX_BACKOFF_SECONDS,
+            rng=backoff_rng,
+        )
+        log_diagnostic(
+            diagnostics,
+            (
+                f"event=retry_wait attempt={attempt}/{retries} sleep_s={delay:.2f} "
+                f"url={safe_url}"
+            ),
+        )
+        time.sleep(delay)
 
     if last_error is None:
-        raise RuntimeError(f"Unable to fetch JSON from {url}")
+        raise SyncRequestError(f"Unable to fetch JSON from {safe_url}", transient=False)
+    log_diagnostic(
+        diagnostics,
+        f"event=fetch_final_error retries={retries} url={safe_url} reason={last_error}",
+    )
     raise last_error
 
 
-def fetch_posts(config: SyncConfig) -> list[dict[str, Any]]:
+def fetch_posts(
+    config: SyncConfig,
+    *,
+    retries: int,
+    timeout_seconds: float,
+    diagnostics: bool,
+    stats: SyncStats,
+) -> list[dict[str, Any]]:
     base = f"https://{config.publication_host}/api/v1/posts"
     posts: list[dict[str, Any]] = []
-    cache_bust = int(time.time())
 
     for page in range(config.max_pages):
         params = {
             "limit": config.page_limit,
             "offset": page * config.page_limit,
-            "_": cache_bust + page,
         }
         url = f"{base}?{urlencode(params)}"
-        page_data = fetch_json(url)
+        page_data = fetch_json(
+            url,
+            retries=retries,
+            timeout_seconds=timeout_seconds,
+            diagnostics=diagnostics,
+            stats=stats,
+        )
         if not isinstance(page_data, list):
             raise RuntimeError(f"Unexpected posts payload shape at {url}")
         if not page_data:
             break
         posts.extend([post for post in page_data if isinstance(post, dict)])
+        stats.pages_fetched += 1
+        stats.posts_received += len(page_data)
+        log_diagnostic(
+            diagnostics,
+            (
+                f"event=page_received page={page + 1} page_size={len(page_data)} "
+                f"total_posts={len(posts)}"
+            ),
+        )
 
         if len(page_data) < config.page_limit:
             break
@@ -494,19 +720,92 @@ def write_outputs_atomically(writings: list[dict[str, Any]], projects: list[dict
     write_json_atomically(WORKS_SUBSTACK_PATH, projects)
 
 
+def emit_run_summary(status: str, stats: SyncStats, message: str) -> None:
+    duration_ms = int((time.monotonic() - stats.started_at) * 1000) if stats.started_at else 0
+    summary_line = (
+        f"event=run_summary status={status} attempts={stats.fetch_attempts} pages={stats.pages_fetched} "
+        f"posts={stats.posts_received} writings={stats.writings_entries} projects={stats.project_entries} "
+        f"outputs={stats.outputs_written} duration_ms={duration_ms} message={message!r}"
+    )
+    print(f"{LOG_PREFIX} {summary_line}")
+
+    write_step_summary(
+        [
+            "### Substack Sync Summary",
+            "",
+            f"- Status: `{status}`",
+            f"- Message: `{message}`",
+            f"- Fetch attempts: `{stats.fetch_attempts}`",
+            f"- Pages fetched: `{stats.pages_fetched}`",
+            f"- Posts received: `{stats.posts_received}`",
+            f"- Writings entries: `{stats.writings_entries}`",
+            f"- Project entries: `{stats.project_entries}`",
+            f"- Outputs written: `{stats.outputs_written}`",
+            f"- Duration (ms): `{duration_ms}`",
+        ]
+    )
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--retries",
+        type=int,
+        default=DEFAULT_RETRIES,
+        help=f"Transient retry count for Substack API requests (default: {DEFAULT_RETRIES}).",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=float,
+        default=DEFAULT_TIMEOUT_SECONDS,
+        help=f"HTTP timeout in seconds per request (default: {DEFAULT_TIMEOUT_SECONDS}).",
+    )
+    parser.add_argument(
+        "--diagnostics",
+        action=argparse.BooleanOptionalAction,
+        default=bool(os.getenv("CI")),
+        help="Enable structured diagnostic logs (defaults to enabled in CI).",
+    )
+    return parser.parse_args()
+
+
 def main() -> int:
+    args = parse_args()
+    retries = max(1, int(args.retries))
+    timeout_seconds = max(1.0, float(args.timeout))
+    diagnostics = bool(args.diagnostics)
+    stats = SyncStats(started_at=time.monotonic())
+
     try:
         config = load_config(CONFIG_PATH)
-        posts = fetch_posts(config)
+        log_diagnostic(
+            diagnostics,
+            (
+                f"event=run_start host={config.publication_host!r} retries={retries} "
+                f"timeout_s={timeout_seconds}"
+            ),
+        )
+        posts = fetch_posts(
+            config,
+            retries=retries,
+            timeout_seconds=timeout_seconds,
+            diagnostics=diagnostics,
+            stats=stats,
+        )
         writings = to_writings_entries(posts, config)
         projects = to_project_entries(posts, config)
         write_outputs_atomically(writings, projects)
-        print(f"Sync completed: {len(writings)} writings, {len(projects)} project entries.")
+        stats.writings_entries = len(writings)
+        stats.project_entries = len(projects)
+        stats.outputs_written = 2
+        emit_run_summary("success", stats, "Sync completed")
         return 0
-    except (HTTPError, URLError, TimeoutError) as exc:
+    except (SyncRequestError, HTTPError, URLError, TimeoutError) as exc:
+        emit_run_summary("failure", stats, str(exc))
         print(f"Substack sync failed due to network/API error: {exc}", file=sys.stderr)
         return 1
     except (KeyError, TypeError, ValueError, RuntimeError, OSError, json.JSONDecodeError) as exc:
+        emit_run_summary("failure", stats, str(exc))
         print(f"Substack sync failed: {exc}", file=sys.stderr)
         return 1
 

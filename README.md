@@ -14,6 +14,7 @@ Static personal website with a classical editorial visual language, Substack-syn
 - [Local Development](#local-development)
 - [Maintenance Scripts](#maintenance-scripts)
 - [Deployment](#deployment)
+- [Substack Sync Verification Workflow](#substack-sync-verification-workflow)
 - [Accessibility And Performance](#accessibility-and-performance)
 - [Troubleshooting](#troubleshooting)
 
@@ -356,11 +357,31 @@ Pipeline steps:
 1. Checkout repository.
 2. Setup Python 3.x.
 3. Install Pillow (`python -m pip install --upgrade pip pillow`).
-4. Run `python scripts/sync_substack_content.py` with `continue-on-error: true`.
+4. Run `python scripts/sync_substack_content.py --diagnostics`.
 5. Run `python scripts/optimize_runtime_images.py --check`.
 6. Configure Pages.
 7. Upload full repository artifact.
 8. Deploy to GitHub Pages.
+
+## Substack Sync Verification Workflow
+
+Workflow file: `.github/workflows/verify-substack-sync.yml`
+
+Purpose:
+
+- Run Substack sync health checks on a schedule without doing a Pages deploy.
+- Fail fast when API/request issues occur, with structured diagnostics in logs and step summary.
+
+Triggers:
+
+- Scheduled run every 6 hours at `:17` (`00:17`, `06:17`, `12:17`, `18:17` UTC)
+- Manual `workflow_dispatch`
+
+Verification steps:
+
+1. Checkout repository.
+2. Setup Python 3.x.
+3. Run `python scripts/sync_substack_content.py --diagnostics --retries 4`.
 
 Notes:
 
@@ -393,7 +414,15 @@ Maintenance expectations:
   - `data/writings.json`
   - `data/works-substack.json`
 - Re-run Substack sync:
-  - `python scripts/sync_substack_content.py`
+  - `python scripts/sync_substack_content.py --diagnostics`
+
+### Known failure signature (March 1, 2026)
+
+- Workflow run: `https://github.com/jkull04/personal_site/actions/runs/22553269839`
+- Failing step: `Deploy GitHub Pages / deploy / Sync Substack content`
+- Failure time: `2026-03-01T21:37:16Z`
+- Check details: root cause happened in sync step before asset validation/deploy steps began.
+- Mitigation now in place: deterministic retries, structured diagnostics, and scheduled verification workflow.
 
 ### Projects post missing after sync
 
