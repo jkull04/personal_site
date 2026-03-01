@@ -3,8 +3,8 @@
   "tagline": "Making things.",
   "nav": [
     { "label": "Home", "href": "/" },
-    { "label": "Projects", "href": "/projects" },
-    { "label": "Writings", "href": "/writings" },
-    { "label": "Contact", "href": "/contact" }
+    { "label": "Projects", "href": "/projects/" },
+    { "label": "Writings", "href": "/writings/" },
+    { "label": "Contact", "href": "/contact/" }
   ]
 }

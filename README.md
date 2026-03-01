@@ -3,9 +3,10 @@
 Static portfolio site with a classical editorial visual system and restrained interaction.
 
 - `index.html`
-- `projects.html`
-- `writings.html`
-- `contact.html`
+- `projects/index.html` (canonical `/projects/`)
+- `writings/index.html` (canonical `/writings/`)
+- `contact/index.html` (canonical `/contact/`)
+- `projects.html`, `writings.html`, `contact.html` (legacy redirect shims)
 
 ## Style Philosophy
 
@@ -63,7 +64,12 @@ Edit `data/site.json`:
 {
   "name": "Your Name",
   "tagline": "Your positioning line",
-  "nav": [{ "label": "Home", "href": "./index.html" }]
+  "nav": [
+    { "label": "Home", "href": "/" },
+    { "label": "Projects", "href": "/projects/" },
+    { "label": "Writings", "href": "/writings/" },
+    { "label": "Contact", "href": "/contact/" }
+  ]
 }
 ```
 
@@ -137,7 +143,8 @@ This repo includes `.github/workflows/deploy-pages.yml` for auto-deploy.
 3. Publish under project path:
    `https://<user>.github.io/<repo>/`
 
-All links use relative paths for project-site compatibility.
+Canonical internal routes use trailing slashes (`/projects/`, `/writings/`, `/contact/`).
+Legacy compatibility shims (`*.html`) should always redirect to trailing-slash routes to avoid `foo.html` and `/foo` collisions.
 Substack sync runs during the deploy workflow and updates generated content before artifact upload.
 
 ## Local Preview
