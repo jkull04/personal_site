@@ -56,12 +56,12 @@ class FetchJsonTests(unittest.TestCase):
     @patch("scripts.sync_substack_content.urlopen")
     def test_fetch_json_fail_fast_on_non_transient_http(self, mock_urlopen, mock_sleep):
         url = "https://example.com/posts"
-        mock_urlopen.side_effect = [http_error(url, 403, body=b"forbidden")]
+        mock_urlopen.side_effect = [http_error(url, 404, body=b"not found")]
 
         with self.assertRaises(sync.SyncRequestError) as raised:
             sync.fetch_json(url, retries=3, timeout_seconds=2.0)
 
-        self.assertIn("HTTP 403", str(raised.exception))
+        self.assertIn("HTTP 404", str(raised.exception))
         self.assertEqual(mock_urlopen.call_count, 1)
         self.assertEqual(mock_sleep.call_count, 0)
 

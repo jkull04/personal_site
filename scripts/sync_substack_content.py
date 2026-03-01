@@ -34,9 +34,9 @@ WRITINGS_PATH = ROOT / "data" / "writings.json"
 WORKS_SUBSTACK_PATH = ROOT / "data" / "works-substack.json"
 DEFAULT_RETRIES = 3
 DEFAULT_TIMEOUT_SECONDS = 20.0
-DEFAULT_BACKOFF_BASE_SECONDS = 0.8
-DEFAULT_MAX_BACKOFF_SECONDS = 6.0
-TRANSIENT_HTTP_CODES = {408, 425, 429}
+DEFAULT_BACKOFF_BASE_SECONDS = 2.0
+DEFAULT_MAX_BACKOFF_SECONDS = 15.0
+TRANSIENT_HTTP_CODES = {403, 408, 425, 429}
 REDACT_QUERY_KEY_PATTERN = re.compile(r"(token|key|secret|pass|auth)", flags=re.IGNORECASE)
 LOG_PREFIX = "[substack-sync]"
 
@@ -137,7 +137,7 @@ def load_config(path: Path) -> SyncConfig:
 
 def log_diagnostic(enabled: bool, message: str) -> None:
     if enabled:
-        print(f"{LOG_PREFIX} {message}")
+        print(f"{LOG_PREFIX} {message}", flush=True)
 
 
 def sanitize_url(url: str) -> str:
@@ -240,7 +240,7 @@ def fetch_json(
             url,
             headers={
                 "Accept": "application/json",
-                "User-Agent": "PersonalWebsiteSubstackSync/1.0",
+                "User-Agent": "Mozilla/5.0 (compatible; PersonalSiteSync/1.0; +https://www.jameskull.com)",
             },
         )
         started = time.monotonic()
@@ -780,6 +780,11 @@ def main() -> int:
     diagnostics = bool(args.diagnostics)
     stats = SyncStats(started_at=time.monotonic())
 
+    log_diagnostic(
+        diagnostics,
+        f"event=startup python={sys.version!r} cwd={os.getcwd()!r} config_exists={CONFIG_PATH.exists()}",
+    )
+
     try:
         config = load_config(CONFIG_PATH)
         log_diagnostic(
@@ -809,8 +814,10 @@ def main() -> int:
         print(f"Substack sync failed due to network/API error: {exc}", file=sys.stderr)
         return 1
     except (KeyError, TypeError, ValueError, RuntimeError, OSError, json.JSONDecodeError) as exc:
+        import traceback
         emit_run_summary("failure", stats, str(exc))
         print(f"Substack sync failed: {exc}", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
         return 1
 
 
