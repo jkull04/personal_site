@@ -39,28 +39,18 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install pillow
 
-      - name: Test Substack API access
+      - name: Fetch Substack posts
         run: |
-          echo "### Substack API Probe" >> "$GITHUB_STEP_SUMMARY"
-          STATUS=$(curl -s -o /tmp/substack_probe.json -w "%{http_code}" \
+          curl -sf --retry 4 --retry-delay 3 --retry-all-errors \
             -H "Accept: application/json" \
-            -H "User-Agent: Mozilla/5.0 (compatible; PersonalSiteSync/1.0)" \
-            "https://jameskull.substack.com/api/v1/posts?limit=1" || true)
-          CT=$(file -b --mime-type /tmp/substack_probe.json 2>/dev/null || echo "unknown")
-          SIZE=$(wc -c < /tmp/substack_probe.json 2>/dev/null || echo "0")
-          SNIPPET=$(head -c 300 /tmp/substack_probe.json 2>/dev/null || echo "empty")
-          echo "- HTTP Status: \`$STATUS\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- MIME type: \`$CT\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Size: \`$SIZE bytes\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "<details><summary>Response snippet</summary>" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-          echo "$SNIPPET" >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-          echo "</details>" >> "$GITHUB_STEP_SUMMARY"
+            -H "User-Agent: Mozilla/5.0 (compatible; PersonalSiteSync/1.0; +https://www.jameskull.com)" \
+            "https://jameskull.substack.com/api/v1/posts?limit=50&offset=0" \
+            -o /tmp/substack_posts.json
+          echo "### Substack Fetch" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Posts fetched: \`$(python -c "import json; print(len(json.load(open('/tmp/substack_posts.json'))))")\`" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Sync Substack content
-        run: python scripts/sync_substack_content.py --diagnostics --retries 6 --timeout 30
+        run: python scripts/sync_substack_content.py --diagnostics --input-file /tmp/substack_posts.json
 
       - name: Validate optimized runtime assets
         run: python scripts/optimize_runtime_images.py --check

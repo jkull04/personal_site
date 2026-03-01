@@ -750,6 +750,19 @@ def emit_run_summary(status: str, stats: SyncStats, message: str) -> None:
     )
 
 
+def load_posts_from_file(path: Path, *, diagnostics: bool, stats: SyncStats) -> list[dict[str, Any]]:
+    log_diagnostic(diagnostics, f"event=load_file path={str(path)!r}")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, list):
+        raise RuntimeError(f"Expected JSON array in {path}, got {type(data).__name__}")
+    posts = [p for p in data if isinstance(p, dict)]
+    stats.pages_fetched = 1
+    stats.posts_received = len(posts)
+    stats.fetch_attempts = 0
+    log_diagnostic(diagnostics, f"event=file_loaded posts={len(posts)}")
+    return posts
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -770,6 +783,12 @@ def parse_args() -> argparse.Namespace:
         default=bool(os.getenv("CI")),
         help="Enable structured diagnostic logs (defaults to enabled in CI).",
     )
+    parser.add_argument(
+        "--input-file",
+        type=str,
+        default="",
+        help="Read posts from a local JSON file instead of fetching from the Substack API.",
+    )
     return parser.parse_args()
 
 
@@ -778,6 +797,7 @@ def main() -> int:
     retries = max(1, int(args.retries))
     timeout_seconds = max(1.0, float(args.timeout))
     diagnostics = bool(args.diagnostics)
+    input_file = str(args.input_file).strip()
     stats = SyncStats(started_at=time.monotonic())
 
     log_diagnostic(
@@ -791,16 +811,20 @@ def main() -> int:
             diagnostics,
             (
                 f"event=run_start host={config.publication_host!r} retries={retries} "
-                f"timeout_s={timeout_seconds}"
+                f"timeout_s={timeout_seconds} input_file={input_file!r}"
             ),
         )
-        posts = fetch_posts(
-            config,
-            retries=retries,
-            timeout_seconds=timeout_seconds,
-            diagnostics=diagnostics,
-            stats=stats,
-        )
+
+        if input_file:
+            posts = load_posts_from_file(Path(input_file), diagnostics=diagnostics, stats=stats)
+        else:
+            posts = fetch_posts(
+                config,
+                retries=retries,
+                timeout_seconds=timeout_seconds,
+                diagnostics=diagnostics,
+                stats=stats,
+            )
         writings = to_writings_entries(posts, config)
         projects = to_project_entries(posts, config)
         write_outputs_atomically(writings, projects)
