@@ -41,13 +41,33 @@ jobs:
 
       - name: Fetch Substack posts
         run: |
-          curl -sf --retry 4 --retry-delay 3 --retry-all-errors \
-            -H "Accept: application/json" \
-            -H "User-Agent: Mozilla/5.0 (compatible; PersonalSiteSync/1.0; +https://www.jameskull.com)" \
-            "https://jameskull.substack.com/api/v1/posts?limit=50&offset=0" \
-            -o /tmp/substack_posts.json
           echo "### Substack Fetch" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Posts fetched: \`$(python -c "import json; print(len(json.load(open('/tmp/substack_posts.json'))))")\`" >> "$GITHUB_STEP_SUMMARY"
+          for ATTEMPT in 1 2 3 4 5 6; do
+            HTTP_CODE=$(curl -s -o /tmp/substack_posts.json -w "%{http_code}" \
+              -H "Accept: application/json" \
+              -H "User-Agent: Mozilla/5.0 (compatible; PersonalSiteSync/1.0; +https://www.jameskull.com)" \
+              "https://jameskull.substack.com/api/v1/posts?limit=50&offset=0")
+            echo "- Attempt $ATTEMPT: HTTP \`$HTTP_CODE\`" >> "$GITHUB_STEP_SUMMARY"
+            if [ "$HTTP_CODE" = "200" ]; then
+              COUNT=$(python -c "import json,sys; d=json.load(open('/tmp/substack_posts.json')); print(len(d))" 2>/dev/null || echo "parse_error")
+              echo "- Posts: \`$COUNT\`" >> "$GITHUB_STEP_SUMMARY"
+              if [ "$COUNT" != "parse_error" ] && [ "$COUNT" -gt 0 ] 2>/dev/null; then
+                echo "- Status: **success**" >> "$GITHUB_STEP_SUMMARY"
+                exit 0
+              fi
+            fi
+            echo "  Waiting before retry..." >&2
+            sleep $(( ATTEMPT * 3 ))
+          done
+          echo "- Status: **failed after 6 attempts**" >> "$GITHUB_STEP_SUMMARY"
+          echo "<details><summary>Last response</summary>" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          head -c 500 /tmp/substack_posts.json >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "</details>" >> "$GITHUB_STEP_SUMMARY"
+          exit 1
 
       - name: Sync Substack content
         run: python scripts/sync_substack_content.py --diagnostics --input-file /tmp/substack_posts.json
