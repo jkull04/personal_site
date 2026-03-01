@@ -510,9 +510,9 @@
 
   async function hydrateContent() {
     const [site, projects, writings] = await Promise.all([
-      readJson("./data/site.json").catch(() => null),
-      readJson("./data/works-substack.json").catch(() => null),
-      readJson("./data/writings.json").catch(() => null)
+      readJson("/data/site.json").catch(() => null),
+      readJson("/data/works-substack.json").catch(() => null),
+      readJson("/data/writings.json").catch(() => null)
     ]);
 
     renderSiteContent(site);
