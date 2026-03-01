@@ -37,7 +37,6 @@ jobs:
           python -m pip install pillow
 
       - name: Sync Substack content
-        continue-on-error: true
         run: python scripts/sync_substack_content.py
 
       - name: Validate optimized runtime assets

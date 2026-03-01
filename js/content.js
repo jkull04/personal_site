@@ -23,6 +23,16 @@
     return Number.isNaN(parsed) ? 0 : parsed;
   }
 
+  function externalIconSvg() {
+    return `
+      <svg class="external-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M6 3h7v7"/>
+        <path d="M4 12 13 3"/>
+        <path d="M13 9v4H3V3h4"/>
+      </svg>
+    `;
+  }
+
   function panelState(title, message) {
     return `
       <article class="empty-state panel">
@@ -137,13 +147,28 @@
         String(project.summary || "").trim() ||
         "Project notes published on Substack.";
 
-      const links = Array.isArray(project.links) ? project.links : [];
+      const links = (Array.isArray(project.links) ? project.links : []).filter(
+        (link) => link && String(link.href || "").trim()
+      );
+      const primaryLink = links[0] || null;
+      const secondaryLinks = links.slice(1);
+      const primaryLinkHtml = primaryLink
+        ? `
+          <div class="substack-cta">
+            <p class="meta-line substack-source">Published on Substack</p>
+            <a class="action-link card-cta" href="${escapeHtml(primaryLink.href)}" target="_blank" rel="noopener noreferrer">
+              Read full project
+              ${externalIconSvg()}
+            </a>
+          </div>
+        `
+        : "";
       const linksHtml =
-        links.length === 0
+        secondaryLinks.length === 0
           ? ""
           : `
             <div class="detail-links">
-              ${links
+              ${secondaryLinks
                 .map(
                   (link) =>
                     `<a href="${escapeHtml(link.href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(link.label)}</a>`
@@ -167,8 +192,8 @@
             ${sectionHtml(project.id, "approach", "Approach", project.approach)}
             ${sectionHtml(project.id, "output", "Output", project.output)}
           </div>
+          ${primaryLinkHtml}
           ${linksHtml}
-          <p class="back-top"><a href="#top">Back to top</a></p>
         </section>
       `;
     };
@@ -422,14 +447,13 @@
             ${(entry.tags || []).map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join("")}
           </div>
           <p>${escapeHtml(entry.abstract)}</p>
-          <a href="${escapeHtml(entry.href)}" target="_blank" rel="noopener noreferrer">
-            ${escapeHtml(linkLabel)}
-            <svg class="external-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M6 3h7v7"/>
-              <path d="M4 12 13 3"/>
-              <path d="M13 9v4H3V3h4"/>
-            </svg>
-          </a>
+          <div class="substack-cta">
+            <p class="meta-line substack-source">Published on Substack</p>
+            <a class="action-link card-cta" href="${escapeHtml(entry.href)}" target="_blank" rel="noopener noreferrer">
+              ${escapeHtml(linkLabel)}
+              ${externalIconSvg()}
+            </a>
+          </div>
         </div>
       </article>
     `;
@@ -508,6 +532,77 @@
     renderFiltered();
   }
 
+  function initializeBackToTopFab() {
+    const shouldRender =
+      document.getElementById("works-list") !== null ||
+      document.getElementById("writings-essays") !== null ||
+      document.getElementById("writings-notes") !== null;
+    if (!shouldRender) return;
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "back-to-top-fab";
+    button.setAttribute("aria-label", "Back to top");
+    button.innerHTML = `
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M8 12V4"/>
+        <path d="M5.3 6.7 8 4l2.7 2.7"/>
+      </svg>
+    `;
+    const footer = document.querySelector(".footer");
+    const baseOffset = 14;
+    const footerClearance = 12;
+    const listContainers = [
+      document.getElementById("works-list"),
+      document.getElementById("writings-essays"),
+      document.getElementById("writings-notes")
+    ].filter(Boolean);
+
+    const hasListScroll = () =>
+      listContainers.some((node) => {
+        if (!node) return false;
+        const canScroll = node.scrollHeight > node.clientHeight + 2;
+        return canScroll && node.scrollTop > 64;
+      });
+
+    const updateVisibility = () => {
+      const visibleFromPage = window.scrollY > 180;
+      const visibleFromList = hasListScroll();
+      button.classList.toggle("is-visible", visibleFromPage || visibleFromList);
+
+      let offset = baseOffset;
+      if (footer) {
+        const footerRect = footer.getBoundingClientRect();
+        const overlap = Math.max(0, window.innerHeight - footerRect.top);
+        if (overlap > 0) {
+          offset = baseOffset + overlap + footerClearance;
+        }
+      }
+
+      const maxOffset = Math.max(baseOffset, window.innerHeight - 56);
+      const clampedOffset = Math.min(offset, maxOffset);
+      button.style.setProperty("--fab-offset", `${Math.round(clampedOffset)}px`);
+    };
+
+    button.addEventListener("click", () => {
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const behavior = reduceMotion ? "auto" : "smooth";
+      window.scrollTo({ top: 0, behavior });
+      listContainers.forEach((node) => {
+        if (!node) return;
+        node.scrollTo({ top: 0, behavior });
+      });
+    });
+
+    window.addEventListener("scroll", updateVisibility, { passive: true });
+    window.addEventListener("resize", updateVisibility, { passive: true });
+    listContainers.forEach((node) => {
+      node.addEventListener("scroll", updateVisibility, { passive: true });
+    });
+    document.body.appendChild(button);
+    updateVisibility();
+  }
+
   async function hydrateContent() {
     const needsSiteContent =
       document.querySelector("[data-site-name]") !== null ||
@@ -526,6 +621,7 @@
     if (needsSiteContent) renderSiteContent(site);
     if (needsProjectsContent) renderProjects(projects);
     if (needsWritingsContent) renderWritings(writings);
+    initializeBackToTopFab();
 
     if (typeof window.initializeDinoInteractions === "function") {
       window.initializeDinoInteractions();

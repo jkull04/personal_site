@@ -19,36 +19,11 @@
     },
     "problem": "Desire to avoid constraints of traditional personal websites, and wanting to add my own personal touch to my online presence",
     "approach": "Went through four design phases for my website, until I landed on something that fit what was in my mind around personal branding and style",
-    "output": "Final website is professional while also allowing my character and personality to shine through. A good ‘home base’ for me on the internet\nThanks for reading! Subscribe for free to receive new posts and stay up to date!\nLeave a comment\nShare",
+    "output": "Final website is professional while also allowing my character and personality to shine through. A good ‘home base’ for me on the internet",
     "links": [
       {
         "label": "Project Post",
         "href": "https://jameskull.substack.com/p/personal-website-project"
-      }
-    ]
-  },
-  {
-    "id": "testing-projects",
-    "title": "testing projects",
-    "date": "2026-03-01",
-    "summary": "Problem",
-    "tags": [
-      "Projects"
-    ],
-    "year": "2026",
-    "tools": "Substack",
-    "outcome": "Problem",
-    "metadata": {
-      "tools": "Substack",
-      "outcome": "Problem"
-    },
-    "problem": "Text",
-    "approach": "text",
-    "output": "text",
-    "links": [
-      {
-        "label": "Project Post",
-        "href": "https://jameskull.substack.com/p/testing-projects"
       }
     ]
   }

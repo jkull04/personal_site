@@ -13,6 +13,7 @@ import os
 import re
 import sys
 import tempfile
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from html import unescape
@@ -103,28 +104,54 @@ def load_config(path: Path) -> SyncConfig:
     )
 
 
-def fetch_json(url: str) -> Any:
-    request = Request(
-        url,
-        headers={
-            "Accept": "application/json",
-            "User-Agent": "PersonalWebsiteSubstackSync/1.0",
-        },
-    )
-    with urlopen(request, timeout=20) as response:
-        content_type = response.headers.get("Content-Type", "")
-        if "application/json" not in content_type.lower():
-            raise RuntimeError(f"Unexpected content type for {url}: {content_type}")
-        body = response.read().decode("utf-8")
-    return json.loads(body)
+def fetch_json(url: str, retries: int = 3) -> Any:
+    last_error: Exception | None = None
+
+    for attempt in range(1, retries + 1):
+        request = Request(
+            url,
+            headers={
+                "Accept": "application/json",
+                "Cache-Control": "no-cache",
+                "Pragma": "no-cache",
+                "User-Agent": "PersonalWebsiteSubstackSync/1.0",
+            },
+        )
+
+        try:
+            with urlopen(request, timeout=20) as response:
+                content_type = response.headers.get("Content-Type", "")
+                if "application/json" not in content_type.lower():
+                    raise RuntimeError(f"Unexpected content type for {url}: {content_type}")
+                body = response.read().decode("utf-8")
+            return json.loads(body)
+        except HTTPError as exc:
+            # Retry only transient HTTP classes; fail fast on persistent client errors.
+            if exc.code not in (408, 425, 429, 500, 502, 503, 504):
+                raise
+            last_error = exc
+        except (URLError, TimeoutError, json.JSONDecodeError, RuntimeError) as exc:
+            last_error = exc
+
+        if attempt < retries:
+            time.sleep(0.8 * attempt)
+
+    if last_error is None:
+        raise RuntimeError(f"Unable to fetch JSON from {url}")
+    raise last_error
 
 
 def fetch_posts(config: SyncConfig) -> list[dict[str, Any]]:
     base = f"https://{config.publication_host}/api/v1/posts"
     posts: list[dict[str, Any]] = []
+    cache_bust = int(time.time())
 
     for page in range(config.max_pages):
-        params = {"limit": config.page_limit, "offset": page * config.page_limit}
+        params = {
+            "limit": config.page_limit,
+            "offset": page * config.page_limit,
+            "_": cache_bust + page,
+        }
         url = f"{base}?{urlencode(params)}"
         page_data = fetch_json(url)
         if not isinstance(page_data, list):
@@ -145,7 +172,7 @@ def fetch_posts(config: SyncConfig) -> list[dict[str, Any]]:
 
 
 def post_is_public(post: dict[str, Any]) -> bool:
-    return bool(post.get("is_published", True)) and str(post.get("audience", "")).lower() == "everyone"
+    return post.get("is_published") is True and str(post.get("audience", "")).lower() == "everyone"
 
 
 def extract_tags(post: dict[str, Any]) -> list[str]:
