@@ -62,36 +62,37 @@
 
 .dino--arena {
   --dino-opacity: 1;
+  --arena-dino-size-mult: 1.25;
 }
 
 .dino--sheet.dino--stego.dino--lounge {
-  --sheet-frame-w: calc(74px * var(--arena-dino-scale, 1));
-  --sheet-frame-h: calc(46px * var(--arena-dino-scale, 1));
+  --sheet-frame-w: calc(74px * var(--arena-dino-scale, 1) * var(--arena-dino-size-mult, 1));
+  --sheet-frame-h: calc(46px * var(--arena-dino-scale, 1) * var(--arena-dino-size-mult, 1));
 }
 
 .dino--sheet.dino--stego.dino--route {
-  --sheet-frame-w: 74px;
-  --sheet-frame-h: 46px;
+  --sheet-frame-w: calc(74px * var(--arena-dino-size-mult, 1));
+  --sheet-frame-h: calc(46px * var(--arena-dino-size-mult, 1));
 }
 
 .dino--sheet.dino--raptor.dino--lounge {
-  --sheet-frame-w: calc(58px * var(--arena-dino-scale, 1));
-  --sheet-frame-h: calc(30px * var(--arena-dino-scale, 1));
+  --sheet-frame-w: calc(58px * var(--arena-dino-scale, 1) * var(--arena-dino-size-mult, 1));
+  --sheet-frame-h: calc(30px * var(--arena-dino-scale, 1) * var(--arena-dino-size-mult, 1));
 }
 
 .dino--sheet.dino--raptor.dino--route {
-  --sheet-frame-w: 56px;
-  --sheet-frame-h: 30px;
+  --sheet-frame-w: calc(56px * var(--arena-dino-size-mult, 1));
+  --sheet-frame-h: calc(30px * var(--arena-dino-size-mult, 1));
 }
 
 .dino--sheet.dino--longneck.dino--lounge {
-  --sheet-frame-w: calc(55px * var(--arena-dino-scale, 1));
-  --sheet-frame-h: calc(72px * var(--arena-dino-scale, 1));
+  --sheet-frame-w: calc(55px * var(--arena-dino-scale, 1) * var(--arena-dino-size-mult, 1));
+  --sheet-frame-h: calc(72px * var(--arena-dino-scale, 1) * var(--arena-dino-size-mult, 1));
 }
 
 .dino--sheet.dino--longneck.dino--route {
-  --sheet-frame-w: 54px;
-  --sheet-frame-h: 72px;
+  --sheet-frame-w: calc(54px * var(--arena-dino-size-mult, 1));
+  --sheet-frame-h: calc(72px * var(--arena-dino-size-mult, 1));
 }
 
 .dino[data-dino-state="hidden"] {
@@ -123,6 +124,11 @@
 
 .dino--sheet.is-idle {
   background-position: 0 0;
+}
+
+/* Keep the home stego lounge in a planted idle stance instead of frame-0 stride. */
+.dino--sheet.dino--stego.dino--lounge.is-idle {
+  background-position: calc(var(--sheet-frame-w) * -7) 0;
 }
 
 .dino.play-sent {

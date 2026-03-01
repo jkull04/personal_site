@@ -86,8 +86,8 @@ The workflow also runs on:
 Tag names are case-insensitive:
 
 - `Projects`: excluded from Writings page and used for project card generation
-- `Blog`: appears in Writings page "Blog Posts" column
-- `Writings`: appears in Writings page "Essays" column (unless `Blog` is also present)
+- `Notes`: appears in Writings page "Notes" column
+- `Essays`: appears in Writings page "Essays" column (unless `Notes` is also present)
 - Untagged posts: excluded
 
 All post tags are still displayed on rendered cards.

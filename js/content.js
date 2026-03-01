@@ -323,7 +323,7 @@
 
   function renderWritings(writings) {
     const essaysEl = document.getElementById("writings-essays");
-    const blogsEl = document.getElementById("writings-blogs");
+    const blogsEl = document.getElementById("writings-notes");
     if (!essaysEl || !blogsEl) return;
 
     const searchInput = document.getElementById("writings-search");
@@ -389,7 +389,7 @@
     if (!Array.isArray(writings)) {
       writeColumns(
         panelState("Essays unavailable", "Writings data could not be loaded."),
-        panelState("Blog posts unavailable", "Writings data could not be loaded.")
+        panelState("Notes unavailable", "Writings data could not be loaded.")
       );
       disableControls();
       return;
@@ -485,8 +485,8 @@
 
       const blogsHtml =
         blogs.length === 0
-          ? panelState("No blog posts match.", "Try a different filter combination.")
-          : blogs.map((entry) => cardHtml(entry, "Read post")).join("");
+          ? panelState("No notes match.", "Try a different filter combination.")
+          : blogs.map((entry) => cardHtml(entry, "Read note")).join("");
 
       writeColumns(essaysHtml, blogsHtml);
     };
@@ -500,7 +500,7 @@
     if (allEntries.length === 0) {
       writeColumns(
         panelState("No essays yet.", "New entries will appear here soon."),
-        panelState("No blog posts yet.", "New entries will appear here soon.")
+        panelState("No notes yet.", "New entries will appear here soon.")
       );
       return;
     }

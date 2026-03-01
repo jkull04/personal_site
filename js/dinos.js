@@ -16,8 +16,8 @@
     bottom: 70.3
   };
   const DEFAULT_ROAMER_SLOTS = {
-    projects: { u: 0.3, v: 0.84 },
-    writings: { u: 0.5, v: 0.54 },
+    projects: { u: 0.2, v: 0.84 },
+    writings: { u: 0.44, v: 0.54 },
     contact: { u: 0.7, v: 0.84 }
   };
   const DINO_BOTTOM_TRIM_RATIO = {
@@ -189,7 +189,8 @@
     dino.classList.add("is-idle");
     markArenaState(dino, "lounge");
     if (!dino.style.getPropertyValue("--dino-face")) {
-      setFacing(dino, 1);
+      const defaultFace = dino.classList.contains("dino--longneck") ? -1 : 1;
+      setFacing(dino, defaultFace);
     }
   }
 
