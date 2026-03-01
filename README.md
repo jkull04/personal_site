@@ -374,7 +374,7 @@ Purpose:
 
 Triggers:
 
-- Scheduled run every 6 hours at `:17` (`00:17`, `06:17`, `12:17`, `18:17` UTC)
+- Scheduled run every 6 hours at `:27` (`00:27`, `06:27`, `12:27`, `18:27` UTC)
 - Manual `workflow_dispatch`
 
 Verification steps:
