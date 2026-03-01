@@ -29,7 +29,10 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.x"
+          python-version: "3.13"
+
+      - name: Show Python runtime
+        run: python --version
 
       - name: Install image tooling
         run: |
@@ -37,7 +40,7 @@ jobs:
           python -m pip install pillow
 
       - name: Sync Substack content
-        run: python scripts/sync_substack_content.py
+        run: python scripts/sync_substack_content.py --diagnostics --retries 6 --timeout 30
 
       - name: Validate optimized runtime assets
         run: python scripts/optimize_runtime_images.py --check

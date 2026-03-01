@@ -18,7 +18,10 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.x"
+          python-version: "3.13"
+
+      - name: Show Python runtime
+        run: python --version
 
       - name: Verify Substack sync with diagnostics
-        run: python scripts/sync_substack_content.py --diagnostics --retries 4
+        run: python scripts/sync_substack_content.py --diagnostics --retries 6 --timeout 30

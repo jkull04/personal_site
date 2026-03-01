@@ -36,7 +36,7 @@ DEFAULT_RETRIES = 3
 DEFAULT_TIMEOUT_SECONDS = 20.0
 DEFAULT_BACKOFF_BASE_SECONDS = 0.8
 DEFAULT_MAX_BACKOFF_SECONDS = 6.0
-TRANSIENT_HTTP_CODES = {408, 425, 429, 500, 502, 503, 504}
+TRANSIENT_HTTP_CODES = {408, 425, 429}
 REDACT_QUERY_KEY_PATTERN = re.compile(r"(token|key|secret|pass|auth)", flags=re.IGNORECASE)
 LOG_PREFIX = "[substack-sync]"
 
@@ -56,6 +56,10 @@ class SyncRequestError(RuntimeError):
     def __init__(self, message: str, *, transient: bool = False) -> None:
         super().__init__(message)
         self.transient = transient
+
+
+def is_transient_http_status(code: int) -> bool:
+    return code in TRANSIENT_HTTP_CODES or (500 <= code <= 599)
 
 
 class TextExtractor(HTMLParser):
@@ -261,7 +265,7 @@ def fetch_json(
                             f"Unexpected content type for {safe_url}: {content_type!r}; "
                             f"body_snippet={snippet!r}"
                         ),
-                        transient=False,
+                        transient=True,
                     )
                 return json.loads(payload.decode("utf-8"))
         except HTTPError as exc:
@@ -272,7 +276,7 @@ def fetch_json(
                     body_snippet = sanitize_body_snippet(exc.fp.read())
             except OSError:
                 body_snippet = ""
-            transient = exc.code in TRANSIENT_HTTP_CODES
+            transient = is_transient_http_status(exc.code)
             log_diagnostic(
                 diagnostics,
                 (
@@ -306,7 +310,7 @@ def fetch_json(
             )
             last_error = SyncRequestError(
                 f"Invalid JSON payload from {safe_url}: {exc.msg} (line {exc.lineno}, col {exc.colno})",
-                transient=False,
+                transient=True,
             )
         except SyncRequestError as exc:
             elapsed_ms = int((time.monotonic() - started) * 1000)

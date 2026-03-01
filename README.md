@@ -355,9 +355,9 @@ Triggers:
 Pipeline steps:
 
 1. Checkout repository.
-2. Setup Python 3.x.
+2. Setup Python 3.13.
 3. Install Pillow (`python -m pip install --upgrade pip pillow`).
-4. Run `python scripts/sync_substack_content.py --diagnostics`.
+4. Run `python scripts/sync_substack_content.py --diagnostics --retries 6 --timeout 30`.
 5. Run `python scripts/optimize_runtime_images.py --check`.
 6. Configure Pages.
 7. Upload full repository artifact.
@@ -380,8 +380,8 @@ Triggers:
 Verification steps:
 
 1. Checkout repository.
-2. Setup Python 3.x.
-3. Run `python scripts/sync_substack_content.py --diagnostics --retries 4`.
+2. Setup Python 3.13.
+3. Run `python scripts/sync_substack_content.py --diagnostics --retries 6 --timeout 30`.
 
 Notes:
 

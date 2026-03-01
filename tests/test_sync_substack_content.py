@@ -72,7 +72,7 @@ class FetchJsonTests(unittest.TestCase):
         mock_urlopen.return_value = FakeResponse(b"<html>oops</html>", "text/html")
 
         with self.assertRaises(sync.SyncRequestError) as raised:
-            sync.fetch_json(url, retries=3, timeout_seconds=2.0)
+            sync.fetch_json(url, retries=1, timeout_seconds=2.0)
 
         self.assertIn("Unexpected content type", str(raised.exception))
         self.assertEqual(mock_urlopen.call_count, 1)
@@ -88,6 +88,21 @@ class FetchJsonTests(unittest.TestCase):
             sync.fetch_json(url, retries=2, timeout_seconds=2.0)
 
         self.assertIn("Network error", str(raised.exception))
+        self.assertEqual(mock_urlopen.call_count, 2)
+        self.assertEqual(mock_sleep.call_count, 1)
+
+    @patch("scripts.sync_substack_content.time.sleep")
+    @patch("scripts.sync_substack_content.urlopen")
+    def test_fetch_json_retries_cloudflare_520_then_succeeds(self, mock_urlopen, mock_sleep):
+        url = "https://example.com/posts"
+        mock_urlopen.side_effect = [
+            http_error(url, 520, body=b"unknown error"),
+            FakeResponse(b'{"ok": true}', "application/json"),
+        ]
+
+        payload = sync.fetch_json(url, retries=3, timeout_seconds=2.0)
+
+        self.assertEqual(payload, {"ok": True})
         self.assertEqual(mock_urlopen.call_count, 2)
         self.assertEqual(mock_sleep.call_count, 1)
 
