@@ -23,8 +23,9 @@ from html import unescape
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
+from xml.etree import ElementTree
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode, urlparse
+from urllib.parse import urlencode, urlparse, urljoin
 from urllib.request import Request, urlopen
 
 
@@ -36,10 +37,12 @@ DEFAULT_RETRIES = 3
 DEFAULT_TIMEOUT_SECONDS = 20.0
 DEFAULT_BACKOFF_BASE_SECONDS = 2.0
 DEFAULT_MAX_BACKOFF_SECONDS = 15.0
-DEFAULT_SOURCE_ORDER = "posts,archive"
+DEFAULT_SOURCE_ORDER = "feed-web,posts,archive"
 DEFAULT_MIN_PUBLIC_POSTS = 1
+DEFAULT_MERGE_BASELINE = True
 TRANSIENT_HTTP_CODES = {403, 408, 425, 429}
 REDACT_QUERY_KEY_PATTERN = re.compile(r"(token|key|secret|pass|auth)", flags=re.IGNORECASE)
+PRELOAD_ASSIGNMENT_PATTERN = re.compile(r"window\._preloads\s*=\s*JSON\.parse\(\"", flags=re.DOTALL)
 LOG_PREFIX = "[substack-sync]"
 
 
@@ -55,6 +58,7 @@ class SyncStats:
     source_selected: str = ""
     source_order: str = ""
     fallback_used: bool = False
+    result_mode: str = "authoritative"
     source_failures: list[str] = field(default_factory=list)
     started_at: float = 0.0
 
@@ -358,6 +362,227 @@ def fetch_json(
     raise last_error
 
 
+def fetch_text(
+    url: str,
+    *,
+    retries: int = DEFAULT_RETRIES,
+    timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
+    diagnostics: bool = False,
+    stats: SyncStats | None = None,
+    rng: random.Random | None = None,
+) -> str:
+    last_error: SyncRequestError | None = None
+    backoff_rng = rng or random.Random(0)
+    safe_url = sanitize_url(url)
+
+    for attempt in range(1, retries + 1):
+        if stats is not None:
+            stats.fetch_attempts += 1
+
+        request = Request(
+            url,
+            headers={
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "User-Agent": "Mozilla/5.0 (compatible; PersonalSiteSync/1.0; +https://www.jameskull.com)",
+            },
+        )
+        started = time.monotonic()
+
+        try:
+            with urlopen(request, timeout=timeout_seconds) as response:
+                status_code = int(getattr(response, "status", 200))
+                content_type = response.headers.get("Content-Type", "")
+                payload = response.read()
+                elapsed_ms = int((time.monotonic() - started) * 1000)
+                log_diagnostic(
+                    diagnostics,
+                    (
+                        f"event=fetch_text_ok attempt={attempt}/{retries} status={status_code} "
+                        f"content_type={content_type!r} elapsed_ms={elapsed_ms} url={safe_url}"
+                    ),
+                )
+                return payload.decode("utf-8", errors="replace")
+        except HTTPError as exc:
+            elapsed_ms = int((time.monotonic() - started) * 1000)
+            body_snippet = ""
+            try:
+                if exc.fp is not None:
+                    body_snippet = sanitize_body_snippet(exc.fp.read())
+            except OSError:
+                body_snippet = ""
+            transient = is_transient_http_status(exc.code)
+            log_diagnostic(
+                diagnostics,
+                (
+                    f"event=fetch_text_http_error attempt={attempt}/{retries} status={exc.code} "
+                    f"transient={str(transient).lower()} elapsed_ms={elapsed_ms} url={safe_url}"
+                ),
+            )
+            message = f"HTTP {exc.code} for {safe_url}"
+            if body_snippet:
+                message = f"{message}; body_snippet={body_snippet!r}"
+            last_error = SyncRequestError(message, transient=transient)
+        except (TimeoutError, URLError, socket.timeout, OSError) as exc:
+            elapsed_ms = int((time.monotonic() - started) * 1000)
+            transient = is_transient_network_error(exc)
+            log_diagnostic(
+                diagnostics,
+                (
+                    f"event=fetch_text_network_error attempt={attempt}/{retries} transient={str(transient).lower()} "
+                    f"elapsed_ms={elapsed_ms} reason={type(exc).__name__} url={safe_url}"
+                ),
+            )
+            last_error = SyncRequestError(f"Network error for {safe_url}: {exc}", transient=transient)
+
+        if last_error is None:
+            continue
+        if not last_error.transient or attempt >= retries:
+            break
+
+        delay = backoff_delay(
+            attempt,
+            base_seconds=DEFAULT_BACKOFF_BASE_SECONDS,
+            max_seconds=DEFAULT_MAX_BACKOFF_SECONDS,
+            rng=backoff_rng,
+        )
+        log_diagnostic(
+            diagnostics,
+            (
+                f"event=retry_wait attempt={attempt}/{retries} sleep_s={delay:.2f} "
+                f"url={safe_url}"
+            ),
+        )
+        time.sleep(delay)
+
+    if last_error is None:
+        raise SyncRequestError(f"Unable to fetch text from {safe_url}", transient=False)
+    log_diagnostic(
+        diagnostics,
+        f"event=fetch_text_final_error retries={retries} url={safe_url} reason={last_error}",
+    )
+    raise last_error
+
+
+def _extract_preloads_payload(page_html: str, *, page_url: str) -> dict[str, Any]:
+    match = PRELOAD_ASSIGNMENT_PATTERN.search(page_html)
+    if match is None:
+        raise RuntimeError(f"Unable to locate preload payload marker in {page_url}")
+
+    payload_start = match.end()
+    cursor = payload_start
+    payload_end = -1
+    while cursor < len(page_html):
+        if page_html[cursor] == "\"":
+            slash_count = 0
+            lookback = cursor - 1
+            while lookback >= payload_start and page_html[lookback] == "\\":
+                slash_count += 1
+                lookback -= 1
+            if slash_count % 2 == 0:
+                payload_end = cursor
+                break
+        cursor += 1
+
+    if payload_end < payload_start:
+        raise RuntimeError(f"Unable to parse preload payload boundary in {page_url}")
+
+    encoded_payload = page_html[payload_start:payload_end]
+    try:
+        decoded_json = json.loads(f"\"{encoded_payload}\"")
+        payload = json.loads(decoded_json)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"Invalid preload payload JSON in {page_url}: {exc}") from exc
+
+    if not isinstance(payload, dict):
+        raise RuntimeError(f"Unexpected preload payload shape in {page_url}")
+    return payload
+
+
+def _extract_feed_links(feed_xml: str, *, publication_host: str) -> list[str]:
+    try:
+        root = ElementTree.fromstring(feed_xml)
+    except ElementTree.ParseError as exc:
+        raise RuntimeError(f"Invalid RSS payload: {exc}") from exc
+
+    items = root.findall(".//item")
+    links: list[str] = []
+    seen: set[str] = set()
+    base_url = f"https://{publication_host}/"
+    for item in items:
+        link_value = ""
+        for child in list(item):
+            child_tag = child.tag if isinstance(child.tag, str) else ""
+            if child_tag == "link" or child_tag.endswith("}link"):
+                link_value = str(child.text or "").strip()
+                break
+        if not link_value:
+            continue
+
+        resolved = urljoin(base_url, link_value).strip()
+        normalized = resolved.rstrip("/")
+        if not normalized or normalized.lower() in seen:
+            continue
+        seen.add(normalized.lower())
+        links.append(resolved)
+
+    if not links:
+        raise RuntimeError("RSS feed returned no post links.")
+    return links
+
+
+def fetch_posts_from_feed_web(
+    config: SyncConfig,
+    *,
+    retries: int,
+    timeout_seconds: float,
+    diagnostics: bool,
+    stats: SyncStats,
+) -> list[dict[str, Any]]:
+    feed_url = f"https://{config.publication_host}/feed"
+    feed_xml = fetch_text(
+        feed_url,
+        retries=retries,
+        timeout_seconds=timeout_seconds,
+        diagnostics=diagnostics,
+        stats=stats,
+    )
+    stats.pages_fetched += 1
+    links = _extract_feed_links(feed_xml, publication_host=config.publication_host)
+    log_diagnostic(
+        diagnostics,
+        f"event=feed_links_received count={len(links)}",
+    )
+
+    posts: list[dict[str, Any]] = []
+    seen_slugs: set[str] = set()
+    for link in links:
+        page_html = fetch_text(
+            link,
+            retries=retries,
+            timeout_seconds=timeout_seconds,
+            diagnostics=diagnostics,
+            stats=stats,
+        )
+        stats.pages_fetched += 1
+        preload_payload = _extract_preloads_payload(page_html, page_url=link)
+        post = preload_payload.get("post")
+        if not isinstance(post, dict):
+            raise RuntimeError(f"Expected post payload in preload data for {link}")
+
+        slug = str(post.get("slug") or "").strip().lower()
+        if slug and slug in seen_slugs:
+            continue
+        if slug:
+            seen_slugs.add(slug)
+
+        posts.append(post)
+        stats.posts_received += 1
+
+    if not posts:
+        raise RuntimeError("Feed-web source produced zero posts.")
+    return posts
+
+
 def fetch_posts_from_posts_api(
     config: SyncConfig,
     *,
@@ -500,7 +725,15 @@ def fetch_posts_with_failover(
         log_diagnostic(diagnostics, f"event=source_attempt source={source!r} order={index + 1}/{len(source_order)}")
 
         try:
-            if source == "posts":
+            if source == "feed-web":
+                posts = fetch_posts_from_feed_web(
+                    config,
+                    retries=retries,
+                    timeout_seconds=timeout_seconds,
+                    diagnostics=diagnostics,
+                    stats=stats,
+                )
+            elif source == "posts":
                 posts = fetch_posts_from_posts_api(
                     config,
                     retries=retries,
@@ -519,7 +752,7 @@ def fetch_posts_with_failover(
             else:
                 raise RuntimeError(f"Unsupported source {source!r}")
 
-            public_posts = sum(1 for post in posts if post_is_public(post))
+            public_posts = count_public_posts(posts)
             log_diagnostic(
                 diagnostics,
                 (
@@ -871,6 +1104,45 @@ def write_json_atomically(path: Path, payload: Any) -> None:
             os.unlink(temp_file)
 
 
+def _load_json_array(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    if not isinstance(raw, list):
+        return []
+    return [item for item in raw if isinstance(item, dict)]
+
+
+def load_existing_outputs() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    return _load_json_array(WRITINGS_PATH), _load_json_array(WORKS_SUBSTACK_PATH)
+
+
+def merge_entries_by_id(
+    new_entries: list[dict[str, Any]],
+    baseline_entries: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    merged_by_id: dict[str, dict[str, Any]] = {}
+
+    for entry in baseline_entries:
+        entry_id = str(entry.get("id") or "").strip()
+        if not entry_id:
+            continue
+        merged_by_id[entry_id] = entry
+
+    for entry in new_entries:
+        entry_id = str(entry.get("id") or "").strip()
+        if not entry_id:
+            continue
+        merged_by_id[entry_id] = entry
+
+    merged = list(merged_by_id.values())
+    merged.sort(key=lambda entry: str(entry.get("date") or ""), reverse=True)
+    return merged
+
+
 def write_outputs_atomically(writings: list[dict[str, Any]], projects: list[dict[str, Any]]) -> None:
     # Keep "last good" behavior by computing everything up front, then replacing files.
     write_json_atomically(WRITINGS_PATH, writings)
@@ -884,6 +1156,7 @@ def emit_run_summary(status: str, stats: SyncStats, message: str) -> None:
         f"posts={stats.posts_received} public_posts={stats.public_posts} writings={stats.writings_entries} "
         f"projects={stats.project_entries} outputs={stats.outputs_written} source={stats.source_selected!r} "
         f"source_order={stats.source_order!r} fallback_used={str(stats.fallback_used).lower()} "
+        f"result_mode={stats.result_mode!r} "
         f"duration_ms={duration_ms} message={message!r}"
     )
     print(f"{LOG_PREFIX} {summary_line}")
@@ -900,6 +1173,7 @@ def emit_run_summary(status: str, stats: SyncStats, message: str) -> None:
         f"- Source selected: `{stats.source_selected or 'n/a'}`",
         f"- Source order: `{stats.source_order or 'n/a'}`",
         f"- Fallback used: `{str(stats.fallback_used).lower()}`",
+        f"- Result mode: `{stats.result_mode}`",
         f"- Writings entries: `{stats.writings_entries}`",
         f"- Project entries: `{stats.project_entries}`",
         f"- Outputs written: `{stats.outputs_written}`",
@@ -926,7 +1200,7 @@ def load_posts_from_file(path: Path, *, diagnostics: bool, stats: SyncStats) -> 
 
 
 def parse_source_order(raw_value: str) -> list[str]:
-    allowed = {"posts", "archive"}
+    allowed = {"feed-web", "posts", "archive"}
     order: list[str] = []
     for raw in str(raw_value).split(","):
         source = raw.strip().lower()
@@ -973,7 +1247,8 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_SOURCE_ORDER,
         help=(
             "Comma-separated source preference order for API fetches. "
-            "Supported values: posts,archive (default: posts,archive)."
+            "Supported values: feed-web,posts,archive "
+            "(default: feed-web,posts,archive)."
         ),
     )
     parser.add_argument(
@@ -983,6 +1258,15 @@ def parse_args() -> argparse.Namespace:
         help=(
             "Minimum number of public posts required before writing outputs. "
             f"Default: {DEFAULT_MIN_PUBLIC_POSTS}."
+        ),
+    )
+    parser.add_argument(
+        "--merge-baseline",
+        action=argparse.BooleanOptionalAction,
+        default=DEFAULT_MERGE_BASELINE,
+        help=(
+            "When source is feed-web, merge freshly built entries with existing "
+            "output files by id to avoid truncating older history."
         ),
     )
     return parser.parse_args()
@@ -1005,6 +1289,7 @@ def main() -> int:
     try:
         source_order = parse_source_order(raw_source_order)
         min_public_posts = max(0, int(args.min_public_posts))
+        merge_baseline = bool(args.merge_baseline)
         stats.source_order = ",".join(source_order)
         config = load_config(CONFIG_PATH)
         log_diagnostic(
@@ -1012,7 +1297,8 @@ def main() -> int:
             (
                 f"event=run_start host={config.publication_host!r} retries={retries} "
                 f"timeout_s={timeout_seconds} input_file={input_file!r} "
-                f"source_order={stats.source_order!r} min_public_posts={min_public_posts}"
+                f"source_order={stats.source_order!r} min_public_posts={min_public_posts} "
+                f"merge_baseline={str(merge_baseline).lower()}"
             ),
         )
 
@@ -1040,6 +1326,15 @@ def main() -> int:
             )
         writings = to_writings_entries(posts, config)
         projects = to_project_entries(posts, config)
+
+        if stats.source_selected == "feed-web" and merge_baseline:
+            baseline_writings, baseline_projects = load_existing_outputs()
+            writings = merge_entries_by_id(writings, baseline_writings)
+            projects = merge_entries_by_id(projects, baseline_projects)
+            stats.result_mode = "merged_with_baseline"
+        else:
+            stats.result_mode = "authoritative"
+
         write_outputs_atomically(writings, projects)
         stats.writings_entries = len(writings)
         stats.project_entries = len(projects)

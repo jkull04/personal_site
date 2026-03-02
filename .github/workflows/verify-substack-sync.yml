@@ -27,5 +27,5 @@ jobs:
             --diagnostics \
             --retries 6 \
             --timeout 30 \
-            --source-order posts,archive \
+            --source-order feed-web,posts,archive \
             --min-public-posts 1

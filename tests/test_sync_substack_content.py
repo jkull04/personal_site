@@ -1,6 +1,7 @@
 import argparse
 import contextlib
 import io
+import json
 import unittest
 from unittest.mock import patch
 from urllib.error import HTTPError
@@ -41,16 +42,24 @@ def make_config() -> sync.SyncConfig:
     )
 
 
-def make_public_post(slug: str = "post-1") -> dict:
+def make_public_post(slug: str = "post-1", *, tags: list[str] | None = None, date: str = "2026-03-01T00:00:00.000Z") -> dict:
+    tag_values = tags or ["Essays"]
     return {
         "slug": slug,
         "title": f"Title {slug}",
-        "post_date": "2026-03-01T00:00:00.000Z",
+        "post_date": date,
         "is_published": True,
         "audience": "everyone",
-        "postTags": [{"name": "Essays"}],
-        "body_html": "<p>hello</p>",
+        "postTags": [{"name": value} for value in tag_values],
+        "body_html": "<h4>Problem</h4><p>P</p><h4>Approach</h4><p>A</p><h4>Output</h4><p>O</p>",
+        "subtitle": "summary",
     }
+
+
+def make_preload_page(post: dict) -> str:
+    payload = {"post": post}
+    encoded = json.dumps(json.dumps(payload))[1:-1]
+    return f'<html><body><script>window._preloads = JSON.parse("{encoded}")</script></body></html>'
 
 
 class FetchJsonTests(unittest.TestCase):
@@ -134,16 +143,78 @@ class FetchJsonTests(unittest.TestCase):
         self.assertEqual(mock_sleep.call_count, 1)
 
 
+class FeedWebTests(unittest.TestCase):
+    def test_extract_preloads_payload_parses_post(self):
+        post = make_public_post("from-preload")
+        page_html = make_preload_page(post)
+
+        payload = sync._extract_preloads_payload(page_html, page_url="https://example.substack.com/p/from-preload")
+
+        self.assertIn("post", payload)
+        self.assertEqual(payload["post"]["slug"], "from-preload")
+
+    @patch("scripts.sync_substack_content.fetch_text")
+    def test_fetch_posts_from_feed_web_reads_feed_and_pages(self, mock_fetch_text):
+        feed_xml = (
+            "<?xml version='1.0' encoding='UTF-8'?>"
+            "<rss><channel>"
+            "<item><link>https://example.substack.com/p/a</link></item>"
+            "<item><link>https://example.substack.com/p/b</link></item>"
+            "</channel></rss>"
+        )
+        page_a = make_preload_page(make_public_post("a"))
+        page_b = make_preload_page(make_public_post("b", tags=["Projects"]))
+        mock_fetch_text.side_effect = [feed_xml, page_a, page_b]
+
+        stats = sync.SyncStats()
+        posts = sync.fetch_posts_from_feed_web(
+            make_config(),
+            retries=3,
+            timeout_seconds=2.0,
+            diagnostics=False,
+            stats=stats,
+        )
+
+        self.assertEqual([post["slug"] for post in posts], ["a", "b"])
+        self.assertEqual(stats.posts_received, 2)
+        self.assertEqual(stats.pages_fetched, 3)  # feed + 2 post pages
+
+
 class SourceFailoverTests(unittest.TestCase):
     @patch("scripts.sync_substack_content.fetch_posts_from_archive_api")
     @patch("scripts.sync_substack_content.fetch_posts_from_posts_api")
-    def test_fetch_posts_with_failover_uses_posts_source_when_available(self, mock_posts_api, mock_archive_api):
+    @patch("scripts.sync_substack_content.fetch_posts_from_feed_web")
+    def test_feed_web_success_short_circuits_fallback(self, mock_feed_web, mock_posts_api, mock_archive_api):
+        mock_feed_web.return_value = [make_public_post("from-feed")]
+        stats = sync.SyncStats()
+
+        posts = sync.fetch_posts_with_failover(
+            make_config(),
+            source_order=["feed-web", "posts", "archive"],
+            retries=3,
+            timeout_seconds=2.0,
+            diagnostics=False,
+            stats=stats,
+            min_public_posts=1,
+        )
+
+        self.assertEqual(posts[0]["slug"], "from-feed")
+        self.assertEqual(stats.source_selected, "feed-web")
+        self.assertFalse(stats.fallback_used)
+        mock_posts_api.assert_not_called()
+        mock_archive_api.assert_not_called()
+
+    @patch("scripts.sync_substack_content.fetch_posts_from_archive_api")
+    @patch("scripts.sync_substack_content.fetch_posts_from_posts_api")
+    @patch("scripts.sync_substack_content.fetch_posts_from_feed_web")
+    def test_feed_web_failure_falls_back_to_posts(self, mock_feed_web, mock_posts_api, mock_archive_api):
+        mock_feed_web.side_effect = RuntimeError("feed unavailable")
         mock_posts_api.return_value = [make_public_post("from-posts")]
         stats = sync.SyncStats()
 
         posts = sync.fetch_posts_with_failover(
             make_config(),
-            source_order=["posts", "archive"],
+            source_order=["feed-web", "posts", "archive"],
             retries=3,
             timeout_seconds=2.0,
             diagnostics=False,
@@ -153,36 +224,16 @@ class SourceFailoverTests(unittest.TestCase):
 
         self.assertEqual(posts[0]["slug"], "from-posts")
         self.assertEqual(stats.source_selected, "posts")
-        self.assertFalse(stats.fallback_used)
-        self.assertEqual(stats.public_posts, 1)
+        self.assertTrue(stats.fallback_used)
+        self.assertEqual(len(stats.source_failures), 1)
+        self.assertIn("feed-web:", stats.source_failures[0])
         mock_archive_api.assert_not_called()
 
     @patch("scripts.sync_substack_content.fetch_posts_from_archive_api")
     @patch("scripts.sync_substack_content.fetch_posts_from_posts_api")
-    def test_fetch_posts_with_failover_falls_back_to_archive(self, mock_posts_api, mock_archive_api):
-        mock_posts_api.side_effect = sync.SyncRequestError("HTTP 503", transient=True)
-        mock_archive_api.return_value = [make_public_post("from-archive")]
-        stats = sync.SyncStats()
-
-        posts = sync.fetch_posts_with_failover(
-            make_config(),
-            source_order=["posts", "archive"],
-            retries=3,
-            timeout_seconds=2.0,
-            diagnostics=False,
-            stats=stats,
-            min_public_posts=1,
-        )
-
-        self.assertEqual(posts[0]["slug"], "from-archive")
-        self.assertEqual(stats.source_selected, "archive")
-        self.assertTrue(stats.fallback_used)
-        self.assertEqual(len(stats.source_failures), 1)
-        self.assertIn("posts:", stats.source_failures[0])
-
-    @patch("scripts.sync_substack_content.fetch_posts_from_archive_api")
-    @patch("scripts.sync_substack_content.fetch_posts_from_posts_api")
-    def test_fetch_posts_with_failover_fails_when_all_sources_fail(self, mock_posts_api, mock_archive_api):
+    @patch("scripts.sync_substack_content.fetch_posts_from_feed_web")
+    def test_fetch_posts_with_failover_fails_when_all_sources_fail(self, mock_feed_web, mock_posts_api, mock_archive_api):
+        mock_feed_web.side_effect = RuntimeError("feed failure")
         mock_posts_api.side_effect = sync.SyncRequestError("HTTP 503", transient=True)
         mock_archive_api.side_effect = sync.SyncRequestError("HTTP 520", transient=True)
         stats = sync.SyncStats()
@@ -190,7 +241,7 @@ class SourceFailoverTests(unittest.TestCase):
         with self.assertRaises(RuntimeError) as raised:
             sync.fetch_posts_with_failover(
                 make_config(),
-                source_order=["posts", "archive"],
+                source_order=["feed-web", "posts", "archive"],
                 retries=3,
                 timeout_seconds=2.0,
                 diagnostics=False,
@@ -199,6 +250,25 @@ class SourceFailoverTests(unittest.TestCase):
             )
 
         self.assertIn("All sources failed", str(raised.exception))
+
+
+class MergeTests(unittest.TestCase):
+    def test_merge_entries_by_id_preserves_baseline_and_overrides_with_new(self):
+        baseline = [
+            {"id": "shared", "date": "2026-01-01", "title": "old"},
+            {"id": "baseline-only", "date": "2025-12-31", "title": "keep"},
+        ]
+        fresh = [
+            {"id": "shared", "date": "2026-03-01", "title": "new"},
+            {"id": "fresh-only", "date": "2026-02-01", "title": "fresh"},
+        ]
+
+        merged = sync.merge_entries_by_id(fresh, baseline)
+        by_id = {entry["id"]: entry for entry in merged}
+
+        self.assertEqual(set(by_id.keys()), {"shared", "baseline-only", "fresh-only"})
+        self.assertEqual(by_id["shared"]["title"], "new")
+        self.assertEqual(merged[0]["id"], "shared")
 
 
 class MainBehaviorTests(unittest.TestCase):
@@ -224,8 +294,9 @@ class MainBehaviorTests(unittest.TestCase):
             timeout=20.0,
             diagnostics=False,
             input_file="",
-            source_order="posts,archive",
+            source_order="feed-web,posts,archive",
             min_public_posts=1,
+            merge_baseline=True,
         )
         mock_load_config.return_value = make_config()
 
@@ -239,7 +310,7 @@ class MainBehaviorTests(unittest.TestCase):
 class SummaryTests(unittest.TestCase):
     @patch("scripts.sync_substack_content.write_step_summary")
     @patch("scripts.sync_substack_content.time.monotonic", return_value=1.0)
-    def test_emit_run_summary_includes_source_and_fallback(self, _mock_time, _mock_write_step_summary):
+    def test_emit_run_summary_includes_source_and_fallback_and_result_mode(self, _mock_time, _mock_write_step_summary):
         stats = sync.SyncStats(
             fetch_attempts=4,
             pages_fetched=1,
@@ -249,8 +320,9 @@ class SummaryTests(unittest.TestCase):
             project_entries=1,
             outputs_written=2,
             source_selected="archive",
-            source_order="posts,archive",
+            source_order="feed-web,posts,archive",
             fallback_used=True,
+            result_mode="merged_with_baseline",
             started_at=0.0,
         )
 
@@ -261,6 +333,7 @@ class SummaryTests(unittest.TestCase):
         logged = output.getvalue()
         self.assertIn("source='archive'", logged)
         self.assertIn("fallback_used=true", logged)
+        self.assertIn("result_mode='merged_with_baseline'", logged)
 
 
 if __name__ == "__main__":

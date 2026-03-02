@@ -218,12 +218,14 @@ Rules:
 
 Fetch strategy is source-failover aware:
 
-- Primary source: `api/v1/posts`
+- Primary source: `feed-web` (`/feed` + per-post page preload payload)
+- Secondary source: `api/v1/posts`
 - Fallback source: `api/v1/archive` + per-slug detail fetch from `api/v1/posts/{slug}`
 
 Safety guard:
 
 - `--min-public-posts` (default `1`) prevents output overwrite when upstream responses are unexpectedly empty.
+- `--merge-baseline` (default enabled) merges `feed-web` results with existing JSON outputs by `id` to avoid truncating older entries when feed scope is partial.
 
 ## Front-End Runtime Behavior
 
@@ -286,7 +288,7 @@ Important:
 ### 1) Sync Substack content
 
 ```bash
-python scripts/sync_substack_content.py --diagnostics --source-order posts,archive --min-public-posts 1
+python scripts/sync_substack_content.py --diagnostics --source-order feed-web,posts,archive --min-public-posts 1 --merge-baseline
 ```
 
 Writes:
@@ -389,9 +391,11 @@ Refresh steps:
 
 1. Checkout repository.
 2. Setup Python 3.13.
-3. Run `python scripts/sync_substack_content.py --diagnostics --retries 6 --timeout 30 --source-order posts,archive --min-public-posts 1`.
-4. Run `python scripts/optimize_runtime_images.py --check`.
-5. Configure Pages and deploy.
+3. Seed local `data/` files from live baseline URLs (`https://www.jameskull.com`, fallback `https://jkull04.github.io/personal_site`) when available.
+4. Run `python scripts/sync_substack_content.py --diagnostics --retries 6 --timeout 30 --source-order feed-web,posts,archive --min-public-posts 1 --merge-baseline`.
+5. If sync fails but baseline exists, continue with baseline data; if both fail, stop the workflow.
+6. Run `python scripts/optimize_runtime_images.py --check`.
+7. Configure Pages and deploy.
 
 ## Substack Sync Verification Workflow
 
@@ -409,7 +413,7 @@ Verification steps:
 
 1. Checkout repository.
 2. Setup Python 3.13.
-3. Run `python scripts/sync_substack_content.py --diagnostics --retries 6 --timeout 30 --source-order posts,archive --min-public-posts 1`.
+3. Run `python scripts/sync_substack_content.py --diagnostics --retries 6 --timeout 30 --source-order feed-web,posts,archive --min-public-posts 1`.
 
 Notes:
 

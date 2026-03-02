@@ -1,0 +1,2 @@
+[  406635ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://api.github.com/_private/browser/stats:0
+[  406636ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ https://collector.github.com/github/collect:0
