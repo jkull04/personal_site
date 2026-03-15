@@ -35,7 +35,7 @@ jobs:
             --diagnostics \
             --retries 6 \
             --timeout 30 \
-            --source-order feed-web,posts,archive \
+            --source-order posts,feed-web,archive \
             --min-public-posts 1 \
             --merge-baseline
 

@@ -218,14 +218,14 @@ Rules:
 
 Fetch strategy is source-failover aware:
 
-- Primary source: `feed-web` (`/feed` + per-post page preload payload)
-- Secondary source: `api/v1/posts`
+- Primary source: `api/v1/posts`
+- Secondary source: `feed-web` (`/feed` + per-post page preload payload)
 - Fallback source: `api/v1/archive` + per-slug detail fetch from `api/v1/posts/{slug}`
 
 Safety guard:
 
 - `--min-public-posts` (default `1`) prevents output overwrite when upstream responses are unexpectedly empty.
-- `--merge-baseline` (default enabled) merges `feed-web` results with existing JSON outputs by `id` to avoid truncating older entries when feed scope is partial.
+- `--merge-baseline` (default enabled) merges `feed-web` results with existing JSON outputs by `id` only when the fallback feed source is used, avoiding feed truncation while still letting authoritative API deletions propagate.
 
 ## Front-End Runtime Behavior
 
@@ -288,7 +288,7 @@ Important:
 ### 1) Sync Substack content
 
 ```bash
-python scripts/sync_substack_content.py --diagnostics --source-order feed-web,posts,archive --min-public-posts 1 --merge-baseline
+python scripts/sync_substack_content.py --diagnostics --source-order posts,feed-web,archive --min-public-posts 1 --merge-baseline
 ```
 
 Writes:
@@ -397,10 +397,63 @@ Refresh steps:
 
 1. Checkout repository.
 2. Setup Python 3.13.
-3. Run `python scripts/sync_substack_content.py --diagnostics --retries 6 --timeout 30 --source-order feed-web,posts,archive --min-public-posts 1 --merge-baseline`.
+3. Run `python scripts/sync_substack_content.py --diagnostics --retries 6 --timeout 30 --source-order posts,feed-web,archive --min-public-posts 1 --merge-baseline`.
 4. Detect whether `data/writings.json` or `data/works-substack.json` changed.
 5. Commit and push refreshed JSON when there is a content change.
 6. Let the regular `.github/workflows/deploy-pages.yml` workflow publish the updated static site from `main`.
+
+## Optional Pipedream RSS Bridge
+
+Purpose:
+
+- Trigger the Substack refresh workflow closer to publish time without moving live Substack fetches into the Pages deploy job.
+- Keep the scheduled GitHub refresh as a fallback, while allowing near-real-time refreshes from a free RSS poller.
+
+Recommended flow:
+
+- `Substack RSS` -> `Pipedream RSS trigger` -> `GitHub workflow_dispatch` -> `Refresh Substack Content` -> `Deploy GitHub Pages`
+
+### Pipedream setup
+
+Create a new Pipedream workflow with:
+
+1. Trigger: `RSS` -> `New Item in Feed`
+2. Feed URL: `https://jameskull.substack.com/feed`
+3. Poll interval: `Every 15 minutes`
+4. Action: `HTTP / Webhook` -> `Send any HTTP Request`
+
+HTTP request settings:
+
+- Method: `POST`
+- URL: `https://api.github.com/repos/jkull04/personal_site/actions/workflows/refresh-substack-pages.yml/dispatches`
+- Headers:
+  - `Accept: application/vnd.github+json`
+  - `Authorization: Bearer {{process.env.GITHUB_TOKEN}}`
+  - `X-GitHub-Api-Version: 2022-11-28`
+  - `Content-Type: application/json`
+- Body:
+
+```json
+{
+  "ref": "main"
+}
+```
+
+### GitHub token setup
+
+Create a fine-grained personal access token with:
+
+- Repository access: `personal_site` only
+- Repository permission: `Actions` -> `Read and write`
+
+Store the raw token value in Pipedream as a secret/environment variable named `GITHUB_TOKEN`.
+
+### Pipedream secret gotchas
+
+- Use `{{process.env.GITHUB_TOKEN}}` in the header, not `{{secrets.GITHUB_TOKEN}}`.
+- The secret value should be only the raw GitHub token, not `Bearer ...`.
+- Re-enter header names manually if the UI pasted hidden line breaks into a key such as `Accept` or `Authorization`.
+- If Pipedream reports invalid characters in the `Authorization` header, delete and recreate the `GITHUB_TOKEN` secret as a single line with no extra spaces or trailing newline.
 
 ## Substack Sync Verification Workflow
 
@@ -418,7 +471,7 @@ Verification steps:
 
 1. Checkout repository.
 2. Setup Python 3.13.
-3. Run `python scripts/sync_substack_content.py --diagnostics --retries 6 --timeout 30 --source-order feed-web,posts,archive --min-public-posts 1`.
+3. Run `python scripts/sync_substack_content.py --diagnostics --retries 6 --timeout 30 --source-order posts,feed-web,archive --min-public-posts 1`.
 
 Notes:
 

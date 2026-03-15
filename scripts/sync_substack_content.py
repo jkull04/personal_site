@@ -37,7 +37,7 @@ DEFAULT_RETRIES = 3
 DEFAULT_TIMEOUT_SECONDS = 20.0
 DEFAULT_BACKOFF_BASE_SECONDS = 2.0
 DEFAULT_MAX_BACKOFF_SECONDS = 15.0
-DEFAULT_SOURCE_ORDER = "feed-web,posts,archive"
+DEFAULT_SOURCE_ORDER = "posts,feed-web,archive"
 DEFAULT_MIN_PUBLIC_POSTS = 1
 DEFAULT_MERGE_BASELINE = True
 TRANSIENT_HTTP_CODES = {403, 408, 425, 429}
@@ -1248,7 +1248,7 @@ def parse_args() -> argparse.Namespace:
         help=(
             "Comma-separated source preference order for API fetches. "
             "Supported values: feed-web,posts,archive "
-            "(default: feed-web,posts,archive)."
+            "(default: posts,feed-web,archive)."
         ),
     )
     parser.add_argument(

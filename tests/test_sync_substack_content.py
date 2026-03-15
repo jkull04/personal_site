@@ -294,7 +294,7 @@ class MainBehaviorTests(unittest.TestCase):
             timeout=20.0,
             diagnostics=False,
             input_file="",
-            source_order="feed-web,posts,archive",
+            source_order="posts,feed-web,archive",
             min_public_posts=1,
             merge_baseline=True,
         )
@@ -320,7 +320,7 @@ class SummaryTests(unittest.TestCase):
             project_entries=1,
             outputs_written=2,
             source_selected="archive",
-            source_order="feed-web,posts,archive",
+            source_order="posts,feed-web,archive",
             fallback_used=True,
             result_mode="merged_with_baseline",
             started_at=0.0,
