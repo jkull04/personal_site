@@ -1,5 +1,16 @@
 [
   {
+    "id": "stars",
+    "type": "blog",
+    "title": "Stars",
+    "date": "2026-03-15",
+    "tags": [
+      "Notes"
+    ],
+    "abstract": "A few thoughts.",
+    "href": "https://jameskull.substack.com/p/stars"
+  },
+  {
     "id": "testing-blog",
     "type": "blog",
     "title": "testing blog",

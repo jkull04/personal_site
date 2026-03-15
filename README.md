@@ -75,7 +75,7 @@ High-signal files and folders:
 - `assets/illustrations/runtime/*.png`: runtime hero monument art.
 - `assets/sprites/*-walk-atlas.png`: dino walk atlases used at runtime.
 - `assets/source-art/*.png`: source sprite sheets for atlas normalization.
-- `assets/images/headshot-square.png`: profile image.
+- `assets/images/headshot-square.png` or `assets/images/headshot-square.jpg`: profile image source.
 - `assets/documents/James F Kull Jr. Resume.pdf`: downloadable resume.
 - `assets/icons/*.svg` and `assets/icons/laurel-circle.png`: icon set and favicon source.
 - `css/`: styling system.
@@ -352,7 +352,7 @@ Expected outputs:
 - `assets/images/headshot-square-640.webp`
 - `assets/icons/favicon-32.png`
 
-Re-run this script whenever runtime PNG sources are replaced or re-exported.
+ Re-run this script whenever runtime image sources are replaced or re-exported, including the contact headshot.
 
 ## Deployment
 
@@ -361,6 +361,7 @@ Workflow file: `.github/workflows/deploy-pages.yml`
 Triggers:
 
 - Push to `main`
+- Successful completion of `Refresh Substack Content`
 - Manual `workflow_dispatch`
 
 Pipeline steps:
@@ -373,14 +374,19 @@ Pipeline steps:
 6. Upload full repository artifact.
 7. Deploy to GitHub Pages.
 
+Notes:
+
+- Push-based site deploys stay isolated from live Substack network fetches.
+- When the scheduled Substack refresh workflow commits updated JSON, this workflow also runs via `workflow_run` and deploys the latest `main`.
+
 ## Scheduled Substack Refresh Workflow
 
 Workflow file: `.github/workflows/refresh-substack-pages.yml`
 
 Purpose:
 
-- Refresh Substack content and deploy it to Pages on a schedule.
-- Keep push-based deploys isolated from Substack API availability.
+- Refresh Substack content on a schedule without coupling live fetches to the Pages deployment job.
+- Let the normal push-based Pages workflow deploy refreshed JSON after the repo is updated.
 
 Triggers:
 
@@ -391,11 +397,10 @@ Refresh steps:
 
 1. Checkout repository.
 2. Setup Python 3.13.
-3. Seed local `data/` files from live baseline URLs (`https://www.jameskull.com`, fallback `https://jkull04.github.io/personal_site`) when available.
-4. Run `python scripts/sync_substack_content.py --diagnostics --retries 6 --timeout 30 --source-order feed-web,posts,archive --min-public-posts 1 --merge-baseline`.
-5. If sync fails but baseline exists, continue with baseline data; if both fail, stop the workflow.
-6. Run `python scripts/optimize_runtime_images.py --check`.
-7. Configure Pages and deploy.
+3. Run `python scripts/sync_substack_content.py --diagnostics --retries 6 --timeout 30 --source-order feed-web,posts,archive --min-public-posts 1 --merge-baseline`.
+4. Detect whether `data/writings.json` or `data/works-substack.json` changed.
+5. Commit and push refreshed JSON when there is a content change.
+6. Let the regular `.github/workflows/deploy-pages.yml` workflow publish the updated static site from `main`.
 
 ## Substack Sync Verification Workflow
 

@@ -64,11 +64,25 @@ def compute_expected_size(
         )
 
 
+def resolve_source_path(*candidates: Path) -> Path:
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+
+    tried = ", ".join(str(candidate.relative_to(ROOT)) for candidate in candidates)
+    raise FileNotFoundError(f"Missing source image. Tried: {tried}")
+
+
 def specs() -> tuple[AssetSpec, ...]:
     home = ROOT / "assets" / "illustrations" / "runtime"
     sprites = ROOT / "assets" / "sprites"
     images = ROOT / "assets" / "images"
     icons = ROOT / "assets" / "icons"
+    headshot_source = resolve_source_path(
+        images / "headshot-square.png",
+        images / "headshot-square.jpg",
+        images / "headshot-square.jpeg",
+    )
 
     definitions: list[AssetSpec] = [
         AssetSpec(
@@ -163,7 +177,7 @@ def specs() -> tuple[AssetSpec, ...]:
             max_bytes=210_000,
         ),
         AssetSpec(
-            source=images / "headshot-square.png",
+            source=headshot_source,
             output=images / "headshot-square-640.webp",
             output_format="WEBP",
             target_width=640,
