@@ -398,9 +398,11 @@ Refresh steps:
 1. Checkout repository.
 2. Setup Python 3.13.
 3. Run `python scripts/sync_substack_content.py --diagnostics --retries 6 --timeout 30 --source-order posts,feed-web,archive --min-public-posts 1 --merge-baseline`.
-4. Detect whether `data/writings.json` or `data/works-substack.json` changed.
-5. Commit and push refreshed JSON when there is a content change.
-6. Let the regular `.github/workflows/deploy-pages.yml` workflow publish the updated static site from `main`.
+4. If the first sync attempt fails, wait briefly and retry once.
+5. For `workflow_dispatch` bridge runs, preserve existing data and finish successfully if both attempts fail.
+6. Detect whether `data/writings.json` or `data/works-substack.json` changed.
+7. Commit and push refreshed JSON when there is a content change.
+8. Let the regular `.github/workflows/deploy-pages.yml` workflow publish the updated static site from `main`.
 
 ## Optional Pipedream RSS Bridge
 
@@ -411,7 +413,12 @@ Purpose:
 
 Recommended flow:
 
-- `Substack RSS` -> `Pipedream RSS trigger` -> `GitHub workflow_dispatch` -> `Refresh Substack Content` -> `Deploy GitHub Pages`
+- `Substack RSS` -> `Pipedream RSS trigger` -> `Fetch post page HTML` -> `GitHub repository_dispatch` -> `Refresh Substack Content` -> `Deploy GitHub Pages`
+
+Bridge behavior:
+
+- Bridge-triggered runs do not perform a fresh Substack fetch on the GitHub runner. They apply the post payload sent by Pipedream directly into `data/writings.json` and `data/works-substack.json`.
+- The scheduled GitHub refresh remains the slower fallback path for deletions, older-history reconciliation, and any bridge event that is missed upstream.
 
 ### Pipedream setup
 
@@ -421,11 +428,14 @@ Create a new Pipedream workflow with:
 2. Feed URL: `https://jameskull.substack.com/feed`
 3. Poll interval: `Every 15 minutes`
 4. Action: `HTTP / Webhook` -> `Send any HTTP Request`
+   - Method: `GET`
+   - URL: use the RSS item link from the trigger event
+5. Action: `HTTP / Webhook` -> `Send any HTTP Request`
 
 HTTP request settings:
 
 - Method: `POST`
-- URL: `https://api.github.com/repos/jkull04/personal_site/actions/workflows/refresh-substack-pages.yml/dispatches`
+- URL: `https://api.github.com/repos/jkull04/personal_site/dispatches`
 - Headers:
   - `Accept: application/vnd.github+json`
   - `Authorization: Bearer {{process.env.GITHUB_TOKEN}}`
@@ -435,16 +445,22 @@ HTTP request settings:
 
 ```json
 {
-  "ref": "main"
+  "event_type": "substack-post-preload",
+  "client_payload": {
+    "page_url": "https://jameskull.substack.com/p/your-post-slug",
+    "page_html": "<full html of the Substack post page>"
+  }
 }
 ```
+
+In Pipedream, set `page_url` from the RSS trigger's link field and `page_html` from the body returned by the intermediate `GET` request step.
 
 ### GitHub token setup
 
 Create a fine-grained personal access token with:
 
 - Repository access: `personal_site` only
-- Repository permission: `Actions` -> `Read and write`
+- Repository permission: `Contents` -> `Read and write`
 
 Store the raw token value in Pipedream as a secret/environment variable named `GITHUB_TOKEN`.
 
@@ -454,6 +470,7 @@ Store the raw token value in Pipedream as a secret/environment variable named `G
 - The secret value should be only the raw GitHub token, not `Bearer ...`.
 - Re-enter header names manually if the UI pasted hidden line breaks into a key such as `Accept` or `Authorization`.
 - If Pipedream reports invalid characters in the `Authorization` header, delete and recreate the `GITHUB_TOKEN` secret as a single line with no extra spaces or trailing newline.
+- Repository dispatch requests must send `event_type` plus a `client_payload`; they do not use the `workflow_dispatch` `ref` body shape.
 
 ## Substack Sync Verification Workflow
 

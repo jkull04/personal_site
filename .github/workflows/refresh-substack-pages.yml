@@ -4,6 +4,8 @@ on:
   schedule:
     - cron: "17 */6 * * *"
   workflow_dispatch:
+  repository_dispatch:
+    types: [substack-post-preload]
 
 permissions:
   contents: write
@@ -29,7 +31,14 @@ jobs:
       - name: Show Python runtime
         run: python --version
 
+      - name: Apply bridge payload
+        if: github.event_name == 'repository_dispatch'
+        run: python scripts/apply_substack_bridge_payload.py --event-path "$GITHUB_EVENT_PATH"
+
       - name: Sync Substack content
+        if: github.event_name != 'repository_dispatch'
+        id: sync_primary
+        continue-on-error: true
         run: |
           python scripts/sync_substack_content.py \
             --diagnostics \
@@ -38,6 +47,63 @@ jobs:
             --source-order posts,feed-web,archive \
             --min-public-posts 1 \
             --merge-baseline
+
+      - name: Wait before retry
+        if: github.event_name != 'repository_dispatch' && steps.sync_primary.outcome == 'failure'
+        shell: bash
+        run: sleep 180
+
+      - name: Retry Substack sync
+        id: sync_retry
+        if: github.event_name != 'repository_dispatch' && steps.sync_primary.outcome == 'failure'
+        continue-on-error: true
+        run: |
+          python scripts/sync_substack_content.py \
+            --diagnostics \
+            --retries 6 \
+            --timeout 30 \
+            --source-order posts,feed-web,archive \
+            --min-public-posts 1 \
+            --merge-baseline
+
+      - name: Finalize sync outcome
+        if: github.event_name != 'repository_dispatch'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          PRIMARY_OUTCOME="${{ steps.sync_primary.outcome }}"
+          RETRY_OUTCOME="${{ steps.sync_retry.outcome }}"
+          EVENT_NAME="${{ github.event_name }}"
+
+          if [ -z "$RETRY_OUTCOME" ]; then
+            RETRY_OUTCOME="skipped"
+          fi
+
+          if [ "$PRIMARY_OUTCOME" = "success" ] || [ "$RETRY_OUTCOME" = "success" ]; then
+            {
+              echo "### Sync Outcome"
+              echo ""
+              echo "- Primary attempt: \`$PRIMARY_OUTCOME\`"
+              echo "- Retry attempt: \`$RETRY_OUTCOME\`"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "::warning::Substack refresh failed for a workflow_dispatch run; leaving existing published data unchanged."
+            {
+              echo "### Sync Outcome"
+              echo ""
+              echo "- Primary attempt: \`$PRIMARY_OUTCOME\`"
+              echo "- Retry attempt: \`$RETRY_OUTCOME\`"
+              echo "- Result: \`No data changed; existing site content preserved\`"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          echo "::error::Substack refresh failed after retry."
+          exit 1
 
       - name: Detect content changes
         id: changes

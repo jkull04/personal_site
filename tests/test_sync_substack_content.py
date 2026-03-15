@@ -6,6 +6,7 @@ import unittest
 from unittest.mock import patch
 from urllib.error import HTTPError
 
+from scripts import apply_substack_bridge_payload as bridge
 from scripts import sync_substack_content as sync
 
 
@@ -305,6 +306,36 @@ class MainBehaviorTests(unittest.TestCase):
         self.assertEqual(exit_code, 1)
         mock_write_outputs.assert_not_called()
         mock_emit_run_summary.assert_called_once()
+
+
+class BridgePayloadTests(unittest.TestCase):
+    @patch("scripts.apply_substack_bridge_payload.sync.load_config")
+    @patch("scripts.apply_substack_bridge_payload.sync.load_existing_outputs")
+    def test_apply_post_replaces_same_id_and_clears_other_collection(self, mock_load_existing_outputs, mock_load_config):
+        mock_load_config.return_value = make_config()
+        mock_load_existing_outputs.return_value = (
+            [{"id": "testing", "date": "2026-02-01", "title": "Old Essay"}],
+            [{"id": "testing", "date": "2026-02-01", "title": "Old Project"}],
+        )
+
+        writings, projects = bridge.apply_post(make_public_post("testing", tags=["Essays"], date="2026-03-15T00:00:00.000Z"))
+
+        self.assertEqual(writings[0]["id"], "testing")
+        self.assertEqual(writings[0]["title"], "Title testing")
+        self.assertFalse(any(item["id"] == "testing" for item in projects))
+
+    def test_extract_post_from_event_supports_preload_html(self):
+        post = make_public_post("from-bridge", tags=["Projects"])
+        event = {
+            "client_payload": {
+                "page_url": "https://example.substack.com/p/from-bridge",
+                "page_html": make_preload_page(post),
+            }
+        }
+
+        extracted = bridge._extract_post_from_event(event)
+
+        self.assertEqual(extracted["slug"], "from-bridge")
 
 
 class SummaryTests(unittest.TestCase):
