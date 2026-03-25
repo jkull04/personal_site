@@ -74,7 +74,6 @@ jobs:
 
           PRIMARY_OUTCOME="${{ steps.sync_primary.outcome }}"
           RETRY_OUTCOME="${{ steps.sync_retry.outcome }}"
-          EVENT_NAME="${{ github.event_name }}"
 
           if [ -z "$RETRY_OUTCOME" ]; then
             RETRY_OUTCOME="skipped"
@@ -90,20 +89,18 @@ jobs:
             exit 0
           fi
 
-          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            echo "::warning::Substack refresh failed for a workflow_dispatch run; leaving existing published data unchanged."
-            {
-              echo "### Sync Outcome"
-              echo ""
-              echo "- Primary attempt: \`$PRIMARY_OUTCOME\`"
-              echo "- Retry attempt: \`$RETRY_OUTCOME\`"
-              echo "- Result: \`No data changed; existing site content preserved\`"
-            } >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-
-          echo "::error::Substack refresh failed after retry."
-          exit 1
+          # All sources failed (typically Cloudflare blocking CI runner IPs).
+          # Emit a warning rather than failing the job so GitHub does not send
+          # failure notification emails. Data files are left unchanged.
+          echo "::warning::Substack refresh failed (likely Cloudflare blocking CI IPs); existing site content preserved. Use scripts/local_substack_push.py to update manually."
+          {
+            echo "### Sync Outcome"
+            echo ""
+            echo "- Primary attempt: \`$PRIMARY_OUTCOME\`"
+            echo "- Retry attempt: \`$RETRY_OUTCOME\`"
+            echo "- Result: \`No data changed; existing site content preserved\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 0
 
       - name: Detect content changes
         id: changes
