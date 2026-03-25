@@ -1,5 +1,17 @@
 [
   {
+    "id": "the-political-maneuvering-of-claudius",
+    "type": "essay",
+    "title": "The Political Maneuvering of Claudius",
+    "date": "2026-03-18",
+    "tags": [
+      "Classics",
+      "Essays"
+    ],
+    "abstract": "From the Archive: 18 April 2025",
+    "href": "https://jameskull.substack.com/p/the-political-maneuvering-of-claudius"
+  },
+  {
     "id": "stars",
     "type": "blog",
     "title": "Stars",
@@ -9,16 +21,5 @@
     ],
     "abstract": "A few thoughts.",
     "href": "https://jameskull.substack.com/p/stars"
-  },
-  {
-    "id": "testing",
-    "type": "essay",
-    "title": "testing",
-    "date": "2026-03-01",
-    "tags": [
-      "Essays"
-    ],
-    "abstract": "testing",
-    "href": "https://jameskull.substack.com/p/testing"
   }
 ]
