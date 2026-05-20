@@ -38,9 +38,9 @@
   const ROOT_ATLAS_LOADING_CLASS = "dino-atlases-loading";
   const ATLAS_PRELOAD_DELAY_MS = 120;
   const DINO_ATLAS_URLS = [
-    "/assets/sprites/stegosaurus-walk-atlas-2x.webp?v=20260301b",
-    "/assets/sprites/raptor-walk-atlas-2x.webp?v=20260301b",
-    "/assets/sprites/marble-brach-walk-atlas-2x.webp?v=20260301b"
+    "/assets/sprites/stegosaurus-walk-atlas-2x.webp?v=20260519a",
+    "/assets/sprites/raptor-walk-atlas-2x.webp?v=20260519a",
+    "/assets/sprites/marble-brach-walk-atlas-2x.webp?v=20260519a"
   ];
 
   const copyResetTimers = new WeakMap();

@@ -29,17 +29,17 @@
 }
 
 .dino--sheet.dino--stego {
-  --dino-sheet-image: url("../assets/sprites/stegosaurus-walk-atlas-2x.webp?v=20260301b");
+  --dino-sheet-image: url("../assets/sprites/stegosaurus-walk-atlas-2x.webp?v=20260519a");
   background-image: var(--dino-sheet-image);
 }
 
 .dino--sheet.dino--raptor {
-  --dino-sheet-image: url("../assets/sprites/raptor-walk-atlas-2x.webp?v=20260301b");
+  --dino-sheet-image: url("../assets/sprites/raptor-walk-atlas-2x.webp?v=20260519a");
   background-image: var(--dino-sheet-image);
 }
 
 .dino--sheet.dino--longneck {
-  --dino-sheet-image: url("../assets/sprites/marble-brach-walk-atlas-2x.webp?v=20260301b");
+  --dino-sheet-image: url("../assets/sprites/marble-brach-walk-atlas-2x.webp?v=20260519a");
   background-image: var(--dino-sheet-image);
   background-size: calc(var(--sheet-frame-w) * 8) var(--sheet-frame-h);
 }

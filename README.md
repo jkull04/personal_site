@@ -296,24 +296,32 @@ Writes:
 - `data/writings.json`
 - `data/works-substack.json`
 
-### 2) Normalize sprite atlases
+### 2) Convert generated art into true pixel assets
 
 ```bash
-python scripts/normalize_longneck_atlas.py --sprite all
+python scripts/pixel_asset_tool.py convert input.png output.png --logical-size 384x256 --pixel-scale 4 --palette adaptive --max-colors 32
+python scripts/pixel_asset_tool.py convert input.png output.png --logical-size 592x46 --palette marble
 ```
-
-Target options:
-
-- `all`
-- `stego`
-- `raptor`
-- `longneck`
 
 Outputs:
 
 - `assets/sprites/stegosaurus-walk-atlas.png`
 - `assets/sprites/raptor-walk-atlas.png`
 - `assets/sprites/marble-brach-walk-atlas.png`
+- `assets/source-art/final-steg.png`
+- `assets/source-art/final-raptor.png`
+- `assets/source-art/final-longneck.png`
+- `assets/illustrations/runtime/hero-home-arena.png`
+- `assets/illustrations/runtime/hero-projects-forum.png`
+- `assets/illustrations/runtime/hero-writings-pantheon.png`
+- `assets/illustrations/runtime/hero-contact-delphi.png`
+
+Use this for ChatGPT/imagegen outputs. The important step is crushing the generated image to a declared logical grid, quantizing it to the project palette, and only then scaling with nearest-neighbor. That makes the result an actual pixel image rather than a high-resolution image that imitates pixels.
+
+```bash
+python scripts/pixel_asset_tool.py convert input.png output.png --logical-size 384x256 --pixel-scale 4 --palette adaptive --max-colors 32
+python scripts/pixel_asset_tool.py check output.png --palette adaptive --max-colors 32 --pixel-scale 4
+```
 
 ### 3) Validate sprite atlases
 
@@ -321,6 +329,7 @@ Outputs:
 python scripts/validate_sprite_atlas.py --atlas assets/sprites/stegosaurus-walk-atlas.png
 python scripts/validate_sprite_atlas.py --atlas assets/sprites/raptor-walk-atlas.png
 python scripts/validate_sprite_atlas.py --atlas assets/sprites/marble-brach-walk-atlas.png
+python scripts/pixel_asset_tool.py check assets/illustrations/runtime/hero-home-arena.png assets/illustrations/runtime/hero-projects-forum.png assets/illustrations/runtime/hero-writings-pantheon.png assets/illustrations/runtime/hero-contact-delphi.png --palette adaptive --max-colors 32 --pixel-scale 4
 ```
 
 Useful options:
