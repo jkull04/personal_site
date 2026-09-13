@@ -962,7 +962,6 @@ def to_writings_entries(posts: list[dict[str, Any]], config: SyncConfig) -> list
     writings: list[dict[str, Any]] = []
     projects_key = config.projects_tag.lower()
     blog_key = config.blog_tag.lower()
-    writings_key = config.writings_tag.lower()
 
     for post in posts:
         if not post_is_public(post):
@@ -974,14 +973,8 @@ def to_writings_entries(posts: list[dict[str, Any]], config: SyncConfig) -> list
         if projects_key in tags_lower:
             continue
 
-        entry_type = None
-        if blog_key in tags_lower:
-            entry_type = "blog"
-        elif writings_key in tags_lower:
-            entry_type = "essay"
-
-        if entry_type is None:
-            continue
+        # Tags choose a section; an absent category must not hide public writing.
+        entry_type = "blog" if blog_key in tags_lower else "essay"
 
         title = str(post.get("title") or "").strip()
         slug = str(post.get("slug") or "").strip()

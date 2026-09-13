@@ -44,7 +44,7 @@ def make_config() -> sync.SyncConfig:
 
 
 def make_public_post(slug: str = "post-1", *, tags: list[str] | None = None, date: str = "2026-03-01T00:00:00.000Z") -> dict:
-    tag_values = tags or ["Essays"]
+    tag_values = ["Essays"] if tags is None else tags
     return {
         "slug": slug,
         "title": f"Title {slug}",
@@ -61,6 +61,42 @@ def make_preload_page(post: dict) -> str:
     payload = {"post": post}
     encoded = json.dumps(json.dumps(payload))[1:-1]
     return f'<html><body><script>window._preloads = JSON.parse("{encoded}")</script></body></html>'
+
+
+class WritingsRoutingTests(unittest.TestCase):
+    def test_untagged_and_topic_only_public_posts_are_essays(self):
+        posts = [
+            make_public_post("untagged", tags=[]),
+            make_public_post("topic-only", tags=["Economics"]),
+            make_public_post("essay", tags=["Essays"]),
+        ]
+        entries = sync.to_writings_entries(posts, make_config())
+        self.assertEqual({entry["id"] for entry in entries}, {p["slug"] for p in posts})
+        self.assertTrue(all(entry["type"] == "essay" for entry in entries))
+        self.assertEqual(entries[0]["tags"], [])
+
+    def test_notes_and_projects_keep_their_section_precedence(self):
+        posts = [
+            make_public_post("note", tags=["nOtEs", "Essays"]),
+            make_public_post("project", tags=["Projects", "Notes", "Essays"]),
+        ]
+        entries = sync.to_writings_entries(posts, make_config())
+        self.assertEqual([(e["id"], e["type"]) for e in entries], [("note", "blog")])
+
+    def test_drafts_and_nonpublic_posts_stay_excluded(self):
+        draft = make_public_post("draft", tags=[])
+        draft["is_published"] = False
+        paid = make_public_post("paid", tags=[])
+        paid["audience"] = "only_paid"
+        self.assertEqual(sync.to_writings_entries([draft, paid], make_config()), [])
+
+    def test_bridge_also_includes_untagged_public_posts(self):
+        with patch.object(sync, "load_config", return_value=make_config()), patch.object(
+            sync, "load_existing_outputs", return_value=([], [])
+        ):
+            writings, projects = bridge.apply_post(make_public_post("untagged", tags=[]))
+        self.assertEqual([(e["id"], e["type"]) for e in writings], [("untagged", "essay")])
+        self.assertEqual(projects, [])
 
 
 class FetchJsonTests(unittest.TestCase):

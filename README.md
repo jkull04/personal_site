@@ -183,7 +183,8 @@ Tag matching is case-insensitive:
 - `Projects`: treated as project entries and excluded from Writings list.
 - `Notes`: emitted as writings `type = "blog"`.
 - `Essays`: emitted as writings `type = "essay"` if not classified as Notes.
-- Untagged or unmatched posts are skipped.
+- All other public posts, including untagged posts or posts with only topic tags,
+  appear in Essays. Category tags are optional for inclusion in Writings.
 
 Only public posts (`audience == "everyone"` and published) are included.
 
