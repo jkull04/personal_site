@@ -1,8 +1,7 @@
 name: Refresh Substack Content
 
 on:
-  schedule:
-    - cron: "17 */6 * * *"
+  # Daily refresh runs locally; Substack rejects GitHub-hosted runner requests.
   workflow_dispatch:
   repository_dispatch:
     types: [substack-post-preload]
@@ -12,11 +11,12 @@ permissions:
 
 concurrency:
   group: "substack-refresh"
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   refresh_content:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -89,10 +89,9 @@ jobs:
             exit 0
           fi
 
-          # All sources failed (typically Cloudflare blocking CI runner IPs).
-          # Emit a warning rather than failing the job so GitHub does not send
-          # failure notification emails. Data files are left unchanged.
-          echo "::warning::Substack refresh failed (likely Cloudflare blocking CI IPs); existing site content preserved. Use scripts/local_substack_push.py to update manually."
+          # Preserve the last good content, but report the failed refresh honestly.
+          # A failed refresh must not trigger a successful Pages deployment.
+          echo "::error::Substack refresh failed after both attempts; existing site content preserved. Inspect the fetch diagnostics above."
           {
             echo "### Sync Outcome"
             echo ""
@@ -100,7 +99,7 @@ jobs:
             echo "- Retry attempt: \`$RETRY_OUTCOME\`"
             echo "- Result: \`No data changed; existing site content preserved\`"
           } >> "$GITHUB_STEP_SUMMARY"
-          exit 0
+          exit 1
 
       - name: Detect content changes
         id: changes

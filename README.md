@@ -14,7 +14,7 @@ Static personal website with a classical editorial visual language, Substack-syn
 - [Local Development](#local-development)
 - [Maintenance Scripts](#maintenance-scripts)
 - [Deployment](#deployment)
-- [Scheduled Substack Refresh Workflow](#scheduled-substack-refresh-workflow)
+- [Daily Substack Refresh](#daily-substack-refresh)
 - [Substack Sync Verification Workflow](#substack-sync-verification-workflow)
 - [Accessibility And Performance](#accessibility-and-performance)
 - [Troubleshooting](#troubleshooting)
@@ -386,39 +386,52 @@ Pipeline steps:
 Notes:
 
 - Push-based site deploys stay isolated from live Substack network fetches.
-- When the scheduled Substack refresh workflow commits updated JSON, this workflow also runs via `workflow_run` and deploys the latest `main`.
+- Daily local content pushes deploy through `push`; successful bridge/manual GitHub refreshes deploy through `workflow_run` using the latest `main`.
 
-## Scheduled Substack Refresh Workflow
+## Daily Substack Refresh
 
-Workflow file: `.github/workflows/refresh-substack-pages.yml`
+The daily refresh runs on the owner's Mac through a Codex scheduled task at noon
+(local time). Keep the Mac on and Codex running for local scheduled tasks.
+It runs once and exits; there is no continuously running sync process.
 
-Purpose:
+Run the same refresh manually:
 
-- Refresh Substack content on a schedule without coupling live fetches to the Pages deployment job.
-- Let the normal push-based Pages workflow deploy refreshed JSON after the repo is updated.
+```bash
+python3 scripts/refresh_substack_local.py --push
+```
 
-Triggers:
+Omit `--push` to preview. This command:
 
-- Scheduled run every 6 hours at `:17` (`00:17`, `06:17`, `12:17`, `18:17` UTC)
-- Manual `workflow_dispatch`
+1. Creates a temporary, sparse checkout of the latest production `main`.
+2. Fetches public Substack posts with the existing tag and project-template rules.
+3. Commits only `data/writings.json` and `data/works-substack.json` if they changed.
+4. Pushes to `main`, triggering the existing GitHub Pages deployment.
+5. Removes the temporary checkout without touching unfinished project edits.
 
-Refresh steps:
+Git must be authenticated for pushing to this repository. Failed fetches preserve
+production content; a concurrent update to `main` rejects the push safely. An
+unchanged feed produces no commit or deployment. The task reports changed content
+or a failure requiring attention and stays quiet when nothing changed.
 
-1. Checkout repository.
-2. Setup Python 3.13.
-3. Run `python scripts/sync_substack_content.py --diagnostics --retries 6 --timeout 30 --source-order posts,feed-web,archive --min-public-posts 1 --merge-baseline`.
-4. If the first sync attempt fails, wait briefly and retry once.
-5. For `workflow_dispatch` bridge runs, preserve existing data and finish successfully if both attempts fail.
-6. Detect whether `data/writings.json` or `data/works-substack.json` changed.
-7. Commit and push refreshed JSON when there is a content change.
-8. Let the regular `.github/workflows/deploy-pages.yml` workflow publish the updated static site from `main`.
+### Why the schedule moved off GitHub
+
+On September 13, 2026, the GitHub refresh workflow was disabled for inactivity.
+Fresh verification runs on both Ubuntu and macOS runners received Substack HTTP
+403 challenge responses, while the local Mac fetched the same public posts
+successfully. The old workflow also converted failed refreshes to successful runs.
+
+The six-hour GitHub schedule has been removed. The workflow
+`.github/workflows/refresh-substack-pages.yml` remains available for manual
+`workflow_dispatch` and the optional `substack-post-preload` bridge. It now fails
+visibly if both network attempts fail and preserves the last good site data.
+Successful bridge/manual refreshes trigger Pages through `workflow_run`.
 
 ## Optional Pipedream RSS Bridge
 
 Purpose:
 
 - Trigger the Substack refresh workflow closer to publish time without moving live Substack fetches into the Pages deploy job.
-- Keep the scheduled GitHub refresh as a fallback, while allowing near-real-time refreshes from a free RSS poller.
+- Keep the daily local refresh as a fallback, while allowing near-real-time refreshes from a free RSS poller.
 
 Recommended flow:
 
@@ -427,7 +440,7 @@ Recommended flow:
 Bridge behavior:
 
 - Bridge-triggered runs do not perform a fresh Substack fetch on the GitHub runner. They apply the post payload sent by Pipedream directly into `data/writings.json` and `data/works-substack.json`.
-- The scheduled GitHub refresh remains the slower fallback path for deletions, older-history reconciliation, and any bridge event that is missed upstream.
+- The daily local refresh reconciles deletions, older history, and bridge events missed upstream.
 
 ### Pipedream setup
 
