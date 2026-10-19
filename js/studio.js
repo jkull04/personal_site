@@ -26,7 +26,7 @@
   function setBusy(value) {
     busy = value;
     document.querySelectorAll('#studio-editor button, #studio-editor input, #studio-editor textarea, #studio-editor select').forEach(el=>el.disabled=value);
-    updateBatchButton();
+    renderBatch();
     if(state) { refreshManagerOptions(); managedKinds.forEach(updateSelectionControls); }
   }
   async function api(path, method='GET', body) {
@@ -207,21 +207,31 @@
     const count=pendingBatchPicks().length;
     $('batch-add').hidden=!batchRows.some(row=>row.matches.length);
     $('batch-add').disabled=busy || !count;
-    $('batch-add').textContent=count ? `Add ${count} book${count===1?'':'s'}` : 'Choose books to add';
+    $('batch-add').textContent=count ? `Add ${count} reviewed book${count===1?'':'s'}` : 'Choose books to add';
   }
   function renderBatch() {
+    const selected=[];
     $('batch-results').innerHTML=batchRows.map((row,i)=>{
       const book=row.selected===null ? null : row.matches[row.selected];
-      const existing=book && existingBook(book);
-      return `<div class="batch-row ${existing?'is-added':''}"><div>${bookCover(book?BookData.coverURL(book.coverId):'',book?.title || row.title)}</div><div><label for="batch-match-${i}">${esc(row.title)}</label><select id="batch-match-${i}" data-batch-row="${i}" ${busy?'disabled':''}><option value="">${row.error?'Search unavailable — retry below':'Choose a match or leave out'}</option>${row.matches.map((match,j)=>`<option value="${j}" ${row.selected===j?'selected':''}>${existingBook(match)?'✓ Already added · ':''}${esc(match.title)} — ${esc(match.author || 'Unknown author')}${match.year?' ('+esc(match.year)+')':''}</option>`).join('')}</select><p class="book-badge">${existing?'✓ Added · '+esc(bookStatus(existing)):book?'Selected · not added yet':'Not added · choose a match'}</p></div></div>`;
+      const existing=book && existingBook(book), duplicate=book && BookData.findExisting(selected,book);
+      if(book)selected.push(book);
+      const blocked=busy || !!existing || !!duplicate;
+      return `<div class="batch-row ${existing?'is-added':''}"><div>${bookCover(book?BookData.coverURL(book.coverId):'',book?.title || row.title)}</div><div><label for="batch-match-${i}">${esc(row.title)}</label><select id="batch-match-${i}" data-batch-row="${i}" ${busy?'disabled':''}><option value="">${row.error?'Search unavailable — retry below':'Choose a match or leave out'}</option>${row.matches.map((match,j)=>`<option value="${j}" ${row.selected===j?'selected':''}>${existingBook(match)?'✓ Already added · ':''}${esc(match.title)} — ${esc(match.author || 'Unknown author')}${match.year?' ('+esc(match.year)+')':''}</option>`).join('')}</select>
+      ${book?`<div class="batch-review"><strong>${esc(book.title)}</strong><p>${esc(book.author || 'Author unavailable — choose another match or add manually')}</p><div class="batch-details"><label>Completed<input type="date" data-batch-date="${i}" value="${esc(row.finished || '')}" ${blocked?'disabled':''} /></label><label>Rating<select data-batch-rating="${i}" ${blocked?'disabled':''}><option value="">No rating</option>${[1,2,3,4,5].map(n=>`<option value="${n}" ${String(row.rating)===String(n)?'selected':''}>${'★'.repeat(n)} · ${n}/5</option>`).join('')}</select></label></div><p class="batch-year-hint">${row.finished?'Completed '+esc(row.finished):'Year only: '+esc($('batch-year').value)+'. Exact date optional.'}</p></div>`:''}
+      <p class="book-badge">${existing?'✓ Already added · '+esc(bookStatus(existing)):duplicate?'Duplicate in this batch · added only once':book?'Ready for review · not added yet':'Not added · choose a match'}</p></div></div>`;
     }).join('');
     updateBatchButton();
   }
+  $('batch-year').addEventListener('change',renderBatch);
   $('batch-results').onchange=event=>{
-    if(busy || !event.target.matches('[data-batch-row]')) return;
-    const index=Number(event.target.dataset.batchRow); if(!Number.isInteger(index) || !batchRows[index]) return;
-    batchRows[index].selected=event.target.value===''?null:Number(event.target.value);
-    renderBatch();$('batch-match-'+index).focus({preventScroll:true});
+    if(busy) return;
+    const target=event.target, key=target.matches('[data-batch-row]')?'selected':target.matches('[data-batch-date]')?'finished':target.matches('[data-batch-rating]')?'rating':'';
+    if(!key)return;
+    const index=Number(key==='selected'?target.dataset.batchRow:key==='finished'?target.dataset.batchDate:target.dataset.batchRating);
+    if(!Number.isInteger(index) || !batchRows[index])return;
+    batchRows[index][key]=key==='selected'?(target.value===''?null:Number(target.value)):target.value;
+    if(key==='selected') {renderBatch();$('batch-match-'+index).focus({preventScroll:true});}
+    else if(key==='finished') target.closest('.batch-review').querySelector('.batch-year-hint').textContent=target.value?'Completed '+target.value:'Year only: '+$('batch-year').value+'. Exact date optional.';
   };
   $('batch-cancel').onclick=()=>batchController?.abort();
   $('batch-find').onclick=async()=>{
@@ -263,13 +273,13 @@
   };
   $('batch-add').onclick=()=>{
     if(busy) return;
-    const picks=batchRows.filter(row=>row.selected!==null).map(row=>row.matches[row.selected]).filter(Boolean);
+    const picks=batchRows.filter(row=>row.selected!==null).map(row=>row.matches[row.selected]?{...row.matches[row.selected],finished:row.finished || '',rating:row.rating || ''}:null).filter(Boolean);
     if(!picks.length) {$('batch-status').textContent='Choose at least one catalog match first.';return;}
     try {
       const result=BookData.addBatch(state.data.books,picks,$('batch-year').value,()=>crypto.randomUUID());
       undoDraft=null;state.data.books=result.books;render();save().catch(()=>{});
       renderBatch();
-      $('batch-status').textContent=`${result.added} books added to your draft for ${$('batch-year').value}. ${result.skipped?result.skipped+' already on your shelf were skipped. ':''}Publish when ready.`;
+      $('batch-status').textContent=`${result.added} book${result.added===1?'':'s'} added with the dates and ratings you reviewed. ${result.skipped?result.skipped+' already on your shelf were skipped. ':''}Publish when ready.`;
     } catch(error) {$('batch-status').textContent=error.message;}
   };
   function downloadBackup() {
@@ -325,7 +335,7 @@
       const ctx=canvas.getContext('2d'); ctx.fillStyle='#F7F5F0'; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);
       return {content:canvas.toDataURL('image/jpeg',.86).split(',')[1],width:canvas.width,height:canvas.height};
     }
-    try { return {full:encode(2400),thumb:encode(960)}; } finally { bitmap.close(); }
+    try { return {full:encode(2400),thumb:encode(640)}; } finally { bitmap.close(); }
   }
   async function upload(files) {
     if (busy || !state) return;
@@ -442,7 +452,8 @@
     const saved=state.baseline[kind].find(e=>e.id===entry.id);
     if(entry.published===false) return saved ? 'Removal pending' : 'Private draft';
     if(!saved) return 'Not published';
-    return JSON.stringify(entry)===JSON.stringify(saved) ? 'Published' : 'Changes to publish';
+    const orderChanged=kind==='photography' && state.data[kind].filter(p=>p.published!==false).findIndex(p=>p.id===entry.id)!==state.baseline[kind].findIndex(p=>p.id===entry.id);
+    return JSON.stringify(entry)===JSON.stringify(saved) && !orderChanged ? 'Published' : 'Changes to publish';
   }
   function setupManagers() {
     for(const kind of managedKinds) {
@@ -455,7 +466,7 @@
         ${select('visibility','Visibility',option('','All entries')+option('pending','Pending changes')+option('included','Included on site')+option('private','Private drafts'))}
         ${photo?select('group','Group',option('','All groups'))+select('subgroup','Subgroup',option('','All subgroups')):select('shelf','Reading status',option('','All statuses')+['Read','Reading','Want to read'].map(v=>option(v,v)).join(''))+select('year','Year finished',option('','All years'))}
         ${select('sort','Sort',option('order','Your order')+option('title','Title A–Z')+option('date','Newest '+(photo?'photo':'finish')+' first'))}
-      </div><p id="${kind}-count" role="status"></p><div class="studio-actions"><button type="button" data-manage="select" data-kind="${kind}">Select shown</button><button type="button" data-manage="clear" data-kind="${kind}">Clear selection</button><button type="button" data-manage="undo" data-kind="${kind}" disabled>Undo last bulk action</button></div>
+      </div><p id="${kind}-count" role="status"></p><div class="studio-actions"><button type="button" data-manage="select" data-kind="${kind}">Select shown</button><button type="button" data-manage="clear" data-kind="${kind}">Clear selection</button><button type="button" data-manage="undo" data-kind="${kind}" disabled>Undo last organization change</button></div>
       <details class="bulk-panel"><summary>Update selected <span id="${kind}-selected">(0)</span></summary><p>Changes affect every selected entry. Publish when ready.</p><div class="manager-filters">
       ${photo?field('move-group','Move to group','<input CONTROL list="photo-groups" maxlength="100" placeholder="Blank = ungrouped" />')+field('move-subgroup','Move to subgroup','<input CONTROL list="photo-subgroups" maxlength="100" placeholder="Optional" />'):select('bulk-shelf','Reading status',option('','Keep current')+['Read','Reading','Want to read'].map(v=>option(v,v)).join(''))+field('bulk-year','Finish year (replaces exact date)','<input CONTROL type="number" min="1000" max="9999" placeholder="Keep current" />')+select('bulk-rating','Rating',option('','Keep current')+option('none','No rating')+[1,2,3,4,5].map(v=>option(v,v+' / 5')).join(''))}
       </div><div class="studio-actions"><button type="button" data-manage="apply" data-kind="${kind}">${photo?'Move selected':'Apply to selected'}</button><button type="button" data-manage="include" data-kind="${kind}">Include on site</button><button type="button" data-manage="private" data-kind="${kind}">Make private</button><button type="button" data-manage="remove" data-kind="${kind}">Remove selected</button></div></details>
@@ -507,7 +518,7 @@
       const action=button.dataset.manage;
       button.disabled=busy || (action==='undo'? !undoDraft : ['clear','apply','include','private','remove'].includes(action)?!size:false);
     });
-    document.querySelectorAll(`.edit-card[data-kind="${kind}"] [data-select-entry]`).forEach(input=>input.checked=selection[kind].has(input.closest('[data-id]').dataset.id));
+    document.querySelectorAll(`[data-kind="${kind}"] [data-select-entry]`).forEach(input=>input.checked=selection[kind].has(input.closest('[data-id]').dataset.id));
   }
   function applyManagerView(kind) {
     if(!state) return;
@@ -517,6 +528,7 @@
     cards.forEach((card,id)=>card.hidden=!ids.has(id));
     entries.forEach(e=>{if(cards.has(e.id))holder.append(cards.get(e.id));});
     $(''+kind+'-count').textContent=`${entries.length} of ${state.data[kind].length} ${kind==='books'?'books':'photos'} shown`;
+    if(kind==='photography')renderPhotoOrganizer(entries);
     updateSelectionControls(kind);
   }
   function refreshManagementSummary() {
@@ -597,6 +609,60 @@
       render();save().catch(()=>{});
       $(kind+'-feedback').textContent=action==='undo'?'Restored the draft from before the last bulk action.':'Draft updated. Review your entries, then publish when ready.';
     } catch(error) {$(kind+'-feedback').textContent=error.message;}
+  });
+  function photoThumb(photo) {
+    const path=photo.thumb.slice(1), data=state.images[path] || previews[path];
+    return data?'data:image/jpeg;base64,'+data:photo.thumb;
+  }
+  function renderPhotoOrganizer(entries) {
+    const holder=$('photo-organizer');
+    const ordered=managerValue('photography','sort')==='order';
+    holder.innerHTML=`<div class="organizer-heading"><h3>Arrange &amp; preview</h3><p>${ordered?'Drag a handle to reorder the photos shown below. Use the arrow buttons on a phone or keyboard.':'Choose “Your order” above to rearrange photos.'} Select 1–4 included photos from one group to set its square preview.</p></div><div class="studio-actions"><button type="button" data-photo-organize="preview">Use selected as category preview</button><button type="button" data-photo-organize="automatic">Use automatic preview for this group</button></div>
+    <div class="photo-organizer-grid">${entries.map((e,i)=>`<article class="organizer-photo" data-kind="photography" data-id="${e.id}" data-photo-order="${e.id}"><div class="organizer-image"><img src="${esc(photoThumb(e))}" alt="${esc(e.alt || e.title)}" loading="lazy" /><label><input type="checkbox" data-select-entry aria-label="Select ${esc(e.title)}" ${selection.photography.has(e.id)?'checked':''} />Select</label>${e.preview?'<span class="preview-marker">Preview</span>':''}</div><p>${esc(e.title)}</p><small>${esc(PhotoData.group(e)||'Ungrouped')}${e.published===false?' · Private':''}</small><div class="organizer-order"><button type="button" draggable="${ordered&&!busy}" data-drag-photo="${e.id}" aria-label="Drag to reorder ${esc(e.title)}" ${!ordered||busy?'disabled':''}>⠿</button><button type="button" data-photo-organize="earlier" aria-label="Move ${esc(e.title)} earlier" ${!ordered||busy||i===0?'disabled':''}>←</button><button type="button" data-photo-organize="later" aria-label="Move ${esc(e.title)} later" ${!ordered||busy||i===entries.length-1?'disabled':''}>→</button></div></article>`).join('')}</div><p id="photo-organize-status" role="status"></p>`;
+  }
+  function reorderPhoto(from,to) {
+    if(busy || managerValue('photography','sort')!=='order')return;
+    const next=PhotoData.reorder(state.data.photography,managerEntries('photography').map(e=>e.id),from,to);
+    if(next===state.data.photography)return;
+    rememberBulk();state.data.photography=next;render();save().catch(()=>{});
+    $('photo-organize-status').textContent='Photo order saved in your draft. Publish when ready.';
+    $('photo-organizer').querySelector(`[data-photo-order="${from}"] [data-drag-photo]`)?.focus({preventScroll:true});
+  }
+  let draggedPhoto='';
+  $('photo-organizer').addEventListener('dragstart',event=>{
+    const handle=event.target.closest('[data-drag-photo]');
+    if(!handle || busy || managerValue('photography','sort')!=='order'){event.preventDefault();return;}
+    draggedPhoto=handle.dataset.dragPhoto;event.dataTransfer.effectAllowed='move';event.dataTransfer.setData('text/plain',draggedPhoto);
+    handle.closest('[data-photo-order]').classList.add('is-dragging');
+  });
+  $('photo-organizer').addEventListener('dragover',event=>{
+    const target=event.target.closest('[data-photo-order]');if(!draggedPhoto || !target)return;
+    event.preventDefault();event.dataTransfer.dropEffect='move';
+    $('photo-organizer').querySelectorAll('.drop-before').forEach(el=>el.classList.remove('drop-before'));target.classList.add('drop-before');
+  });
+  $('photo-organizer').addEventListener('drop',event=>{
+    event.preventDefault();const target=event.target.closest('[data-photo-order]');
+    if(draggedPhoto && target)reorderPhoto(draggedPhoto,target.dataset.photoOrder);draggedPhoto='';
+  });
+  $('photo-organizer').addEventListener('dragend',()=>{draggedPhoto='';$('photo-organizer').querySelectorAll('.is-dragging,.drop-before').forEach(el=>el.classList.remove('is-dragging','drop-before'));});
+  $('photo-organizer').addEventListener('click',event=>{
+    const button=event.target.closest('[data-photo-organize]');if(!button || busy)return;
+    const action=button.dataset.photoOrganize;
+    try {
+      if(action==='earlier' || action==='later') {
+        const id=button.closest('[data-photo-order]').dataset.photoOrder, entries=managerEntries('photography'),index=entries.findIndex(e=>e.id===id),to=entries[index+(action==='earlier'?-1:1)];
+        if(to)reorderPhoto(id,to.id);return;
+      }
+      let next;
+      if(action==='preview')next=PhotoData.setPreview(state.data.photography,[...selection.photography]);
+      else {
+        const parent=selectedGroup(managerValue('photography','group'));
+        if(parent===undefined)throw Error('Choose a group in the filters first.');
+        next=state.data.photography.map(p=>PhotoData.group(p)===parent?{...p,preview:false}:p);
+      }
+      rememberBulk();state.data.photography=next;render();save().catch(()=>{});
+      $('photo-organize-status').textContent=action==='preview'?'Category preview saved. Publish to update the site.':'This group will use its first four included photos.';
+    }catch(error){$('photo-organize-status').textContent=error.message;}
   });
   const writingEditor=createWritingEditor({getState:()=>state,save,isBusy:()=>busy,onChange:()=>{undoDraft=null;managedKinds.forEach(updateSelectionControls);}});
   setupManagers();

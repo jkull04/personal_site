@@ -16,9 +16,9 @@
     <link rel="stylesheet" href="/css/components.css" />
     <link rel="stylesheet" href="/css/dinos.css" />
     <script defer src="/js/dinos.js"></script>
-    <link rel="stylesheet" href="/css/collections.css?v=smooth-spread-1" />
-    <script defer src="/js/photo-data.js?v=management-1"></script>
-    <script defer src="/js/collections.js?v=smooth-spread-1"></script>
+    <link rel="stylesheet" href="/css/collections.css?v=gallery-next-1" />
+    <script defer src="/js/photo-data.js?v=gallery-next-1"></script>
+    <script defer src="/js/collections.js?v=gallery-next-1"></script>
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
@@ -60,7 +60,7 @@
       <dialog id="photo-viewer" aria-label="Photograph viewer">
         <button class="viewer-close" type="button" aria-label="Close photograph"><span aria-hidden="true">×</span></button>
         <figure><img id="viewer-image" alt="" /><figcaption id="viewer-caption"></figcaption></figure>
-        <div class="viewer-controls"><button id="viewer-prev" type="button">← Previous</button><span id="viewer-count"></span><button id="viewer-next" type="button">Next →</button></div>
+        <div class="viewer-controls"><button id="viewer-prev" type="button">← Previous</button><span class="viewer-info"><span id="viewer-count" role="status" aria-live="polite"></span><button id="viewer-share" type="button" aria-label="Copy photo link">Copy link</button></span><button id="viewer-next" type="button">Next →</button></div>
       </dialog>
     </main>
     <footer class="footer site-shell">

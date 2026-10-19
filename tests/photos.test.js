@@ -37,3 +37,33 @@ test('publishing rejects orphan subgroups while old collections remain valid',()
  assert.throws(()=>validate({books:[],photography:[photo('a','','Mountains')]},true),/Choose a group/);
  assert.doesNotThrow(()=>validate({books:[],photography:[photo('a','','Mountains')]}));
 });
+test('category preview chooses exactly the selected published photos and falls back to four',()=>{
+ const {preview,setPreview}=require('../js/photo-data.js');
+ const source=[photo('a','Trip'),photo('b','Trip'),photo('c','Trip'),photo('d','Trip'),photo('e','Trip')];
+ const chosen=setPreview(source,['b','d']);
+ assert.deepEqual(preview(chosen).map(p=>p.id),['b','d']);
+ assert.deepEqual(preview(source).map(p=>p.id),['a','b','c','d']);
+ assert.deepEqual(preview(chosen.map(p=>({...p,published:p.id!=='b'}))).map(p=>p.id),['d']);
+ assert.throws(()=>setPreview(source,source.map(p=>p.id)),/four/);
+ assert.throws(()=>setPreview(photos(),['a','b']),/one group/);
+ assert.throws(()=>setPreview([{...source[0],published:false}],['a']),/Include/);
+ assert.equal(source[1].preview,undefined);
+});
+test('drag reorder keeps hidden photos fixed and preserves all photo metadata',()=>{
+ const {reorder}=require('../js/photo-data.js');const source=photos(), before=structuredClone(source);
+ const next=reorder(source,['a','c','d'],'d','a');
+ assert.deepEqual(next.map(p=>p.id),['d','b','a','c','e']);
+ assert.deepEqual(source,before);assert.deepEqual(next.find(p=>p.id==='d'),source[3]);
+ assert.equal(reorder(source,['a','c'],'missing','a'),source);
+});
+test('photo links survive group renames and moves; encoded subgroup and empty group roundtrip',()=>{
+ const {link,resolveLink}=require('../js/photo-data.js');const source=photos();
+ const hash=link(source,'New Zealand','South Island','d',2);
+ assert.deepEqual(resolveLink(source,hash),{parent:'New Zealand',child:'South Island',photoId:'d',page:2});
+ const moved=move(source,['d'],'France & Italy','A/B');
+ assert.deepEqual(resolveLink(moved,hash),{parent:'France & Italy',child:undefined,photoId:'d',page:2});
+ assert.equal(resolveLink(rename(source,'New Zealand',undefined,'NZ'),hash).parent,'NZ');
+ assert.equal(resolveLink(source,link(source,'',undefined,'e')).parent,'');
+ assert.equal(resolveLink(source,'#photo=unknown'),null);
+ assert.equal(resolveLink(source,'#group=New+Zealand&page=Infinity').page,0);
+});

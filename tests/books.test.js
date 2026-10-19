@@ -58,3 +58,10 @@ test('publication labels distinguish drafts, pending changes, removals and finis
   const reading={...book,status:'Reading'};
   assert.equal(publicationStatus(reading,[reading]),'Published · not finished');
 });
+test('reviewed batch preserves individual completion dates and ratings; year-only stays undated',()=>{
+ const result=addBatch([],[{title:'A',author:'One',finished:'2026-09-01',rating:'5'},{title:'B',author:'Two',rating:'3'}],'2024',(()=>{let i=0;return()=>String(++i);})());
+ assert.equal(result.books[0].finished,'2026-09-01');assert.equal(result.books[0].finishedYear,'2026');assert.equal(result.books[0].rating,'5');
+ assert.equal(result.books[1].finished,'');assert.equal(result.books[1].finishedYear,'2024');assert.equal(result.books[1].rating,'3');
+ for(const finished of ['2026-02-30','2026-13-01','bad'])assert.throws(()=>addBatch([],[{title:'Bad',finished}],'2026',()=> 'id'),/completion date/);
+ assert.throws(()=>addBatch([],[{title:'Bad',rating:'6'}],'2026',()=> 'id'),/rating/);
+});
