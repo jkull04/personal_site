@@ -30,3 +30,30 @@ test('public shelf includes only published finished books, newest first, without
   assert.deepEqual(recentlyFinished(books).map(b=>b.id),['new','old','undated']);assert.equal(JSON.stringify(books),original);
   assert.equal(recentlyFinished(Array.from({length:20},(_,i)=>({status:'Read',title:String(i)}))).length,12);
 });
+test('English search requests matching editions and uses their title and cover',()=>{
+  const {searchParams}=require('../js/book-data.js');
+  const params=searchParams('Crime and Punishment');
+  assert.match(params.get('q'),/language:eng/);
+  assert.match(params.get('fields'),/editions.cover_i/);
+  assert.doesNotMatch(searchParams('Crime and Punishment',false).get('q'),/language:eng/);
+  const [book]=catalogResults({docs:[{title:'Преступление и наказание',key:'/works/OL1W',cover_i:1,author_name:['Dostoevsky'],editions:{docs:[{title:'Crime and Punishment',cover_i:2,language:['eng']}]}}]});
+  assert.equal(book.title,'Crime and Punishment'); assert.equal(book.coverId,2);assert.equal(book.catalogKey,'/works/OL1W');
+});
+test('existing book detection shares rules between single search and batch import',()=>{
+  const {findExisting}=require('../js/book-data.js');
+  const books=[{id:'a',title:' The   Odyssey ',author:'Homer'},{id:'b',title:'Foreign title',catalogKey:'/works/OL1W'}];
+  assert.equal(findExisting(books,{title:'the odyssey',author:'Homer'}).id,'a');
+  assert.equal(findExisting(books,{title:'English title',catalogKey:'/works/OL1W'}).id,'b');
+  assert.equal(findExisting(books,{title:'The Odyssey',author:'Another author'}),undefined);
+});
+test('publication labels distinguish drafts, pending changes, removals and finished published books',()=>{
+  const {publicationStatus}=require('../js/book-data.js');
+  const book={id:'a',title:'Odyssey',status:'Read',published:true};
+  assert.equal(publicationStatus(book,[]),'Not published');
+  assert.equal(publicationStatus({...book,published:false},[]),'Private draft');
+  assert.equal(publicationStatus(book,[{...book}]),'Published');
+  assert.equal(publicationStatus({...book,title:'The Odyssey'},[book]),'Changes to publish');
+  assert.equal(publicationStatus({...book,published:false},[book]),'Removal pending');
+  const reading={...book,status:'Reading'};
+  assert.equal(publicationStatus(reading,[reading]),'Published · not finished');
+});

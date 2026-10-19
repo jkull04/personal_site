@@ -6,6 +6,7 @@
   const previews = {};
   const status = message => { $('studio-status').textContent = message; };
   function save() {
+    refreshBookOverview();
     const snapshot = structuredClone(state);
     saveQueue = saveQueue.catch(()=>{}).then(()=>new Promise((resolve,reject)=>{
       const tx = db.transaction('drafts','readwrite');
@@ -18,6 +19,7 @@
   function setBusy(value) {
     busy = value;
     document.querySelectorAll('main button, main input, main textarea, main select').forEach(el=>el.disabled=value);
+    updateBatchButton();
   }
   async function api(path, method='GET', body) {
     const token = $('github-token').value.trim();
@@ -67,6 +69,9 @@
         return `<article class="edit-card" data-kind="${kind}" data-id="${e.id}"><h3>${kind==='books'?'Book':'Photograph'} ${i+1}</h3><div class="${kind==='photography'?'edit-photo':'edit-book'}">${cover}<div><div class="edit-fields">${fields}</div>${actions(kind,e,i)}</div></div></article>`;
       }).join('') || `<p>No ${kind==='books'?'books':'photographs'} yet. Add your first one above.</p>`;
     }
+    refreshBookOverview();
+    if(catalogMatches.length) showCatalog(catalogMatches,false);
+    renderBatch();
   }
   function bookCover(url,title) {
     return `<div class="catalog-cover">${url?`<img src="${esc(url)}" alt="Cover of ${esc(title)}" loading="lazy" referrerpolicy="no-referrer" />`:''}<span ${url?'hidden':''}>No cover available</span></div>`;
@@ -76,27 +81,53 @@
   },true);
   let catalogMatches=[], catalogController, catalogTimer, catalogVersion=0, lastSearch=0, catalogTarget='';
   const catalogCache=new Map();
-  function showCatalog(matches) {
-    catalogMatches=matches;
-    $('catalog-results').innerHTML=matches.map((book,i)=>`<button class="catalog-result" type="button" data-catalog-index="${i}" ${busy?'disabled':''}>${bookCover(BookData.coverURL(book.coverId),book.title)}<span><strong>${esc(book.title)}</strong><span>${esc(book.author || 'Author unavailable')}</span><small>${esc(book.year)}</small></span></button>`).join('');
-    $('catalog-status').textContent=matches.length?'Choose the book you finished.':'No matches found. Try another title, or add the book manually.';
+  const existingBook=book=>BookData.findExisting(state.data.books,book);
+  const bookStatus=book=>BookData.publicationStatus(book,state.baseline.books);
+  function refreshBookOverview() {
+    if(!state) return;
+    const books=state.data.books;
+    $('shelf-count').textContent=`${books.length} book${books.length===1?'':'s'} added`;
+    $('shelf-overview').innerHTML=books.map(book=>`<button type="button" class="shelf-item" data-edit-book="${book.id}" ${busy?'disabled':''}>${bookCover(BookData.coverURL(book.coverId),book.title)}<strong>${esc(book.title || 'Untitled book')}</strong><span class="book-badge">${esc(bookStatus(book))}</span></button>`).join('') || '<p>Your added books will appear here.</p>';
   }
+  function focusBook(id) {
+    const input=$(id+'-title');
+    if(input) {input.closest('.edit-card').scrollIntoView({block:'start'});input.focus({preventScroll:true});}
+  }
+  $('shelf-overview').onclick=event=>{
+    const button=event.target.closest('[data-edit-book]');
+    if(button && !busy) focusBook(button.dataset.editBook);
+  };
+  function showCatalog(matches,announce=true) {
+    catalogMatches=matches;
+    $('catalog-results').innerHTML=matches.map((book,i)=>{
+      const existing=existingBook(book);
+      const label=catalogTarget ? 'Use this edition' : existing ? '✓ Added · Edit book' : '+ Add book';
+      return `<button class="catalog-result ${existing?'is-added':''}" type="button" data-catalog-index="${i}" ${busy?'disabled':''}>${bookCover(BookData.coverURL(book.coverId),book.title)}<span><strong>${esc(book.title)}</strong><span>${esc(book.author || 'Author unavailable')}</span><small>${esc(book.year)}</small><span class="book-badge">${label}</span></span></button>`;
+    }).join('');
+    if(announce) $('catalog-status').textContent=matches.length?'Choose a book to add. Books already on your shelf are marked.':'No matches found. Try another title, turn off English editions only, or add the book manually.';
+  }
+  const searchKey=title=>($('english-only').checked?'eng:':'all:')+title.toLowerCase();
+  $('english-only').onchange=()=>{
+    batchController?.abort();batchRows=[];renderBatch();
+    $('batch-status').textContent='Language filter changed. Find books again to refresh batch matches.';
+    if($('book-search').value.trim().length>=2) queueBookSearch(true);
+  };
   async function searchBooks(version) {
     if(busy || version!==catalogVersion) return;
     const query=$('book-search').value.trim();
     if(query.length<2) return;
-    if(catalogCache.has(query.toLowerCase())) {showCatalog(catalogCache.get(query.toLowerCase()));return;}
+    if(catalogCache.has(searchKey(query))) {showCatalog(catalogCache.get(searchKey(query)));return;}
     catalogController=new AbortController();
     const controller=catalogController;
     const timeout=setTimeout(()=>controller.abort(),15000);
     lastSearch=Date.now(); $('catalog-status').textContent='Searching the catalog…';
     try {
-      const params=new URLSearchParams({title:query,fields:'key,title,author_name,cover_i,first_publish_year',limit:'8',lang:'en'});
+      const params=BookData.searchParams(query,$('english-only').checked);
       const response=await fetch('https://openlibrary.org/search.json?'+params,{signal:controller.signal,credentials:'omit',referrerPolicy:'no-referrer'});
       if(!response.ok) throw Error();
       const matches=BookData.catalogResults(await response.json());
       if(version!==catalogVersion) return;
-      catalogCache.set(query.toLowerCase(),matches); showCatalog(matches);
+      catalogCache.set(searchKey(query),matches); showCatalog(matches);
     } catch(error) {
       if(version===catalogVersion) $('catalog-status').textContent='The catalog is unavailable right now. Try Search again, or add the book manually.';
     } finally {clearTimeout(timeout);}
@@ -120,10 +151,14 @@
   $('catalog-results').onclick=event=>{
     const button=event.target.closest('[data-catalog-index]'); if(!button || busy) return;
     const book=catalogMatches[Number(button.dataset.catalogIndex)]; if(!book) return;
-    if(book.catalogKey && state.data.books.some(e=>e.catalogKey===book.catalogKey && e.id!==catalogTarget)) {$('catalog-status').textContent='This book is already on your shelf. Edit its existing entry below.';return;}
-    const existing=state.data.books.find(e=>e.id===catalogTarget) || state.data.books.find(e=>!e.catalogKey && e.title.trim().toLowerCase()===book.title.trim().toLowerCase());
+    const duplicate=existingBook(book);
+    if(duplicate && duplicate.id!==catalogTarget) {
+      $('catalog-status').textContent=`“${duplicate.title}” is already added. ${bookStatus(duplicate)}.`;
+      focusBook(duplicate.id);return;
+    }
+    const existing=state.data.books.find(e=>e.id===catalogTarget);
     if(existing) {
-      Object.assign(existing,book); render(); save().catch(()=>{});
+      Object.assign(existing,book); catalogTarget=''; render(); save().catch(()=>{});
       $('catalog-status').textContent='Author and cover filled in. Your shelf, date, and notes are unchanged.';
       document.getElementById(existing.id+'-title').focus(); return;
     }
@@ -131,20 +166,37 @@
     state.data.books.unshift({...book,id:crypto.randomUUID(),status:'Read',finished:today.toISOString().slice(0,10),rating:'',note:'',published:true});
     render(); save().catch(()=>{});
     $('catalog-status').textContent='Added to your draft as finished today. Adjust the date below, then publish when ready.';
-    $('book-edit-list').querySelector('input').focus();
+    $('catalog-results').querySelector(`[data-catalog-index="${button.dataset.catalogIndex}"]`)?.focus({preventScroll:true});
   };
   let batchRows=[], batchController;
   $('batch-year').value=String(new Date().getFullYear());
-  function renderBatch() {
-    $('batch-results').innerHTML=batchRows.map((row,i)=>`<div class="batch-row"><div id="batch-cover-${i}">${bookCover('',row.title)}</div><label for="batch-match-${i}">${esc(row.title)}<select id="batch-match-${i}" data-batch-row="${i}"><option value="">${row.error?'Search unavailable — retry below':'Choose a match or leave out'}</option>${row.matches.map((book,j)=>`<option value="${j}" ${row.selected===j?'selected':''}>${esc(book.title)} — ${esc(book.author || 'Unknown author')}${book.year?' ('+esc(book.year)+')':''}</option>`).join('')}</select></label></div>`).join('');
+  function pendingBatchPicks() {
+    const picks=[];
+    for(const row of batchRows) {
+      const book=row.selected===null ? null : row.matches[row.selected];
+      if(book && !existingBook(book) && !BookData.findExisting(picks,book)) picks.push(book);
+    }
+    return picks;
+  }
+  function updateBatchButton() {
+    const count=pendingBatchPicks().length;
     $('batch-add').hidden=!batchRows.some(row=>row.matches.length);
+    $('batch-add').disabled=busy || !count;
+    $('batch-add').textContent=count ? `Add ${count} book${count===1?'':'s'}` : 'Choose books to add';
+  }
+  function renderBatch() {
+    $('batch-results').innerHTML=batchRows.map((row,i)=>{
+      const book=row.selected===null ? null : row.matches[row.selected];
+      const existing=book && existingBook(book);
+      return `<div class="batch-row ${existing?'is-added':''}"><div>${bookCover(book?BookData.coverURL(book.coverId):'',book?.title || row.title)}</div><div><label for="batch-match-${i}">${esc(row.title)}</label><select id="batch-match-${i}" data-batch-row="${i}" ${busy?'disabled':''}><option value="">${row.error?'Search unavailable — retry below':'Choose a match or leave out'}</option>${row.matches.map((match,j)=>`<option value="${j}" ${row.selected===j?'selected':''}>${existingBook(match)?'✓ Already added · ':''}${esc(match.title)} — ${esc(match.author || 'Unknown author')}${match.year?' ('+esc(match.year)+')':''}</option>`).join('')}</select><p class="book-badge">${existing?'✓ Added · '+esc(bookStatus(existing)):book?'Selected · not added yet':'Not added · choose a match'}</p></div></div>`;
+    }).join('');
+    updateBatchButton();
   }
   $('batch-results').onchange=event=>{
+    if(busy || !event.target.matches('[data-batch-row]')) return;
     const index=Number(event.target.dataset.batchRow); if(!Number.isInteger(index) || !batchRows[index]) return;
-    const row=batchRows[index]; row.selected=event.target.value===''?null:Number(event.target.value);
-    const book=row.matches[row.selected]; $('batch-cover-'+index).innerHTML=bookCover(book?BookData.coverURL(book.coverId):'',book?.title || row.title);
-    const count=batchRows.filter(row=>row.selected!==null).length;
-    $('batch-add').textContent=`Add ${count || 'selected'} book${count===1?'':'s'}`;
+    batchRows[index].selected=event.target.value===''?null:Number(event.target.value);
+    renderBatch();$('batch-match-'+index).focus({preventScroll:true});
   };
   $('batch-cancel').onclick=()=>batchController?.abort();
   $('batch-find').onclick=async()=>{
@@ -161,7 +213,7 @@
       for(const [i,title] of titles.entries()) {
         if(signal.aborted) break;
         $('batch-status').textContent=`Finding ${i+1} of ${titles.length}: ${title}…`;
-        let matches=catalogCache.get(title.toLowerCase()),failed=false;
+        let matches=catalogCache.get(searchKey(title)),failed=false;
         if(!matches) {
           await new Promise(resolve=>setTimeout(resolve,Math.max(0,1100-(Date.now()-lastSearch))));
           if(signal.aborted) break;
@@ -170,10 +222,10 @@
           const timeout=setTimeout(abort,15000);
           try {
             lastSearch=Date.now();
-            const params=new URLSearchParams({title,fields:'key,title,author_name,cover_i,first_publish_year',limit:'8',lang:'en'});
+            const params=BookData.searchParams(title,$('english-only').checked);
             const response=await fetch('https://openlibrary.org/search.json?'+params,{signal:request.signal,credentials:'omit',referrerPolicy:'no-referrer'});
             if(!response.ok) throw Error();
-            matches=BookData.catalogResults(await response.json());catalogCache.set(title.toLowerCase(),matches);
+            matches=BookData.catalogResults(await response.json());catalogCache.set(searchKey(title),matches);
           } catch(error) {if(signal.aborted) break; matches=[];failed=true;failures++;}
           finally {clearTimeout(timeout);signal.removeEventListener('abort',abort);}
         }
@@ -191,7 +243,7 @@
     try {
       const result=BookData.addBatch(state.data.books,picks,$('batch-year').value,()=>crypto.randomUUID());
       state.data.books=result.books;render();save().catch(()=>{});
-      batchRows=[];renderBatch();
+      renderBatch();
       $('batch-status').textContent=`${result.added} books added to your draft for ${$('batch-year').value}. ${result.skipped?result.skipped+' already on your shelf were skipped. ':''}Publish when ready.`;
     } catch(error) {$('batch-status').textContent=error.message;}
   };
