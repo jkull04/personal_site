@@ -1,3 +1,4 @@
+.collection-hero { margin-bottom: var(--space-4); }
 .collection-intro { padding: 64px 0 40px; max-width: 720px; }
 .collection-intro h1 { margin: 12px 0 16px; }
 .eyebrow { font: 12px var(--font-display); letter-spacing: .16em; text-transform: uppercase; color: var(--travertine-deep); }

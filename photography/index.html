@@ -39,10 +39,17 @@
     </header>
 
     <main id="main" class="site-shell collection-page" data-collection="photography">
-      <header class="collection-intro">
-        <p class="eyebrow">Field notes</p>
-        <h1>Photos</h1><p class="hero-lead">Places, details, and moments along the way.</p>
-      </header>
+      <section class="hero hero--monument collection-hero" aria-labelledby="photography-title">
+        <div class="grid home-identity">
+          <h1 id="photography-title">Photos</h1>
+          <p class="hero-lead">Places, details, and moments along the way.</p>
+        </div>
+        <figure class="page-monument monument--machu-picchu">
+          <img class="monument-img" src="/assets/illustrations/runtime/hero-photography-machu-picchu.png"
+            width="1536" height="1024" decoding="async" alt="Golden pixel art of Machu Picchu’s stone terraces and citadel, with Huayna Picchu rising behind." />
+          <figcaption class="hero-caption">Machu Picchu, Peru.</figcaption>
+        </figure>
+      </section>
       <div class="collection-controls" role="group" aria-label="Photos filters">
         <label>Search<input id="collection-search" type="search" placeholder="Title, place, or caption" /></label>
         <label>Collection<select id="collection-filter"><option value="">All collections</option></select></label>
