@@ -7,16 +7,15 @@
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const safeImage = path => /^\/assets\/photography\/[a-zA-Z0-9_-]+\.jpg$/.test(path || '') ? path : '';
   const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const batchSize = 24;
+  const batchSize = 8;
   let entries = [], albums = [], visible = [], current = 0;
-  let panel = null, activeIndex = -1, activeSubgroup = '', shown = batchSize, switchVersion = 0;
+  let panel = null, activeIndex = -1, activeSubgroup = '', page = 0, origin = null, closing = false;
   const photoWord = n => n === 1 ? 'photo' : 'photos';
   function showPhoto(index) {
     if (!visible.length) return;
     current = (index + visible.length) % visible.length;
     const photo = visible[current], image = $('viewer-image');
     image.src = safeImage(photo.src); image.alt = photo.alt || photo.title;
-    $('viewer-caption').textContent = [photo.title, photo.location, photo.caption].filter(Boolean).join(' · ');
     $('viewer-count').textContent = `${current + 1} / ${visible.length}`;
     if (!dialog.open) dialog.showModal();
   }
@@ -28,66 +27,75 @@
       event.preventDefault(); showPhoto(current + (event.key === 'ArrowLeft' ? -1 : 1));
     }
   });
-  function placePanel() {
-    if (!panel || activeIndex < 0) return;
-    const columns = getComputedStyle(list).gridTemplateColumns.split(/\s+/).length;
-    const tiles = [...list.querySelectorAll('.album-tile')];
-    const rowEnd = Math.min(tiles.length - 1, Math.floor(activeIndex / columns) * columns + columns - 1);
-    if (tiles[rowEnd]?.nextElementSibling !== panel) tiles[rowEnd]?.after(panel);
+  function animateSpread(reverse = false) {
+    if (!panel || reducedMotion()) return Promise.resolve();
+    const center = origin || {x:innerWidth/2,y:innerHeight/2};
+    return Promise.all([...panel.querySelectorAll('.photo-card')].map((card,i) => {
+      const r = card.getBoundingClientRect();
+      const collapsed = {transform:`translate(${center.x-r.x-r.width/2}px,${center.y-r.y-r.height/2}px) scale(.12) rotate(${i%2 ? 12 : -12}deg)`,opacity:0};
+      const expanded = {transform:'translate(0,0) scale(1) rotate(0deg)',opacity:1};
+      return card.animate(reverse ? [expanded,collapsed] : [collapsed,expanded], {
+        duration:reverse ? 260 : 620, delay:reverse ? 0 : i*35,
+        easing:reverse ? 'ease-in' : 'cubic-bezier(.16,1,.3,1)',fill:'both'
+      }).finished.catch(()=>{});
+    }));
   }
-  function closePanel({instant = false, focus = false} = {}) {
+  async function closePanel() {
+    if (!panel || closing) return;
+    closing = true;
     const old = panel, button = list.querySelector(`[data-album="${activeIndex}"]`);
-    panel = null; activeIndex = -1;
-    if (button) { button.setAttribute('aria-expanded','false'); button.removeAttribute('aria-controls'); }
-    if (focus) button?.focus({preventScroll:true});
-    if (!old) return Promise.resolve();
-    old.inert = true; old.classList.remove('is-open');
-    if (instant || reducedMotion()) { old.remove(); return Promise.resolve(); }
-    return new Promise(resolve => setTimeout(() => { old.remove(); resolve(); }, 280));
+    await animateSpread(true);
+    old.close(); old.remove(); panel = null; activeIndex = -1; closing = false;
+    document.documentElement.style.overflow = '';
+    button?.setAttribute('aria-expanded','false'); button?.removeAttribute('aria-controls');
+    button?.focus({preventScroll:true});
   }
   function photoCard(photo, index) {
-    return `<figure class="photo-card"><button type="button" data-photo="${index}" aria-label="View ${esc(photo.title)}"><img src="${esc(safeImage(photo.thumb || photo.src))}" alt="${esc(photo.alt || photo.title)}" width="${Number(photo.width)||1600}" height="${Number(photo.height)||1200}" loading="lazy" decoding="async" /></button><figcaption><h3>${esc(photo.title)}</h3>${photo.location ? `<p>${esc(photo.location)}</p>` : ''}</figcaption></figure>`;
+    return `<figure class="photo-card"><button type="button" data-photo="${index}" aria-label="View ${esc(photo.title)}"><img src="${esc(safeImage(photo.thumb || photo.src))}" alt="${esc(photo.alt || photo.title)}" width="${Number(photo.width)||1600}" height="${Number(photo.height)||1200}" loading="lazy" decoding="async" /></button></figure>`;
   }
-  function renderDetails() {
+  function renderDetails(animate = true) {
     if (!panel || activeIndex < 0) return;
     const album = albums[activeIndex];
     const child = activeSubgroup ? JSON.parse(activeSubgroup) : undefined;
     visible = album.subgroups.filter(s => child === undefined || s.name === child).flatMap(s => s.photos);
-    let index = 0;
-    const sections = album.subgroups.filter(s => child === undefined || s.name === child).map(s => {
-      const start = index; index += s.photos.length;
-      const photos = s.photos.slice(0,Math.max(0,shown-start));
-      if (!photos.length) return '';
-      return `<section class="album-photo-section" aria-label="${esc(s.name || album.name || 'Other photos')}">${s.name && child === undefined ? `<h3 class="album-subheading">${esc(s.name)}</h3>` : ''}<div class="album-photo-grid">${photos.map((p,i)=>photoCard(p,start+i)).join('')}</div></section>`;
-    }).join('');
-    const total = visible.length, loaded = Math.min(shown,total);
-    panel.innerHTML = `<div class="album-expansion-clip"><div class="album-detail">
-      <div class="album-detail-head"><div><h2 id="album-detail-title">${esc(album.name || 'Other photos')}</h2><p>${total} ${photoWord(total)}${child ? ' · '+esc(child) : ''}</p></div><button type="button" class="album-close" data-close-album aria-label="Close ${esc(album.name || 'Other photos')}">Close <span aria-hidden="true">×</span></button></div>
+    const start = page*batchSize, photos = visible.slice(start,start+batchSize), total = visible.length;
+    panel.innerHTML = `<div class="album-spread-shell">
+      <div class="album-spread-bar"><span>Photos <span aria-hidden="true">/</span> ${esc(album.name || 'Other photos')}</span><button type="button" data-close-album aria-label="Close ${esc(album.name || 'Other photos')}">Back to categories <span aria-hidden="true">×</span></button></div>
       ${album.subgroups.some(s=>s.name) ? `<div class="album-subfilters" role="group" aria-label="Filter subgroups"><button type="button" data-subgroup="" aria-pressed="${!activeSubgroup}">All</button>${album.subgroups.map(s=>`<button type="button" data-subgroup="${esc(JSON.stringify(s.name))}" aria-pressed="${child===s.name}">${esc(s.name || 'Other photos')} <span>${s.photos.length}</span></button>`).join('')}</div>` : ''}
-      ${sections}<div class="album-pagination"><p role="status">Showing ${loaded} of ${total} ${photoWord(total)}</p>${loaded < total ? `<button type="button" data-more-photos>Show ${Math.min(batchSize,total-loaded)} more</button>` : ''}</div>
-    </div></div>`;
+      <div class="album-spread" data-count="${photos.length}"><div class="album-center"><h2 id="album-detail-title">${esc(album.name || 'Other photos')}</h2><p>${child ? esc(child)+' · ' : ''}${total} ${photoWord(total)}</p><span class="album-center-rule" aria-hidden="true"></span></div>${photos.map((p,i)=>photoCard(p,start+i)).join('')}</div>
+      ${total > batchSize ? `<nav class="album-pagination" aria-label="Album pages"><button type="button" data-page="-1" ${page===0?'disabled':''}>← Previous</button><p role="status">${start+1}–${Math.min(start+batchSize,total)} of ${total}</p><button type="button" data-page="1" ${start+batchSize>=total?'disabled':''}>Next →</button></nav>` : ''}
+    </div>`;
+    if (animate) { origin = {x:innerWidth/2,y:innerHeight/2}; animateSpread(); }
   }
-  async function openAlbum(index) {
-    const version = ++switchVersion, same = index === activeIndex;
-    await closePanel();
-    if (version !== switchVersion || same || !albums[index]) return;
-    activeIndex = index; activeSubgroup = ''; shown = batchSize;
-    panel = document.createElement('section');
-    panel.className = 'album-expansion'; panel.id = 'album-expansion';
+  function openAlbum(index) {
+    if (panel || !albums[index]) return;
+    activeIndex = index; activeSubgroup = ''; page = 0;
+    const button = list.querySelector(`[data-album="${index}"]`), r = button.getBoundingClientRect();
+    origin = {x:r.x+r.width/2,y:r.y+r.height/2};
+    panel = document.createElement('dialog'); panel.className = 'album-explorer'; panel.id = 'album-expansion';
     panel.setAttribute('aria-labelledby','album-detail-title');
-    renderDetails(); placePanel();
-    const button = list.querySelector(`[data-album="${index}"]`);
+    document.body.append(panel); renderDetails(false);
+    panel.addEventListener('click',handleDetails);
+    panel.addEventListener('cancel',event=>{event.preventDefault();closePanel();});
     button.setAttribute('aria-expanded','true'); button.setAttribute('aria-controls',panel.id);
-    // Only the opened category creates photo thumbnails; collapsed categories load previews only.
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      if (version !== switchVersion || !panel) return;
-      panel.classList.add('is-open');
-      const heading = panel.querySelector('.album-detail-head');
-      if (heading.getBoundingClientRect().top > innerHeight - 100) heading.scrollIntoView({block:'nearest',behavior:reducedMotion()?'instant':'smooth'});
-    }));
+    document.documentElement.style.overflow = 'hidden';
+    panel.showModal(); animateSpread();
+  }
+  function handleDetails(event) {
+    const button = event.target.closest('button'); if (!button || closing) return;
+    if (button.hasAttribute('data-close-album')) { closePanel(); return; }
+    if (button.hasAttribute('data-photo')) { showPhoto(Number(button.dataset.photo)); return; }
+    if (button.hasAttribute('data-subgroup')) {
+      activeSubgroup=button.dataset.subgroup; page=0; renderDetails();
+      [...panel.querySelectorAll('[data-subgroup]')].find(b=>b.dataset.subgroup===activeSubgroup)?.focus({preventScroll:true});
+    }
+    if (button.hasAttribute('data-page')) {
+      const direction = Number(button.dataset.page); page+=direction; renderDetails();
+      const target=panel.querySelector(`[data-page="${direction}"]:not(:disabled)`) || panel.querySelector('[data-page]:not(:disabled)');
+      target?.focus({preventScroll:true}); panel.scrollTop=0;
+    }
   }
   function render() {
-    ++switchVersion; closePanel({instant:true});
     const term = search.value.trim().toLowerCase();
     const matches = entries.filter(photo => [photo.title,photo.caption,photo.location,photo.collection,photo.subgroup].join(' ').toLowerCase().includes(term));
     albums = PhotoData.grouped(matches);
@@ -103,26 +111,9 @@
     }).join('');
   }
   list.addEventListener('click',event=>{
-    const button=event.target.closest('button'); if(!button) return;
-    if(button.hasAttribute('data-album')) { openAlbum(Number(button.dataset.album)); return; }
-    if(button.hasAttribute('data-close-album')) { ++switchVersion; closePanel({focus:true}); return; }
-    if(button.hasAttribute('data-photo')) { showPhoto(Number(button.dataset.photo)); return; }
-    if(button.hasAttribute('data-subgroup')) {
-      activeSubgroup=button.dataset.subgroup; shown=batchSize; renderDetails();
-      [...panel.querySelectorAll('[data-subgroup]')].find(b=>b.dataset.subgroup===activeSubgroup)?.focus({preventScroll:true});
-    }
-    if(button.hasAttribute('data-more-photos')) {
-      const firstNew=shown; shown+=batchSize; renderDetails();
-      (panel.querySelector('[data-more-photos]') || panel.querySelector(`[data-photo="${firstNew}"]`))?.focus({preventScroll:true});
-    }
+    const button=event.target.closest('[data-album]');
+    if(button) openAlbum(Number(button.dataset.album));
   });
-  list.addEventListener('keydown',event=>{
-    if(event.key==='Escape' && panel && !dialog.open) { event.preventDefault(); ++switchVersion; closePanel({focus:true}); }
-  });
-  let previousWidth=0;
-  new ResizeObserver(([entry])=>{
-    if(entry.contentRect.width !== previousWidth) { previousWidth=entry.contentRect.width; placePanel(); }
-  }).observe(list);
   search.oninput=render;
   fetch('/data/photography.json').then(response=>{if(!response.ok)throw Error();return response.json();}).then(data=>{
     if(!Array.isArray(data))throw Error();
