@@ -1193,34 +1193,42 @@
 /* Center the two secondary homepage routes beneath the original three. */
 .arena-routes--home {
   grid-template-columns: repeat(6, minmax(0, 1fr));
+  column-gap: clamp(14px, 2.4vw, 28px);
+  row-gap: clamp(18px, 2.4vw, 28px);
 }
 
 .arena-routes--home > .arena-route {
   grid-column: span 2;
+  padding: 9px;
 }
 
 .arena-routes--home > .arena-route:nth-child(4) {
   grid-column: 2 / span 2;
 }
 
+.arena-routes--home .arena-route-label {
+  padding: 11px 8px;
+  line-height: 1.4;
+}
+
+.arena-routes--home .arena-route:hover .arena-route-label,
+.arena-routes--home .arena-route:focus-visible .arena-route-label {
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--marble-shadow);
+}
+
 @media (max-width: 720px) {
   .arena-routes--home {
     grid-template-columns: repeat(6, minmax(0, 1fr));
   }
-}
 
-@media (max-width: 400px) {
-  .arena-routes--home {
-    gap: 8px;
-  }
-
-  .arena-routes--home .arena-route {
-    padding: 5px;
+  .arena-routes--home > .arena-route {
+    padding: 6px;
   }
 
   .arena-routes--home .arena-route-label {
-    font-size: 0.68rem;
-    letter-spacing: 0.04em;
-    padding-inline: 2px;
+    font-size: clamp(0.62rem, 2.35vw, 0.84rem);
+    letter-spacing: 0.035em;
+    padding: 11px 2px;
   }
 }
