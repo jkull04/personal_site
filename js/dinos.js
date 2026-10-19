@@ -2,13 +2,6 @@
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   const VARIANT_COUNT = 3;
 
-  const AMBLE_DURATION_MIN_MS = 900;
-  const AMBLE_DURATION_MAX_MS = 1500;
-  const AMBLE_NOISE_MIN_MS = 180;
-  const AMBLE_NOISE_MAX_MS = 360;
-  const AMBLE_SPEED_MIN = 0.018;
-  const AMBLE_SPEED_MAX = 0.038;
-  const AMBLE_SEPARATION_PAD = 24;
   const DEFAULT_FLOOR_BOUNDS = {
     left: 44,
     right: 75.8,
@@ -26,11 +19,9 @@
     longneck: 20 / 288
   };
   const DINO_SCALE_REFERENCE_WIDTH = 920;
-  const DINO_SCALE_MIN = 0.72;
+  const DINO_SCALE_MIN = 0.38;
   const DINO_SCALE_MAX = 1.12;
-  const EDGE_TARGET_MIN_RADIUS = 0.72;
-  const EDGE_TARGET_MAX_RADIUS = 0.96;
-  const SHOW_DEBUG_BOUNDS = true;
+  const SHOW_DEBUG_BOUNDS = false;
   const TOOLTIP_MIN_VISIBLE_MS = 1250;
   const TOOLTIP_EMOTIONS = [":)", ":D", ";)", ":P", ":]"];
   const ROOT_DEFER_CLASS = "defer-dino-atlases";
@@ -414,369 +405,386 @@
     return roamerBoundsForScene(scene);
   }
 
-  function nearestDistanceToOtherRoamers(roamer, x, y) {
-    let nearest = Number.POSITIVE_INFINITY;
-    arenaMotion.forEach((otherState, otherRoamer) => {
-      if (otherRoamer === roamer || !otherState) return;
-      const dist = length(x - otherState.x, y - otherState.y);
-      if (dist < nearest) nearest = dist;
-    });
-    return nearest;
+  // Independent decisions plus continuous steering: no animation paths or shared schedule.
+  const personalities = {
+    raptor: { speed: 29, curiosity: 0.85, rest: [700, 1800], walk: [1200, 2600], reaction: [180, 700], food: "meat" },
+    stego: { speed: 15, curiosity: 0.3, rest: [1800, 4200], walk: [2000, 3800], reaction: [550, 1400], food: "leaf" },
+    longneck: { speed: 10, curiosity: 0.5, rest: [2600, 5600], walk: [2400, 4400], reaction: [1000, 2200], food: "leaf" }
+  };
+  const habitats = new Map();
+  let activeDrag = null;
+  let motionLifecycleBound = false;
+
+  function announce(habitat, text) {
+    const status = habitat.scene.querySelector(".arena-feeding-status");
+    if (status) status.textContent = text;
   }
 
-  function edgeBiasForce(state, bounds) {
-    const halfW = Math.max(1, (bounds.maxX - bounds.minX) * 0.5);
-    const halfH = Math.max(1, (bounds.maxY - bounds.minY) * 0.5);
-    const nx = (state.x - bounds.centerX) / halfW;
-    const ny = (state.y - bounds.centerY) / halfH;
-    const radial = Math.hypot(nx, ny);
-    const outward = normalize(state.x - bounds.centerX, state.y - bounds.centerY);
-    const inward = { x: -outward.x, y: -outward.y };
-    const desired = 0.86;
-
-    if (radial < desired) {
-      const strength = (desired - radial) * 0.75;
-      return { x: outward.x * strength, y: outward.y * strength };
-    }
-    if (radial > 0.98) {
-      const strength = (radial - 0.98) * 1.2;
-      return { x: inward.x * strength, y: inward.y * strength };
-    }
-    return { x: 0, y: 0 };
+  function foodPoint(habitat, food) {
+    return normalizedToBounds(habitat.bounds, food.u, food.v);
   }
 
-  function randomRoamerTarget(bounds, roamer) {
-    const centerX = bounds.centerX;
-    const centerY = bounds.centerY;
-    const radiusX = Math.max(1, (bounds.maxX - bounds.minX) * 0.5);
-    const radiusY = Math.max(1, (bounds.maxY - bounds.minY) * 0.5);
-    const desiredGap = roamerRadius(roamer) * 2 + AMBLE_SEPARATION_PAD;
+  function renderFood(habitat, food) {
+    const point = foodPoint(habitat, food);
+    food.element.style.left = `${point.x}px`;
+    food.element.style.top = `${point.y}px`;
+    food.element.style.zIndex = String(190 + Math.round(point.y * 10));
+  }
 
-    let best = null;
-    let bestScore = -Number.POSITIVE_INFINITY;
+  function removeFood(habitat, food) {
+    food.element.remove();
+    habitat.foods = habitat.foods.filter(item => item !== food);
+  }
 
-    for (let i = 0; i < 8; i += 1) {
-      const theta = randomBetween(0, Math.PI * 2);
-      const ring = clamp01(randomBetween(EDGE_TARGET_MIN_RADIUS, EDGE_TARGET_MAX_RADIUS));
-      const candidateX = centerX + Math.cos(theta) * radiusX * ring;
-      const candidateY = centerY + Math.sin(theta) * radiusY * ring;
-      const clampedX = clamp(candidateX, bounds.minX, bounds.maxX);
-      const clampedY = clamp(candidateY, bounds.minY, bounds.maxY);
-      const normalized = pointToNormalized(bounds, clampedX, clampedY);
-      const nearest = nearestDistanceToOtherRoamers(roamer, clampedX, clampedY);
-      const score = (Number.isFinite(nearest) ? nearest : desiredGap) + ring * 24 + Math.random() * 3;
+  function setActivity(state, activity) {
+    if (state.activity === activity) return;
+    state.activity = activity;
+    state.roamer.dataset.activity = activity;
+    state.dino.classList.toggle("is-eating", activity === "eating");
+  }
 
-      if (score > bestScore) {
-        bestScore = score;
-        best = {
-          targetU: normalized.u,
-          targetV: normalized.v,
-          targetX: clampedX,
-          targetY: clampedY
-        };
-      }
-
-      if (Number.isFinite(nearest) && nearest >= desiredGap) {
-        return {
-          targetU: normalized.u,
-          targetV: normalized.v,
-          targetX: clampedX,
-          targetY: clampedY
-        };
-      }
-    }
-
-    return (
-      best || {
-        targetU: 0.5,
-        targetV: 0.5,
-        targetX: centerX,
-        targetY: centerY
-      }
-    );
+  function wander(state, now) {
+    state.heading += randomBetween(-1.5, 1.5);
+    state.decisionAt = now + randomBetween(...state.personality.walk);
+    setActivity(state, "wandering");
   }
 
   function remapArenaRoamers() {
-    document.querySelectorAll(".arena-roamer").forEach((roamer) => {
+    habitats.forEach(habitat => {
+      habitat.bounds = roamerBoundsForScene(habitat.scene);
+      const b = habitat.bounds;
+      const floor = habitat.scene.querySelector(".arena-floor");
+      Object.assign(floor.style, { left: `${b.minX - 12}px`, top: `${b.minY - 12}px`, width: `${b.maxX - b.minX + 24}px`, height: `${b.maxY - b.minY + 24}px` });
+      habitat.foods.forEach(food => renderFood(habitat, food));
+    });
+    document.querySelectorAll(".arena-roamer").forEach(roamer => {
       const scene = roamer.closest(".arena-scene");
       if (!scene) return;
-
-      const bounds = boundsForRoamer(scene, roamer);
+      const bounds = habitats.get(scene)?.bounds || roamerBoundsForScene(scene);
       const state = arenaMotion.get(roamer);
-
-      if (state) {
-        const currentUv =
-          Number.isFinite(state.u) && Number.isFinite(state.v)
-            ? { u: clamp01(state.u), v: clamp01(state.v) }
-            : readRoamerUv(roamer);
-        const targetUv =
-          Number.isFinite(state.targetU) && Number.isFinite(state.targetV)
-            ? { u: clamp01(state.targetU), v: clamp01(state.targetV) }
-            : pointToNormalized(bounds, state.targetX, state.targetY);
-
-        const currentPoint = normalizedToBounds(bounds, currentUv.u, currentUv.v);
-        const targetPoint = normalizedToBounds(bounds, targetUv.u, targetUv.v);
-
-        state.scene = scene;
-        state.minX = bounds.minX;
-        state.maxX = bounds.maxX;
-        state.minY = bounds.minY;
-        state.maxY = bounds.maxY;
-        state.centerX = bounds.centerX;
-        state.centerY = bounds.centerY;
-        state.radius = roamerRadius(roamer);
-        state.u = currentUv.u;
-        state.v = currentUv.v;
-        state.x = currentPoint.x;
-        state.y = currentPoint.y;
-        state.targetU = targetUv.u;
-        state.targetV = targetUv.v;
-        state.targetX = targetPoint.x;
-        state.targetY = targetPoint.y;
-
-        writeRoamerUv(roamer, currentUv.u, currentUv.v);
-        setRoamerPosition(roamer, currentPoint.x, currentPoint.y);
-        setRoamerDepth(roamer, scene, currentPoint.y);
-        setRoamerDebugBox(roamer, state.radius);
-        return;
-      }
-
-      const uv = readRoamerUv(roamer);
+      const uv = state ? { u: state.u, v: state.v } : readRoamerUv(roamer);
       const point = normalizedToBounds(bounds, uv.u, uv.v);
-      writeRoamerUv(roamer, uv.u, uv.v);
+      if (state) Object.assign(state, point, { bounds, radius: roamerRadius(roamer), vx: 0, vy: 0 });
       setRoamerPosition(roamer, point.x, point.y);
       setRoamerDepth(roamer, scene, point.y);
       setRoamerDebugBox(roamer, roamerRadius(roamer));
     });
-
-    if (arenaMotion.size > 0) {
-      queueArenaTick();
-    }
-  }
-
-  function separationForceForRoamer(roamer, state) {
-    let forceX = 0;
-    let forceY = 0;
-
-    arenaMotion.forEach((otherState, otherRoamer) => {
-      if (otherRoamer === roamer || !otherState) return;
-      const dx = state.x - otherState.x;
-      const dy = state.y - otherState.y;
-      const dist = length(dx, dy);
-      const gap = (state.radius || 22) + (otherState.radius || 22) + AMBLE_SEPARATION_PAD;
-      if (dist <= 0.001 || dist >= gap) return;
-
-      const push = ((gap - dist) / gap) ** 2;
-      const away = normalize(dx, dy);
-      forceX += away.x * push;
-      forceY += away.y * push;
-    });
-
-    return { x: forceX, y: forceY };
   }
 
   function beginRoamerAmble(roamer) {
+    const existing = arenaMotion.get(roamer);
+    if (existing) {
+      existing.pettedUntil = performance.now() + 1300;
+      showRoamerReaction(roamer);
+      return;
+    }
     const scene = roamer.closest(".arena-scene");
-    if (!scene) return;
-    if (arenaMotion.has(roamer)) return;
-
+    const habitat = habitats.get(scene);
     const dino = roamer.querySelector("[data-dino]");
-    if (!dino) return;
-
-    const bounds = boundsForRoamer(scene, roamer);
-    const stored = readRoamerUv(roamer);
-    const storedPoint = normalizedToBounds(bounds, stored.u, stored.v);
-    const x = clamp(storedPoint.x, bounds.minX, bounds.maxX);
-    const y = clamp(storedPoint.y, bounds.minY, bounds.maxY);
-    const normalized = pointToNormalized(bounds, x, y);
-    const target = randomRoamerTarget(bounds, roamer);
-    const now = performance.now();
-
-    setRoamerPosition(roamer, x, y);
-    setRoamerDepth(roamer, scene, y);
-    setRoamerDebugBox(roamer, roamerRadius(roamer));
-    writeRoamerUv(roamer, normalized.u, normalized.v);
-    dino.classList.add("play-loop-walk");
-    markArenaState(dino, "moving");
-
+    if (!habitat || !dino) return;
+    const uv = readRoamerUv(roamer);
+    const point = normalizedToBounds(habitat.bounds, uv.u, uv.v);
+    const kind = dinoKindForRoamer(roamer);
     arenaMotion.set(roamer, {
-      scene,
-      dino,
-      x,
-      y,
-      u: normalized.u,
-      v: normalized.v,
-      vx: 0,
-      vy: 0,
-      minX: bounds.minX,
-      maxX: bounds.maxX,
-      minY: bounds.minY,
-      maxY: bounds.maxY,
-      centerX: bounds.centerX,
-      centerY: bounds.centerY,
-      radius: roamerRadius(roamer),
-      targetU: target.targetU,
-      targetV: target.targetV,
-      targetX: target.targetX,
-      targetY: target.targetY,
-      speed: randomBetween(AMBLE_SPEED_MIN, AMBLE_SPEED_MAX),
-      noiseX: 0,
-      noiseY: 0,
-      noiseUntil: now + randomBetweenInt(AMBLE_NOISE_MIN_MS, AMBLE_NOISE_MAX_MS),
-      endAt: now + randomBetweenInt(AMBLE_DURATION_MIN_MS, AMBLE_DURATION_MAX_MS)
+      roamer, scene, habitat, dino, kind, personality: personalities[kind],
+      ...point, ...uv, bounds: habitat.bounds, vx: 0, vy: 0,
+      radius: roamerRadius(roamer), heading: randomBetween(-Math.PI, Math.PI),
+      activity: "resting", decisionAt: performance.now() + randomBetween(400, 2600),
+      food: null, noticeAt: 0, fullUntil: 0, curiousUntil: 0, curiosityCooldown: 0,
+      pettedUntil: 0, eatUntil: 0
     });
-
+    roamer.dataset.activity = "resting";
     queueArenaTick();
   }
 
-  function finishRoamerAmble(roamer, state) {
-    if (!state) return;
-    if (Number.isFinite(state.u) && Number.isFinite(state.v)) {
-      writeRoamerUv(roamer, state.u, state.v);
-    }
-    state.dino.classList.remove("play-loop-walk");
-    markArenaState(state.dino, "lounge");
-    arenaMotion.delete(roamer);
+  function canEat(state, type) {
+    return state.personality.food === type;
+  }
+
+  function eatFood(state, food, now) {
+    if (!canEat(state, food.type)) return;
+    removeFood(state.habitat, food);
+    state.food = null;
+    state.eatUntil = now + randomBetween(1600, 2400);
+    state.fullUntil = now + randomBetween(4500, 8000);
+    state.decisionAt = state.eatUntil + randomBetween(...state.personality.rest);
+    state.vx = state.vy = 0;
+    setActivity(state, "eating");
+    showRoamerReaction(state.roamer);
+    announce(state.habitat, `The ${state.kind === "stego" ? "stegosaurus" : state.kind} enjoyed the ${food.type}.`);
   }
 
   function updateRoamerState(roamer, state, dt, now) {
-    const bounds = boundsForRoamer(state.scene, roamer);
-    state.minX = bounds.minX;
-    state.maxX = bounds.maxX;
-    state.minY = bounds.minY;
-    state.maxY = bounds.maxY;
-    state.centerX = bounds.centerX;
-    state.centerY = bounds.centerY;
-    state.radius = roamerRadius(roamer);
+    const { habitat, bounds: b, personality: p } = state;
+    if (!habitat.visible) return;
+    let target = null;
+    let speed = p.speed * clamp((b.maxX - b.minX) / 270, 0.45, 1.1);
+    let moving = false;
 
-    if (now >= state.endAt) {
-      finishRoamerAmble(roamer, state);
-      return;
+    if (state.activity === "eating" && now >= state.eatUntil) setActivity(state, "resting");
+    if (state.food && !habitat.foods.includes(state.food)) state.food = null;
+
+    // Food is claimed once, so three noses don't pile onto the same snack.
+    if (!state.food && now >= state.fullUntil && state.activity !== "eating") {
+      let best = null;
+      let bestScore = Infinity;
+      habitat.foods.forEach(food => {
+        if (!canEat(state, food.type)) return;
+        if (food.owner && food.owner !== state) return;
+        const point = foodPoint(habitat, food);
+        // Let proximity, appetite and personality decide who notices first,
+        // rather than giving the first dinosaur in the DOM every new snack.
+        if (!food.owner) {
+          const contenders = [...arenaMotion.values()].filter(other => other.habitat === habitat && canEat(other, food.type) && !other.food && now >= other.fullUntil && other.activity !== "eating");
+          const interest = other => length(point.x - other.x, point.y - other.y) / other.personality.speed
+            + other.personality.reaction[0] / 1000;
+          contenders.sort((a, b) => interest(a) - interest(b));
+          if (contenders[0] !== state) return;
+        }
+        const score = length(point.x - state.x, point.y - state.y);
+        if (score < bestScore) { best = food; bestScore = score; }
+      });
+      if (best) {
+        best.owner = state;
+        state.food = best;
+        state.noticeAt = now + randomBetween(...p.reaction);
+      }
     }
 
-    const toTargetX = state.targetX - state.x;
-    const toTargetY = state.targetY - state.y;
-    const targetDist = length(toTargetX, toTargetY);
-
-    if (targetDist < 9) {
-      const target = randomRoamerTarget(bounds, roamer);
-      state.targetU = target.targetU;
-      state.targetV = target.targetV;
-      state.targetX = target.targetX;
-      state.targetY = target.targetY;
+    if (state.activity === "eating" || now < state.pettedUntil) {
+      // A real pause makes their movement feel intentional.
+    } else if (state.food) {
+      target = foodPoint(habitat, state.food);
+      setFacingFromVx(state.dino, target.x - state.x);
+      if (now >= state.noticeAt) {
+        setActivity(state, "seeking");
+        const distance = length(target.x - state.x, target.y - state.y);
+        if (distance < 7) {
+          eatFood(state, state.food, now);
+        } else {
+          moving = true;
+          speed *= state.kind === "raptor" ? 1.75 : 1.3;
+          speed *= Math.min(1, distance / 22 + 0.2);
+        }
+      }
+    } else {
+      const pointer = habitat.pointer;
+      const near = pointer && now - pointer.at < 3200 && length(pointer.x - state.x, pointer.y - state.y) < 135;
+      if (near && now > state.curiosityCooldown && now > state.decisionAt) {
+        state.curiosityCooldown = now + randomBetween(5000, 10000);
+        if (Math.random() < p.curiosity) {
+          state.curiousUntil = now + randomBetween(1200, 2800);
+          setActivity(state, "curious");
+        }
+      }
+      if (state.activity === "curious" && near && now < state.curiousUntil) {
+        setFacingFromVx(state.dino, pointer.x - state.x);
+        target = { x: clamp(pointer.x, b.minX, b.maxX), y: clamp(pointer.y, b.minY, b.maxY) };
+        moving = state.kind !== "longneck" && length(target.x - state.x, target.y - state.y) > 28;
+        speed *= 0.65;
+      } else {
+        if (state.activity === "curious" || state.activity === "seeking") {
+          setActivity(state, "resting");
+          state.decisionAt = now + randomBetween(...p.rest);
+        }
+        if (now >= state.decisionAt) {
+          if (state.activity === "wandering") {
+            setActivity(state, "resting");
+            state.decisionAt = now + randomBetween(...p.rest);
+          } else wander(state, now);
+        }
+        moving = state.activity === "wandering";
+      }
     }
 
-    if (now >= state.noiseUntil) {
-      state.noiseX = randomBetween(-0.25, 0.25);
-      state.noiseY = randomBetween(-0.18, 0.18);
-      state.noiseUntil = now + randomBetweenInt(AMBLE_NOISE_MIN_MS, AMBLE_NOISE_MAX_MS);
+    let desiredX = 0, desiredY = 0;
+    if (moving) {
+      state.heading += randomBetween(-0.8, 0.8) * dt / 1000;
+      let direction = target ? normalize(target.x - state.x, target.y - state.y) : { x: Math.cos(state.heading), y: Math.sin(state.heading) };
+      let sx = 0, sy = 0;
+      arenaMotion.forEach(other => {
+        if (other === state || other.scene !== state.scene) return;
+        const dx = state.x - other.x, dy = state.y - other.y;
+        const distance = length(dx, dy);
+        const gap = Math.min(48, (state.radius + other.radius) * 0.65);
+        if (distance < gap) {
+          const away = distance > 0.1 ? normalize(dx, dy) : { x: state.kind === "raptor" ? 1 : -1, y: 0 };
+          const force = (1 - distance / gap) * (target ? 0.5 : 1.8);
+          sx += away.x * force; sy += away.y * force;
+        }
+      });
+      // Soft walls turn them before the edge; no forced perimeter route.
+      const pad = Math.min(18, (b.maxY - b.minY) / 3);
+      if (!target) {
+        sx += Math.max(0, 1 - (state.x - b.minX) / pad) * 2 - Math.max(0, 1 - (b.maxX - state.x) / pad) * 2;
+        sy += Math.max(0, 1 - (state.y - b.minY) / pad) * 2 - Math.max(0, 1 - (b.maxY - state.y) / pad) * 2;
+      }
+      direction = normalize(direction.x + sx, direction.y + sy);
+      if (!target) state.heading = Math.atan2(direction.y, direction.x);
+      desiredX = direction.x * speed; desiredY = direction.y * speed * (target ? 1 : 0.55);
     }
-
-    const targetDir = normalize(state.targetX - state.x, state.targetY - state.y);
-    const edgeForce = edgeBiasForce(state, bounds);
-    const separation = separationForceForRoamer(roamer, state);
-
-    const steerX = targetDir.x + state.noiseX * 0.7 + edgeForce.x * 0.85 + separation.x * 1.25;
-    const steerY = targetDir.y + state.noiseY * 0.7 + edgeForce.y * 0.85 + separation.y * 1.25;
-    const steerDir = normalize(steerX, steerY);
-
-    const desiredVx = steerDir.x * state.speed;
-    const desiredVy = steerDir.y * state.speed;
-    state.vx += (desiredVx - state.vx) * 0.11;
-    state.vy += (desiredVy - state.vy) * 0.11;
-
-    state.x += state.vx * dt;
-    state.y += state.vy * dt;
-
-    if (state.x < state.minX) {
-      state.x = state.minX;
-      state.vx = Math.abs(state.vx) * 0.5;
-      const target = randomRoamerTarget(bounds, roamer);
-      state.targetU = target.targetU;
-      state.targetV = target.targetV;
-      state.targetX = target.targetX;
-      state.targetY = target.targetY;
-    } else if (state.x > state.maxX) {
-      state.x = state.maxX;
-      state.vx = -Math.abs(state.vx) * 0.5;
-      const target = randomRoamerTarget(bounds, roamer);
-      state.targetU = target.targetU;
-      state.targetV = target.targetV;
-      state.targetX = target.targetX;
-      state.targetY = target.targetY;
-    }
-
-    if (state.y < state.minY) {
-      state.y = state.minY;
-      state.vy = Math.abs(state.vy) * 0.5;
-      const target = randomRoamerTarget(bounds, roamer);
-      state.targetU = target.targetU;
-      state.targetV = target.targetV;
-      state.targetX = target.targetX;
-      state.targetY = target.targetY;
-    } else if (state.y > state.maxY) {
-      state.y = state.maxY;
-      state.vy = -Math.abs(state.vy) * 0.5;
-      const target = randomRoamerTarget(bounds, roamer);
-      state.targetU = target.targetU;
-      state.targetV = target.targetV;
-      state.targetX = target.targetX;
-      state.targetY = target.targetY;
-    }
-
-    const normalized = pointToNormalized(bounds, state.x, state.y);
-    state.u = normalized.u;
-    state.v = normalized.v;
-    writeRoamerUv(roamer, normalized.u, normalized.v);
+    const ease = 1 - Math.exp(-dt / (moving ? 220 : 100));
+    state.vx += (desiredX - state.vx) * ease;
+    state.vy += (desiredY - state.vy) * ease;
+    state.x = clamp(state.x + state.vx * dt / 1000, b.minX, b.maxX);
+    state.y = clamp(state.y + state.vy * dt / 1000, b.minY, b.maxY);
+    const walking = length(state.vx, state.vy) > 2;
+    state.dino.classList.toggle("play-loop-walk", walking);
+    state.dino.classList.toggle("is-idle", !walking);
+    state.dino.style.setProperty("--walk-frame-ms", `${Math.round(16000 / Math.max(9, speed))}ms`);
+    if (walking && Math.abs(state.vx) > 2) setFacingFromVx(state.dino, state.vx);
+    markArenaState(state.dino, walking ? "moving" : "lounge");
+    const uv = pointToNormalized(b, state.x, state.y);
+    state.u = uv.u; state.v = uv.v;
+    writeRoamerUv(roamer, state.u, state.v);
     setRoamerPosition(roamer, state.x, state.y);
     setRoamerDepth(roamer, state.scene, state.y);
-    setRoamerDebugBox(roamer, state.radius);
-    setFacingFromVx(state.dino, state.vx);
   }
 
   function queueArenaTick() {
-    if (arenaRaf || arenaMotion.size === 0 || reducedMotion.matches) return;
+    if (arenaRaf || !arenaMotion.size || reducedMotion.matches || document.hidden || ![...habitats.values()].some(h => h.visible)) return;
     arenaRaf = window.requestAnimationFrame(stepArenaMotion);
   }
 
-  function stepArenaMotion(timestamp) {
+  function stepArenaMotion(now) {
     arenaRaf = 0;
-
-    if (reducedMotion.matches || arenaMotion.size === 0) {
-      arenaLastTick = 0;
-      return;
-    }
-
-    const now = timestamp;
-    const dt = clamp(arenaLastTick ? now - arenaLastTick : 16, 8, 34);
+    const dt = clamp(arenaLastTick ? now - arenaLastTick : 16, 0, 50);
     arenaLastTick = now;
-
+    habitats.forEach(h => h.foods.slice().forEach(food => { if (now > food.expires) removeFood(h, food); }));
     arenaMotion.forEach((state, roamer) => {
-      if (!roamer.isConnected || !state.scene?.isConnected) {
-        arenaMotion.delete(roamer);
-        return;
-      }
+      if (!roamer.isConnected) { arenaMotion.delete(roamer); return; }
       updateRoamerState(roamer, state, dt, now);
     });
-
-    if (arenaMotion.size > 0) {
-      queueArenaTick();
-    }
+    queueArenaTick();
   }
 
   function stopArenaMotion() {
-    if (arenaRaf) {
-      window.cancelAnimationFrame(arenaRaf);
-      arenaRaf = 0;
-    }
-    arenaLastTick = 0;
-    arenaMotion.forEach((state) => {
-      if (state?.dino) {
-        state.dino.classList.remove("play-loop-walk");
-        markArenaState(state.dino, "lounge");
-      }
+    if (arenaRaf) window.cancelAnimationFrame(arenaRaf);
+    arenaRaf = 0; arenaLastTick = 0;
+    arenaMotion.forEach(state => {
+      state.dino.classList.remove("play-loop-walk", "is-eating");
+      state.dino.classList.add("is-idle");
+      markArenaState(state.dino, "lounge");
     });
     arenaMotion.clear();
+    habitats.forEach(h => h.foods.forEach(food => { food.owner = null; }));
+  }
+
+  function dropFood(habitat, type, point) {
+    if (type !== "leaf" && type !== "meat") return;
+    if (habitat.foods.length >= 6) { announce(habitat, "Let them finish these snacks first."); return; }
+    const uv = pointToNormalized(habitat.bounds, point.x, point.y);
+    const element = document.createElement("span");
+    element.className = `arena-food pixel-food pixel-food--${type}`;
+    element.setAttribute("aria-hidden", "true");
+    habitat.scene.append(element);
+    const food = { type, ...uv, element, owner: null, expires: performance.now() + 45000 };
+    habitat.foods.push(food);
+    renderFood(habitat, food);
+    announce(habitat, `${type === "leaf" ? "Leaf" : "Meat"} offered.`);
+    if (reducedMotion.matches) {
+      const candidates = [...arenaMotion.values()].filter(s => s.habitat === habitat && canEat(s, type));
+      const nearest = candidates.sort((a, b) => length(a.x - point.x, a.y - point.y) - length(b.x - point.x, b.y - point.y))[0];
+      if (nearest) { eatFood(nearest, food, performance.now()); nearest.dino.classList.remove("is-eating"); }
+      else removeFood(habitat, food);
+    }
+    queueArenaTick();
+  }
+
+  function cancelFoodDrag(suppressClick = true) {
+    if (!activeDrag) return;
+    const drag = activeDrag;
+    activeDrag = null;
+    document.body.classList.remove("is-dragging-arena-food");
+    if (suppressClick) drag.suppressClick();
+    drag.ghost.remove();
+    drag.habitat.scene.classList.remove("is-feeding", "is-food-over");
+    drag.button.setAttribute("aria-pressed", "false");
+    if (drag.button.hasPointerCapture(drag.id)) drag.button.releasePointerCapture(drag.id);
+  }
+
+  function dragPoint(habitat, event) {
+    const rect = habitat.scene.getBoundingClientRect();
+    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+  }
+
+  function validDrop(habitat, point) {
+    const b = habitat.bounds;
+    return point.x >= b.minX - 14 && point.x <= b.maxX + 14 && point.y >= b.minY - 18 && point.y <= b.maxY + 18;
+  }
+
+  function bindLivingArena() {
+    document.querySelectorAll(".arena-scene").forEach(scene => {
+      if (habitats.has(scene)) return;
+      const habitat = { scene, foods: [], pointer: null, bounds: roamerBoundsForScene(scene), visible: true };
+      habitats.set(scene, habitat);
+      scene.addEventListener("pointermove", event => {
+        if (event.pointerType === "touch" || activeDrag) return;
+        habitat.pointer = { ...dragPoint(habitat, event), at: performance.now() };
+      });
+      scene.addEventListener("pointerleave", () => { habitat.pointer = null; });
+      (scene.closest(".arena-exhibit") || scene).querySelectorAll("[data-food]").forEach(button => {
+        let suppressClick = false;
+        button.addEventListener("pointerdown", event => {
+          if (event.button !== 0 || activeDrag) return;
+          suppressClick = false;
+          const ghost = document.createElement("span");
+          ghost.className = `arena-food-ghost pixel-food pixel-food--${button.dataset.food}`;
+          ghost.setAttribute("aria-hidden", "true");
+          document.body.append(ghost);
+          ghost.style.left = `${event.clientX}px`; ghost.style.top = `${event.clientY}px`;
+          activeDrag = { habitat, button, ghost, id: event.pointerId, startX: event.clientX, startY: event.clientY, moved: false, suppressClick: () => { suppressClick = true; } };
+          button.setPointerCapture(event.pointerId);
+          document.body.classList.add("is-dragging-arena-food");
+          button.setAttribute("aria-pressed", "true");
+          scene.classList.add("is-feeding");
+        });
+        button.addEventListener("pointermove", event => {
+          const drag = activeDrag;
+          if (!drag || drag.button !== button || drag.id !== event.pointerId) return;
+          drag.moved ||= length(event.clientX - drag.startX, event.clientY - drag.startY) > 6;
+          drag.ghost.style.left = `${event.clientX}px`; drag.ghost.style.top = `${event.clientY}px`;
+          scene.classList.toggle("is-food-over", validDrop(habitat, dragPoint(habitat, event)));
+        });
+        button.addEventListener("pointerup", event => {
+          const drag = activeDrag;
+          if (!drag || drag.button !== button || drag.id !== event.pointerId) return;
+          const point = dragPoint(habitat, event);
+          suppressClick = drag.moved;
+          if (drag.moved && validDrop(habitat, point)) dropFood(habitat, button.dataset.food, point);
+          cancelFoodDrag(false);
+        });
+        button.addEventListener("pointercancel", cancelFoodDrag);
+        button.addEventListener("lostpointercapture", () => { if (activeDrag?.button === button) cancelFoodDrag(); });
+        button.addEventListener("click", event => {
+          if (suppressClick && event.detail !== 0) { suppressClick = false; return; }
+          suppressClick = false;
+          dropFood(habitat, button.dataset.food, normalizedToBounds(habitat.bounds, randomBetween(0.2, 0.8), randomBetween(0.25, 0.75)));
+        });
+      });
+      if (typeof IntersectionObserver !== "undefined") {
+        const observer = new IntersectionObserver(entries => {
+          habitat.visible = entries[0].isIntersecting;
+          arenaLastTick = 0;
+          queueArenaTick();
+        });
+        observer.observe(scene);
+      }
+      if (typeof ResizeObserver !== "undefined") new ResizeObserver(remapArenaRoamers).observe(scene);
+    });
+    if (!motionLifecycleBound) {
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) {
+          cancelFoodDrag();
+          if (arenaRaf) window.cancelAnimationFrame(arenaRaf);
+          arenaRaf = 0;
+        } else queueArenaTick();
+        arenaLastTick = 0;
+      });
+      document.addEventListener("keydown", event => { if (event.key === "Escape") cancelFoodDrag(); });
+      window.addEventListener("blur", cancelFoodDrag);
+      motionLifecycleBound = true;
+    }
   }
 
   function clearRoamerTooltipTimer(roamer) {
@@ -796,22 +804,11 @@
     roamerTooltipTimers.set(roamer, timer);
   }
 
-  function nextRoamerTooltipMessage(roamer) {
-    const count = Number.parseInt(roamer.dataset.tooltipCount || "0", 10) || 0;
-    let message = "Click me!";
-
-    if (count > 0) {
-      const previous = roamer.dataset.tooltipLast || "";
-      const pool =
-        TOOLTIP_EMOTIONS.length > 1
-          ? TOOLTIP_EMOTIONS.filter((emotion) => emotion !== previous)
-          : TOOLTIP_EMOTIONS;
-      message = pool[Math.floor(Math.random() * pool.length)] || ":)";
-    }
-
-    roamer.dataset.tooltipCount = String(count + 1);
-    roamer.dataset.tooltipLast = message;
-    return message;
+  function showRoamerReaction(roamer) {
+    const choices = TOOLTIP_EMOTIONS.filter(face => face !== roamer.dataset.lastReaction);
+    const face = choices[Math.floor(Math.random() * choices.length)];
+    roamer.dataset.lastReaction = face;
+    showRoamerTooltip(roamer, face);
   }
 
   function showRoamerTooltip(roamer, message) {
@@ -843,43 +840,10 @@
     clearRoamerTooltipTimer(roamer);
   }
 
-  function beginRoamerTooltipInteraction(roamer) {
-    if (!roamer) return;
-    const message = nextRoamerTooltipMessage(roamer);
-    showRoamerTooltip(roamer, message);
-  }
-
-  function endRoamerTooltipInteraction(roamer) {
-    if (!roamer) return;
-    hideRoamerTooltipIfAllowed(roamer);
-  }
-
-  function bindRoamerTooltips() {
-    document.querySelectorAll(".arena-roamer").forEach((roamer) => {
-      if (roamer.dataset.tooltipBound === "true") return;
-
-      roamer.addEventListener("pointerenter", () => beginRoamerTooltipInteraction(roamer));
-      roamer.addEventListener("focus", () => beginRoamerTooltipInteraction(roamer));
-      roamer.addEventListener("pointerleave", () => endRoamerTooltipInteraction(roamer));
-      roamer.addEventListener("blur", () => endRoamerTooltipInteraction(roamer));
-      roamer.addEventListener(
-        "touchstart",
-        () => {
-          beginRoamerTooltipInteraction(roamer);
-          hideRoamerTooltipIfAllowed(roamer);
-        },
-        { passive: true }
-      );
-
-      roamer.dataset.tooltipBound = "true";
-    });
-  }
-
   function bindRoamerClicks() {
     document.querySelectorAll(".arena-roamer").forEach((roamer) => {
       if (roamer.dataset.ambleBound === "true") return;
       roamer.addEventListener("click", () => {
-        if (reducedMotion.matches) return;
         beginRoamerAmble(roamer);
       });
       roamer.dataset.ambleBound = "true";
@@ -986,9 +950,11 @@
 
     if (!atlasesReady) return;
 
+    bindLivingArena();
+    if (reducedMotion.matches) habitats.forEach(h => h.foods.slice().forEach(food => removeFood(h, food)));
     remapArenaRoamers();
-    bindRoamerTooltips();
     bindRoamerClicks();
+    document.querySelectorAll(".arena-roamer").forEach(beginRoamerAmble);
   }
 
   function bindResizeRefresh() {
@@ -1016,3 +982,4 @@
     scheduleAtlasPreload();
   });
 })();
+

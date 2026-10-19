@@ -29,8 +29,8 @@
     />
     <link rel="stylesheet" href="./css/base.css" />
     <link rel="stylesheet" href="./css/components.css?v=20261019-responsive" />
-    <link rel="stylesheet" href="./css/dinos.css" />
-    <script defer src="./js/dinos.js"></script>
+    <link rel="stylesheet" href="./css/dinos.css?v=20261019-tray-v4" />
+    <script defer src="./js/dinos.js?v=20261019-tray-v4"></script>
     <script defer src="./js/content.js"></script>
   </head>
   <body class="home-page">
@@ -62,54 +62,64 @@
         </div>
 
         <section class="arena-stage" aria-label="Arena route selector">
-          <div class="arena-scene" aria-label="Interactive arena statues">
-            <div class="arena-colosseum" aria-hidden="true"></div>
-            <div class="arena-floor" aria-hidden="true"></div>
-            <button
-              class="arena-statue arena-roamer"
-              type="button"
-              data-dino-lounge="projects"
-              data-tooltip="Click me!"
-              aria-label="Amble Projects guide"
-            >
-              <span
-                class="dino dino--sheet dino--stego dino--arena dino--lounge"
-                data-dino
+          <div class="arena-exhibit">
+            <div class="arena-pantry" role="group" aria-label="Feed the dinosaurs">
+              <div class="arena-pantry-food">
+                <button type="button" class="arena-snack" data-food="leaf" aria-label="Offer a leaf" aria-describedby="feeding-help" aria-pressed="false"><span class="pixel-food pixel-food--leaf" aria-hidden="true"></span></button>
+                <button type="button" class="arena-snack" data-food="meat" aria-label="Offer meat to the raptor" aria-describedby="feeding-help" aria-pressed="false"><span class="pixel-food pixel-food--meat" aria-hidden="true"></span></button>
+              </div>
+              <span class="arena-feeding-status" id="feeding-help">Drag a snack into the arena, or click or tap one to offer it.</span>
+            </div>
+            <div class="arena-scene" aria-label="Interactive dinosaur arena">
+              <div class="arena-colosseum" aria-hidden="true"></div>
+              <div class="arena-floor" aria-hidden="true"></div>
+              <span class="arena-feeding-status" role="status" aria-live="polite"></span>
+              <button
+                class="arena-statue arena-roamer"
+                type="button"
                 data-dino-lounge="projects"
-                data-dino-state="lounge"
-                aria-hidden="true"
-              ></span>
-            </button>
-            <button
-              class="arena-statue arena-roamer"
-              type="button"
-              data-dino-lounge="writings"
-              data-tooltip="Click me!"
-              aria-label="Amble Writings guide"
-            >
-              <span
-                class="dino dino--sheet dino--raptor dino--arena dino--lounge"
-                data-dino
+                data-tooltip=":)"
+                aria-label="Pet the stegosaurus"
+              >
+                <span
+                  class="dino dino--sheet dino--stego dino--arena dino--lounge"
+                  data-dino
+                  data-dino-lounge="projects"
+                  data-dino-state="lounge"
+                  aria-hidden="true"
+                ></span>
+              </button>
+              <button
+                class="arena-statue arena-roamer"
+                type="button"
                 data-dino-lounge="writings"
-                data-dino-state="lounge"
-                aria-hidden="true"
-              ></span>
-            </button>
-            <button
-              class="arena-statue arena-roamer"
-              type="button"
-              data-dino-lounge="contact"
-              data-tooltip="Click me!"
-              aria-label="Amble Contact guide"
-            >
-              <span
-                class="dino dino--sheet dino--longneck dino--arena dino--lounge"
-                data-dino
+                data-tooltip=":)"
+                aria-label="Pet the raptor"
+              >
+                <span
+                  class="dino dino--sheet dino--raptor dino--arena dino--lounge"
+                  data-dino
+                  data-dino-lounge="writings"
+                  data-dino-state="lounge"
+                  aria-hidden="true"
+                ></span>
+              </button>
+              <button
+                class="arena-statue arena-roamer"
+                type="button"
                 data-dino-lounge="contact"
-                data-dino-state="lounge"
-                aria-hidden="true"
-              ></span>
-            </button>
+                data-tooltip=":)"
+                aria-label="Pet the longneck"
+              >
+                <span
+                  class="dino dino--sheet dino--longneck dino--arena dino--lounge"
+                  data-dino
+                  data-dino-lounge="contact"
+                  data-dino-state="lounge"
+                  aria-hidden="true"
+                ></span>
+              </button>
+            </div>
           </div>
           <div class="arena-controls">
             <nav class="arena-routes arena-routes--home" aria-label="Primary site routes">

@@ -219,3 +219,173 @@
     animation: none !important;
   }
 }
+
+
+/* Small, palette-matched snacks built on a hard two-pixel grid. */
+.pixel-food {
+  display: inline-block;
+  position: relative;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  pointer-events: none;
+  image-rendering: pixelated;
+  filter: drop-shadow(1px 0 0 #5f584e) drop-shadow(-1px 0 0 #5f584e)
+    drop-shadow(0 1px 0 #5f584e) drop-shadow(0 -1px 0 #5f584e);
+}
+.pixel-food::before,
+.pixel-food::after {
+  content: "";
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  left: 2px;
+  top: 2px;
+}
+.pixel-food--leaf::before {
+  background: transparent;
+  color: #6f7a5a;
+  box-shadow: 16px 0, 18px 0, 20px 0, 12px 2px, 14px 2px, 16px 2px, 18px 2px, 20px 2px,
+    8px 4px, 10px 4px, 12px 4px, 14px 4px, 16px 4px, 18px 4px, 20px 4px,
+    6px 6px, 8px 6px, 10px 6px, 12px 6px, 14px 6px, 16px 6px, 18px 6px,
+    4px 8px, 6px 8px, 8px 8px, 10px 8px, 12px 8px, 14px 8px, 16px 8px, 18px 8px,
+    4px 10px, 6px 10px, 8px 10px, 10px 10px, 12px 10px, 14px 10px, 16px 10px,
+    4px 12px, 6px 12px, 8px 12px, 10px 12px, 12px 12px, 14px 12px,
+    4px 14px, 6px 14px, 8px 14px, 10px 14px, 4px 16px, 6px 16px;
+}
+.pixel-food--leaf::after {
+  color: #5f584e;
+  box-shadow: 2px 20px, 4px 18px, 6px 16px, 8px 14px, 10px 12px, 12px 10px, 14px 8px;
+}
+.pixel-food--meat::before {
+  width: 18px;
+  height: 18px;
+  left: 2px;
+  top: 2px;
+  background: #d2b791;
+  box-shadow: inset -4px -4px #6b4e34, inset 2px 2px #ddd8cc;
+  clip-path: polygon(4px 0, 12px 0, 12px 2px, 16px 2px, 16px 6px, 100% 6px, 100% 12px, 14px 12px, 14px 16px, 8px 16px, 8px 100%, 2px 100%, 2px 14px, 0 14px, 0 4px, 4px 4px);
+}
+.pixel-food--meat::after {
+  color: #f2f1ea;
+  box-shadow: 14px 14px #c3bbaa, 16px 14px, 14px 16px, 16px 16px,
+    18px 16px, 16px 18px, 18px 18px, 20px 18px, 18px 20px,
+    20px 20px, 22px 18px, 24px 18px, 22px 20px, 24px 20px,
+    18px 22px, 20px 22px, 18px 24px, 20px 24px;
+}
+/* The pantry has its own layout space, clear of the Colosseum silhouette. */
+.arena-exhibit {
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr);
+  align-items: end;
+  column-gap: clamp(16px, 3vw, 36px);
+  width: 100%;
+}
+.home-page .arena-exhibit .arena-scene { width: 100%; pointer-events: auto; }
+.arena-pantry {
+  display: grid;
+  justify-items: center;
+  align-content: end;
+  gap: 8px;
+  padding-bottom: 20px;
+  color: var(--marble-deep);
+  pointer-events: auto;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.arena-pantry-food {
+  position: relative;
+  display: flex;
+  align-items: end;
+  justify-content: center;
+  gap: 0;
+  width: 72px;
+  height: 44px;
+  padding: 0 4px 6px;
+  isolation: isolate;
+}
+/* A shallow stone dish: stepped rim, recessed top and a solid pixel shadow. */
+.arena-pantry-food::before,
+.arena-pantry-food::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+.arena-pantry-food::before {
+  inset: auto 0 0;
+  height: 16px;
+  background: var(--marble-base);
+  box-shadow: inset 0 2px var(--surface), inset 0 -2px var(--marble-shadow);
+  clip-path: polygon(4px 0, calc(100% - 4px) 0, calc(100% - 4px) 2px, 100% 2px, 100% 8px, calc(100% - 2px) 8px, calc(100% - 2px) 12px, calc(100% - 6px) 12px, calc(100% - 6px) 100%, 6px 100%, 6px 12px, 2px 12px, 2px 8px, 0 8px, 0 2px, 4px 2px);
+  z-index: -2;
+}
+.arena-pantry-food::after {
+  left: 4px;
+  right: 4px;
+  bottom: 6px;
+  height: 8px;
+  background: var(--marble-light);
+  box-shadow: inset 0 2px var(--marble-shadow), inset 2px 0 var(--marble-base), inset -2px 0 var(--marble-base);
+  clip-path: polygon(2px 0, calc(100% - 2px) 0, calc(100% - 2px) 2px, 100% 2px, 100% 6px, calc(100% - 2px) 6px, calc(100% - 2px) 100%, 2px 100%, 2px 6px, 0 6px, 0 2px, 2px 2px);
+  z-index: -1;
+}
+.arena-snack {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 44px;
+  flex: 0 0 32px;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--marble-deep);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-appearance: none;
+  appearance: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.arena-snack .pixel-food { translate: 0 2px; }
+@media (hover: hover) {
+  .arena-snack:hover .pixel-food { translate: 0 -2px; }
+}
+.arena-snack:focus-visible { outline: 2px dashed var(--accent); outline-offset: -2px; }
+.arena-snack[aria-pressed="true"] { cursor: grabbing; }
+.arena-snack[aria-pressed="true"] .pixel-food { opacity: 0.35; }
+body.is-dragging-arena-food,
+body.is-dragging-arena-food * { cursor: grabbing !important; }
+.arena-food { position: absolute; transform: translate(-50%, -70%); }
+.arena-food-ghost { position: fixed; z-index: 20000; transform: translate(-50%, -50%); }
+.arena-scene .arena-floor {
+  position: absolute;
+  display: block;
+  border: 1px dashed #6f7a5a;
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease;
+  z-index: 1;
+}
+.arena-scene.is-feeding .arena-floor { opacity: 0.45; }
+.arena-scene.is-food-over .arena-floor { opacity: 0.9; background: rgb(111 122 90 / 10%); }
+.arena-feeding-status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.arena-roamer .dino.is-eating { animation: dino-nibble 340ms steps(2) infinite; }
+@keyframes dino-nibble {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 2px; }
+}
+@media (max-width: 650px) {
+  .arena-exhibit { grid-template-columns: minmax(0, 1fr); row-gap: 8px; }
+  .arena-exhibit .arena-scene { grid-row: 1; }
+  .arena-pantry { grid-row: 2; justify-self: start; padding: 0 0 0 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .arena-roamer .dino.is-eating { animation: none; }
+  .arena-scene .arena-floor { transition: none; }
+}
