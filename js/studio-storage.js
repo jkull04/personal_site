@@ -38,13 +38,14 @@
     // Never send private drafts or unrelated pending images to the service.
     const publicData=Object.fromEntries(Object.entries(data).map(([kind,entries])=>[kind,entries.filter(e=>e.published!==false).map(e=>({...e}))]));
     const uploaded=new Map();
-    for(const [i,photo] of publicData.photography.entries()) {
-      for(const field of ['src','thumb']) {
+    const media=[...publicData.photography.map(entry=>({entry,fields:['src','thumb']})),...publicData.books.filter(b=>b.coverSrc).map(entry=>({entry,fields:['coverSrc']}))];
+    for(const [i,{entry:photo,fields}] of media.entries()) {
+      for(const field of fields) {
         const path=photo[field];
         if(uploaded.has(path)) {photo[field]=uploaded.get(path);continue;}
         const pending=images[path.slice(1)];
         if(!pending && !(migrate && path.startsWith('/assets/photography/'))) continue;
-        progress(`Uploading photo ${i+1} of ${publicData.photography.length}…`);
+        progress(`Uploading image ${i+1} of ${media.length}…`);
         let blob;
         if(pending) blob=new Blob([Uint8Array.from(atob(pending),c=>c.charCodeAt(0))],{type:'image/jpeg'});
         else {

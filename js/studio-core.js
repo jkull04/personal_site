@@ -25,6 +25,7 @@
           if (!['string','boolean','number'].includes(typeof value) || String(value).length > 20000) throw Error('Invalid entry field: '+key);
         }
         if (publishing && entry.published !== false && (!entry.title?.trim() || (kind === 'books' ? !entry.author?.trim() : !entry.alt?.trim()))) throw Error(kind === 'books' ? 'Add a title and author to every included book.' : 'Add a title and image description to every included photo.');
+        if (kind === 'books' && entry.coverSrc && !validPhoto(entry.coverSrc)) throw Error('Invalid book cover path.');
         if (kind === 'books' && !['Reading','Read','Want to read'].includes(entry.status)) throw Error('Choose a valid reading status.');
         if (kind === 'books' && entry.rating && !['1','2','3','4','5'].includes(String(entry.rating))) throw Error('Ratings must be from 1 to 5.');
         if (kind === 'books' && entry.finishedYear && !/^\d{4}$/.test(String(entry.finishedYear))) throw Error('Use four digits for the finish year.');
@@ -61,7 +62,7 @@
         }
       }
     }
-    const needed = new Set(published.photography.flatMap(p=>[p.src.slice(1),p.thumb.slice(1)]));
+    const needed = new Set([...published.photography.flatMap(p=>[p.src.slice(1),p.thumb.slice(1)]),...published.books.filter(b=>b.coverSrc).map(b=>b.coverSrc.slice(1))]);
     for (const [path, content] of Object.entries(images)) {
       if (!needed.has(path)) continue;
       if (!imagePath.test(path) || !/^[A-Za-z0-9+/=]+$/.test(content)) throw Error('Invalid image upload.');

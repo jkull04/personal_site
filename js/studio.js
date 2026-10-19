@@ -81,9 +81,9 @@
       const holder = $(kind==='books'?'book-edit-list':'photo-edit-list');
       holder.innerHTML = state.data[kind].map((e,i)=>{
         const fields = kind==='books' ? field(kind,e,'title','Title')+field(kind,e,'author','Author')+field(kind,e,'status','Shelf','status')+field(kind,e,'rating','Rating (optional)','rating')+field(kind,e,'finished','Date finished (optional)','date')+field(kind,e,'finishedYear','Finish year (if date unknown)','number')+field(kind,e,'note','Your reading note','textarea',true) : field(kind,e,'title','Title')+field(kind,e,'collection','Group')+field(kind,e,'subgroup','Subgroup (optional)')+field(kind,e,'location','Place (optional)')+field(kind,e,'date','Date taken (optional)','date')+field(kind,e,'alt','Image description (required when publishing)','text',true)+field(kind,e,'caption','Caption (optional)','textarea',true);
-        const thumb = kind==='photography' ? ((state.images[e.thumb.slice(1)] || previews[e.thumb.slice(1)]) ? 'data:image/jpeg;base64,'+(state.images[e.thumb.slice(1)] || previews[e.thumb.slice(1)]) : e.thumb) : BookData.coverURL(e.coverId);
-        const cover = kind==='books' ? `<div>${bookCover(thumb,e.title)}<button type="button" data-lookup-book="${e.id}">Find cover &amp; author</button></div>` : (thumb?`<img src="${esc(thumb)}" alt="${esc(e.alt || 'Uploaded photograph preview')}" />`:'');
-        return `<article class="edit-card" data-kind="${kind}" data-id="${e.id}"><label class="entry-select"><input type="checkbox" data-select-entry aria-label="Select ${esc(e.title || 'untitled entry')}" ${selection[kind].has(e.id)?'checked':''} /></label><details ${openIds.has(e.id)?'open':''}><summary class="entry-summary">${kind==='books'?bookCover(thumb,e.title):`<img class="entry-thumb" src="${esc(thumb)}" alt="" loading="lazy" />`}<span><strong class="entry-title">${esc(e.title || 'Untitled')}</strong><span class="entry-meta">${esc(entryLabel(kind,e))}</span><span class="entry-state book-badge">${esc(publication(kind,e))}</span></span><span class="entry-edit-hint">Edit</span></summary><div class="${kind==='photography'?'edit-photo':'edit-book'}">${cover}<div><div class="edit-fields">${fields}</div>${actions(kind,e,i)}</div></div></details></article>`;
+        const thumb = kind==='photography' ? ((state.images[e.thumb.slice(1)] || previews[e.thumb.slice(1)]) ? 'data:image/jpeg;base64,'+(state.images[e.thumb.slice(1)] || previews[e.thumb.slice(1)]) : e.thumb) : studioBookCover(e);
+        const cover = kind==='books' ? `<div>${bookCover(thumb,e.title,e)}<button type="button" data-book-covers="${e.id}">Choose cover</button><button type="button" data-lookup-book="${e.id}">Find book &amp; author</button></div>` : (thumb?`<img src="${esc(thumb)}" alt="${esc(e.alt || 'Uploaded photograph preview')}" />`:'');
+        return `<article class="edit-card" data-kind="${kind}" data-id="${e.id}"><label class="entry-select"><input type="checkbox" data-select-entry aria-label="Select ${esc(e.title || 'untitled entry')}" ${selection[kind].has(e.id)?'checked':''} /></label><details ${openIds.has(e.id)?'open':''}><summary class="entry-summary">${kind==='books'?bookCover(thumb,e.title,e):`<img class="entry-thumb" src="${esc(thumb)}" alt="" loading="lazy" />`}<span><strong class="entry-title">${esc(e.title || 'Untitled')}</strong><span class="entry-meta">${esc(entryLabel(kind,e))}</span><span class="entry-state book-badge">${esc(publication(kind,e))}</span></span><span class="entry-edit-hint">Edit</span></summary><div class="${kind==='photography'?'edit-photo':'edit-book'}">${cover}<div><div class="edit-fields">${fields}</div>${actions(kind,e,i)}</div></div></details></article>`;
       }).join('') || `<p>No ${kind==='books'?'books':'photographs'} yet. Add your first one above.</p>`;
     }
     writingEditor.render();
@@ -94,14 +94,21 @@
     managedKinds.forEach(applyManagerView);
     refreshManagementSummary();
   }
-  function bookCover(url,title) {
-    return `<div class="catalog-cover">${url?`<img src="${esc(url)}" alt="Cover of ${esc(title)}" loading="lazy" referrerpolicy="no-referrer" />`:''}<span ${url?'hidden':''}>No cover available</span></div>`;
+  function studioBookCover(book) {
+    const path=book.coverSrc?.slice(1), pending=path && (state.images[path] || previews[path]);
+    return pending?'data:image/jpeg;base64,'+pending:BookData.imageURL(book);
+  }
+  function bookCover(url,title,book={}) {
+    const fallback=BookData.imageURL({...book,coverSrc:'',coverId:0},'L');
+    return `<div class="catalog-cover">${url?`<img src="${esc(url)}" alt="Cover of ${esc(title)}" data-cover-fallback="${esc(fallback)}" loading="lazy" referrerpolicy="no-referrer" />`:''}<span ${url?'hidden':''}>No cover available</span></div>`;
   }
   document.querySelector('main').addEventListener('error',event=>{
     if(event.target.matches('.catalog-cover img')) {
       const img=event.target;
       if(img.src.includes('-M.jpg')) {img.src=img.src.replace('-M.jpg','-L.jpg');return;}
+      if(img.dataset.coverFallback && img.src!==img.dataset.coverFallback) {const fallback=img.dataset.coverFallback;delete img.dataset.coverFallback;img.src=fallback;return;}
       img.hidden=true;img.nextElementSibling.hidden=false;
+      const choice=img.closest('[data-cover-choice]');if(choice){choice.disabled=true;choice.setAttribute('aria-label','Cover unavailable');}
     }
   },true);
   let catalogMatches=[], catalogController, catalogTimer, catalogVersion=0, lastSearch=0, catalogTarget='';
@@ -112,7 +119,7 @@
     if(!state) return;
     const books=state.data.books;
     $('shelf-count').textContent=`${books.length} book${books.length===1?'':'s'} added`;
-    $('shelf-overview').innerHTML=books.map(book=>`<button type="button" class="shelf-item" data-edit-book="${book.id}" ${busy?'disabled':''}>${bookCover(BookData.coverURL(book.coverId),book.title)}<strong>${esc(book.title || 'Untitled book')}</strong><span class="book-badge">${esc(bookStatus(book))}</span></button>`).join('') || '<p>Your added books will appear here.</p>';
+    $('shelf-overview').innerHTML=books.map(book=>`<button type="button" class="shelf-item" data-edit-book="${book.id}" ${busy?'disabled':''}>${bookCover(studioBookCover(book),book.title,book)}<strong>${esc(book.title || 'Untitled book')}</strong><span class="book-badge">${esc(bookStatus(book))}</span></button>`).join('') || '<p>Your added books will appear here.</p>';
   }
   function focusBook(id) {
     const input=$(id+'-title');
@@ -127,7 +134,7 @@
     $('catalog-results').innerHTML=matches.map((book,i)=>{
       const existing=existingBook(book);
       const label=catalogTarget ? 'Use this edition' : existing ? '✓ Added · Edit book' : '+ Add book';
-      return `<button class="catalog-result ${existing?'is-added':''}" type="button" data-catalog-index="${i}" ${busy?'disabled':''}>${bookCover(BookData.coverURL(book.coverId),book.title)}<span><strong>${esc(book.title)}</strong><span>${esc(book.author || 'Author unavailable')}</span><small>${esc(book.year)}</small><span class="book-badge">${label}</span></span></button>`;
+      return `<button class="catalog-result ${existing?'is-added':''}" type="button" data-catalog-index="${i}" ${busy?'disabled':''}>${bookCover(studioBookCover(book),book.title,book)}<span><strong>${esc(book.title)}</strong><span>${esc(book.author || 'Author unavailable')}</span><small>${esc(book.year)}</small><span class="book-badge">${label}</span></span></button>`;
     }).join('');
     if(announce) $('catalog-status').textContent=matches.length?'Choose a book to add. Books already on your shelf are marked.':'No matches found. Try another title, turn off English editions only, or add the book manually.';
   }
@@ -183,7 +190,7 @@
     }
     const existing=state.data.books.find(e=>e.id===catalogTarget);
     if(existing) {
-      undoDraft=null;Object.assign(existing,book); catalogTarget=''; render(); save().catch(()=>{});
+      undoDraft=null;Object.assign(existing,book); delete existing.coverEditionKey; catalogTarget=''; render(); save().catch(()=>{});
       $('catalog-status').textContent='Author and cover filled in. Your shelf, date, and notes are unchanged.';
       focusBook(existing.id); return;
     }
@@ -216,8 +223,8 @@
       const existing=book && existingBook(book), duplicate=book && BookData.findExisting(selected,book);
       if(book)selected.push(book);
       const blocked=busy || !!existing || !!duplicate;
-      return `<div class="batch-row ${existing?'is-added':''}"><div>${bookCover(book?BookData.coverURL(book.coverId):'',book?.title || row.title)}</div><div><label for="batch-match-${i}">${esc(row.title)}</label><select id="batch-match-${i}" data-batch-row="${i}" ${busy?'disabled':''}><option value="">${row.error?'Search unavailable — retry below':'Choose a match or leave out'}</option>${row.matches.map((match,j)=>`<option value="${j}" ${row.selected===j?'selected':''}>${existingBook(match)?'✓ Already added · ':''}${esc(match.title)} — ${esc(match.author || 'Unknown author')}${match.year?' ('+esc(match.year)+')':''}</option>`).join('')}</select>
-      ${book?`<div class="batch-review"><strong>${esc(book.title)}</strong><p>${esc(book.author || 'Author unavailable — choose another match or add manually')}</p><div class="batch-details"><label>Completed<input type="date" data-batch-date="${i}" value="${esc(row.finished || '')}" ${blocked?'disabled':''} /></label><label>Rating<select data-batch-rating="${i}" ${blocked?'disabled':''}><option value="">No rating</option>${[1,2,3,4,5].map(n=>`<option value="${n}" ${String(row.rating)===String(n)?'selected':''}>${'★'.repeat(n)} · ${n}/5</option>`).join('')}</select></label></div><p class="batch-year-hint">${row.finished?'Completed '+esc(row.finished):'Year only: '+esc($('batch-year').value)+'. Exact date optional.'}</p></div>`:''}
+      return `<div class="batch-row ${existing?'is-added':''}"><div>${bookCover(book?studioBookCover(book):'',book?.title || row.title,book || {})}</div><div><label for="batch-match-${i}">${esc(row.title)}</label><select id="batch-match-${i}" data-batch-row="${i}" ${busy?'disabled':''}><option value="">${row.error?'Search unavailable — retry below':'Choose a match or leave out'}</option>${row.matches.map((match,j)=>`<option value="${j}" ${row.selected===j?'selected':''}>${existingBook(match)?'✓ Already added · ':''}${esc(match.title)} — ${esc(match.author || 'Unknown author')}${match.year?' ('+esc(match.year)+')':''}</option>`).join('')}</select>
+      ${book?`<div class="batch-review"><strong>${esc(book.title)}</strong><button type="button" data-batch-covers="${i}" ${blocked?'disabled':''}>Choose cover</button><p>${esc(book.author || 'Author unavailable — choose another match or add manually')}</p><div class="batch-details"><label>Completed<input type="date" data-batch-date="${i}" value="${esc(row.finished || '')}" ${blocked?'disabled':''} /></label><label>Rating<select data-batch-rating="${i}" ${blocked?'disabled':''}><option value="">No rating</option>${[1,2,3,4,5].map(n=>`<option value="${n}" ${String(row.rating)===String(n)?'selected':''}>${'★'.repeat(n)} · ${n}/5</option>`).join('')}</select></label></div><p class="batch-year-hint">${row.finished?'Completed '+esc(row.finished):'Year only: '+esc($('batch-year').value)+'. Exact date optional.'}</p></div>`:''}
       <p class="book-badge">${existing?'✓ Already added · '+esc(bookStatus(existing)):duplicate?'Duplicate in this batch · added only once':book?'Ready for review · not added yet':'Not added · choose a match'}</p></div></div>`;
     }).join('');
     updateBatchButton();
@@ -282,6 +289,84 @@
       $('batch-status').textContent=`${result.added} book${result.added===1?'':'s'} added with the dates and ratings you reviewed. ${result.skipped?result.skipped+' already on your shelf were skipped. ':''}Publish when ready.`;
     } catch(error) {$('batch-status').textContent=error.message;}
   };
+  const coverDialog=$('book-cover-dialog'), editionCache=new Map();
+  let coverTarget=null, coverOpener=null, coverRequest=null, coverChoices=[], coverLoading=false;
+  const targetBook=()=>coverTarget?.id?state.data.books.find(b=>b.id===coverTarget.id):coverTarget?.book;
+  function renderCoverChoices() {
+    const book=targetBook(); if(!book)return;
+    const cached=editionCache.get(book.catalogKey);
+    coverChoices=BookData.editionCovers({entries:cached?.entries || []},$('cover-english').checked);
+    $('cover-current').innerHTML=bookCover(studioBookCover(book),book.title,book);
+    $('cover-options').innerHTML=coverChoices.map((choice,i)=>`<button type="button" class="edition-cover-choice" data-cover-choice="${i}" aria-label="Use ${esc(choice.publisher || choice.title)} cover, ${esc(choice.year)}, ${esc(choice.language)}" ${Number(book.coverId)===choice.coverId && !book.coverSrc?'aria-pressed="true"':'aria-pressed="false"'}>${bookCover(BookData.coverURL(choice.coverId),choice.title,choice)}<strong>${esc(choice.title)}</strong><small>${esc(choice.publisher)}</small><small>${esc([choice.year,choice.language].filter(Boolean).join(' · '))}</small></button>`).join('');
+    $('cover-more').hidden=!cached || cached.entries.length>=cached.total;
+    $('cover-more').disabled=coverLoading;
+    $('cover-reset').hidden=!book.coverSrc;
+    $('cover-status').textContent=coverLoading?'Looking up editions…':coverChoices.length?`${coverChoices.length} cover${coverChoices.length===1?'':'s'} to choose from. Only the cover changes.`:cached?'No covers in these editions. Load more editions, include other languages, or upload a cover.':'Use Find book & author to connect this book to the catalog, or upload a cover below.';
+  }
+  async function loadCoverEditions() {
+    const book=targetBook(); if(!book || !/^\/works\/OL\d+W$/.test(book.catalogKey || '') || coverLoading)return;
+    const target=coverTarget, key=book.catalogKey;
+    const cached=editionCache.get(key) || {entries:[],total:Infinity};
+    coverLoading=true; const controller=new AbortController();coverRequest=controller;
+    const timeout=setTimeout(()=>controller.abort(),15000);renderCoverChoices();
+    try {
+      const response=await fetch('https://openlibrary.org'+key+'/editions.json?limit=100&offset='+cached.entries.length,{signal:controller.signal,credentials:'omit',referrerPolicy:'no-referrer'});
+      if(!response.ok)throw Error();
+      const data=await response.json();if(!Array.isArray(data.entries))throw Error();
+      if(target!==coverTarget || !coverDialog.open)return;
+      editionCache.set(key,{entries:[...cached.entries,...data.entries],total:data.entries.length?Number(data.size)||cached.entries.length+data.entries.length:cached.entries.length});
+      coverLoading=false;renderCoverChoices();
+    } catch(error) {
+      if(target===coverTarget && coverDialog.open){coverLoading=false;renderCoverChoices();$('cover-status').textContent='Could not load editions. Try again or upload a cover.';$('cover-more').hidden=false;$('cover-more').disabled=false;}
+    } finally {clearTimeout(timeout);if(coverRequest===controller){coverRequest=null;coverLoading=false;}}
+  }
+  function openCoverPicker(target,opener) {
+    coverRequest?.abort();coverLoading=false;coverTarget=target;coverOpener=opener;
+    const book=targetBook();if(!book)return;
+    $('cover-book-title').textContent=book.title || 'Untitled book';
+    $('cover-english').checked=true;$('book-cover-upload').value='';
+    renderCoverChoices();coverDialog.showModal();
+    if(!editionCache.has(book.catalogKey))loadCoverEditions();
+  }
+  function applyCover(values) {
+    const book=targetBook();if(!book)return;
+    undoDraft=null;Object.assign(book,values);render();save().catch(()=>{});coverDialog.close();
+  }
+  document.querySelector('main').addEventListener('click',event=>{
+    if(busy)return;
+    const edit=event.target.closest('[data-book-covers]'), batch=event.target.closest('[data-batch-covers]');
+    if(edit)openCoverPicker({id:edit.dataset.bookCovers},edit);
+    if(batch){const row=batchRows[Number(batch.dataset.batchCovers)];if(row?.selected!==null && row?.matches[row.selected]){row.matches=row.matches.map(b=>({...b}));openCoverPicker({book:row.matches[row.selected],batch:Number(batch.dataset.batchCovers)},batch);}}
+  });
+  $('cover-options').onclick=event=>{
+    const button=event.target.closest('[data-cover-choice]');if(!button || busy)return;
+    const choice=coverChoices[Number(button.dataset.coverChoice)];
+    if(choice)applyCover({coverId:choice.coverId,coverEditionKey:choice.coverEditionKey,coverSrc:''});
+  };
+  $('cover-english').onchange=renderCoverChoices;
+  $('cover-more').onclick=loadCoverEditions;
+  $('cover-close').onclick=()=>{if(!busy)coverDialog.close();};
+  coverDialog.addEventListener('cancel',event=>{if(busy)event.preventDefault();});
+  coverDialog.addEventListener('close',()=>{
+    coverRequest?.abort();coverLoading=false;
+    const target=coverTarget;coverTarget=null;
+    const replacement=target?.id?document.querySelector(`[data-book-covers="${target.id}"]`):document.querySelector(`[data-batch-covers="${target?.batch}"]`);
+    (replacement || coverOpener)?.focus({preventScroll:true});
+  });
+  $('cover-reset').onclick=()=>{if(!busy)applyCover({coverSrc:''});};
+  $('book-cover-upload').onchange=async event=>{
+    const file=event.target.files[0],book=targetBook();if(!file || !book || busy)return;
+    setBusy(true);$('cover-status').textContent='Preparing your cover…';
+    try {
+      const resized=await resizePhoto(file), content=resized.thumb.content;
+      const total=Object.values(state.images).reduce((n,v)=>n+v.length,0)+content.length;
+      if(total>45*1024*1024)throw Error('Publish pending images before adding another cover.');
+      const path='assets/photography/book-cover-'+crypto.randomUUID()+'.jpg';state.images[path]=content;
+      applyCover({coverSrc:'/'+path});
+    } catch(error){$('cover-status').textContent=error.message;}
+    finally {setBusy(false);event.target.value='';}
+  };
+
   function downloadBackup() {
     const blob = new Blob([JSON.stringify(state)],{type:'application/json'});
     const url = URL.createObjectURL(blob); const a = document.createElement('a');
@@ -399,6 +484,7 @@
     setBusy(true); $('publish-result').textContent='Publishing your included entries…';
     try {
       const previousPhotos=structuredClone(state.data.photography);
+      const previousBooks=structuredClone(state.data.books);
       const result=StudioStorage.enabled
         ? await StudioStorage.publish({data:state.data,baseline:state.baseline,images:state.images,migrate,progress:text=>$('publish-result').textContent=text})
         : await StudioCore.publish({data:state.data,baseline:state.baseline,images:state.images,api});
@@ -412,12 +498,17 @@
           if (state.images[path]) { previews[path]=state.images[path]; delete state.images[path]; }
         }
       }
+      for(const book of result.published.books) {
+        const local=state.data.books.find(b=>b.id===book.id), old=previousBooks.find(b=>b.id===book.id);
+        if(old?.coverSrc && state.images[old.coverSrc.slice(1)]) {previews[old.coverSrc.slice(1)]=state.images[old.coverSrc.slice(1)];delete state.images[old.coverSrc.slice(1)];}
+        if(local && book.coverSrc!==undefined) local.coverSrc=book.coverSrc;
+      }
       for(const photo of result.published.photography) {
         const local=state.data.photography.find(p=>p.id===photo.id);
         if(local) {local.src=photo.src;local.thumb=photo.thumb;}
       }
       render();
-      const retained=new Set(state.data.photography.flatMap(p=>[p.src.slice(1),p.thumb.slice(1)]));
+      const retained=new Set([...state.data.photography.flatMap(p=>[p.src.slice(1),p.thumb.slice(1)]),...state.data.books.filter(b=>b.coverSrc).map(b=>b.coverSrc.slice(1))]);
       for(const path of Object.keys(state.images)) if(!retained.has(path)) delete state.images[path];
       await save().catch(()=>{});
       if(StudioStorage.enabled) refreshStorage();

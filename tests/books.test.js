@@ -65,3 +65,20 @@ test('reviewed batch preserves individual completion dates and ratings; year-onl
  for(const finished of ['2026-02-30','2026-13-01','bad'])assert.throws(()=>addBatch([],[{title:'Bad',finished}],'2026',()=> 'id'),/completion date/);
  assert.throws(()=>addBatch([],[{title:'Bad',rating:'6'}],'2026',()=> 'id'),/rating/);
 });
+test('matching English editions never borrow a different-language work cover',()=>{
+ const [book]=catalogResults({docs:[{title:'Foreign title',cover_i:99,editions:{docs:[{key:'/books/OL123M',title:'English title',language:['eng']}]}}]});
+ assert.equal(book.coverId,0);assert.equal(book.editionKey,'/books/OL123M');
+ assert.match(require('../js/book-data.js').imageURL(book),/olid\/OL123M/);
+});
+test('edition picker filters languages, ignores invalid covers and removes duplicate images',()=>{
+ const {editionCovers}=require('../js/book-data.js');
+ const entries=[{title:'French',covers:[1],languages:[{key:'/languages/fre'}]}, {title:'English',key:'/books/OL2M',covers:[2,-1,2],languages:[{key:'/languages/eng'}],publishers:['Publisher'],publish_date:'2020'}, {title:'Unknown',covers:[3]}, {title:'English reissue',covers:[2],languages:[{key:'/languages/eng'}]}];
+ assert.deepEqual(editionCovers({entries}).map(b=>b.coverId),[2]);
+ assert.deepEqual(editionCovers({entries},false).map(b=>b.coverId),[2,1,3]);
+ assert.equal(editionCovers({entries})[0].publisher,'Publisher');
+});
+test('custom covers take precedence and unsafe paths fall back to the catalog',()=>{
+ const {imageURL}=require('../js/book-data.js');
+ assert.equal(imageURL({coverSrc:'/assets/photography/book-cover-123.jpg',coverId:1}),'/assets/photography/book-cover-123.jpg');
+ for(const coverSrc of ['javascript:alert(1)','https://evil.test/cover.jpg','//evil.test/x','/assets/photography/../x.jpg'])assert.equal(imageURL({coverSrc,coverId:1}),coverURL(1));
+});

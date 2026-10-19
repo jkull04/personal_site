@@ -9,7 +9,9 @@
       title: (typeof edition?.title==='string' ? edition.title : book.title).slice(0,500),
       author: (Array.isArray(book.author_name) ? book.author_name.filter(a=>typeof a==='string').join(', ') : '').slice(0,500),
       catalogKey: /^\/?(?:works\/)?OL\d+W$/.test(book.key || '') ? '/works/'+book.key.split('/').pop() : '',
-      coverId: coverURL(edition?.cover_i) ? Number(edition.cover_i) : coverURL(book.cover_i) ? Number(book.cover_i) : 0,
+      coverId: coverURL(edition?.cover_i) ? Number(edition.cover_i) : !edition && coverURL(book.cover_i) ? Number(book.cover_i) : 0,
+      editionKey: /^\/books\/OL\d+M$/.test(edition?.key || '') ? edition.key : '',
+      coverSrc: '',
       year: Number.isInteger(book.first_publish_year) ? String(book.first_publish_year) : ''
     }; });
   }
@@ -17,7 +19,27 @@
     const quoted=String(title).replace(/\\/g,'\\\\').replace(/"/g,'\\"');
     const isbn=String(title).replace(/[\s-]/g,'');
     const query=/^(?:\d{9}[\dXx]|\d{13})$/.test(isbn) ? `isbn:${isbn}` : `title:"${quoted}"`;
-    return new URLSearchParams({q:`${query}${english?' language:eng':''}`,fields:'key,title,author_name,cover_i,first_publish_year,editions,editions.title,editions.cover_i,editions.language',limit:'8',lang:'en'});
+    return new URLSearchParams({q:`${query}${english?' language:eng':''}`,fields:'key,title,author_name,cover_i,first_publish_year,editions,editions.key,editions.title,editions.cover_i,editions.language',limit:'8',lang:'en'});
+  }
+  const customCover = value => /^\/assets\/photography\/[a-zA-Z0-9_-]+\.jpg$/.test(value || '') || /^https:\/\/jameskull-studio-storage\.fitzykull\.workers\.dev\/photos\/[a-f0-9]{64}\.jpg$/.test(value || '');
+  function imageURL(book,size='M') {
+    if(customCover(book.coverSrc)) return book.coverSrc;
+    if(coverURL(book.coverId,size)) return coverURL(book.coverId,size);
+    const key=book.coverEditionKey || book.editionKey;
+    return /^\/books\/OL\d+M$/.test(key || '') ? `https://covers.openlibrary.org/b/olid/${key.split('/').pop()}-${size==='L'?'L':'M'}.jpg?default=false` : '';
+  }
+  function editionCovers(data,english=true) {
+    const seen=new Set(), results=[];
+    for(const edition of Array.isArray(data?.entries)?data.entries:[]) {
+      const languages=(edition.languages || []).map(l=>l?.key?.split('/').pop()).filter(Boolean);
+      if(english && !languages.includes('eng'))continue;
+      for(const id of edition.covers || []) {
+        if(!coverURL(id) || seen.has(Number(id)))continue;
+        seen.add(Number(id));
+        results.push({coverId:Number(id),coverEditionKey:/^\/books\/OL\d+M$/.test(edition.key || '')?edition.key:'',title:String(edition.title || '').slice(0,500),publisher:(edition.publishers || []).filter(p=>typeof p==='string').join(', ').slice(0,500),year:String(edition.publish_date || '').slice(0,100),language:languages.includes('eng')?'English':languages.join(', ') || 'Language unknown'});
+      }
+    }
+    return results.sort((a,b)=>(b.language==='English')-(a.language==='English'));
   }
   function findExisting(books,book) {
     const norm=value=>String(value || '').normalize('NFKC').trim().replace(/\s+/g,' ').toLowerCase();
@@ -63,6 +85,6 @@
     }
     return {books,added,skipped};
   }
-  root.BookData = {coverURL,catalogResults,searchParams,findExisting,publicationStatus,recentlyFinished,finishYear,finishedByYear,addBatch};
+  root.BookData = {coverURL,imageURL,customCover,editionCovers,catalogResults,searchParams,findExisting,publicationStatus,recentlyFinished,finishYear,finishedByYear,addBatch};
   if (typeof module !== 'undefined') module.exports = root.BookData;
 })(globalThis);

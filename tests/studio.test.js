@@ -64,3 +64,12 @@ test('UTF-8 content compares without false conflicts',async()=>{
   const {api}=mockApi(data);const result=await publish({data,baseline:structuredClone(data),images:{},api});
   assert.equal(result.unchanged,true);
 });
+test('replacement covers publish atomically, excluding private and unused uploads',async()=>{
+ const {api,calls}=mockApi();
+ const data={books:[{...book(),rating:'5',finished:'2026-09-01',coverSrc:'/assets/photography/book-cover-new.jpg'},{...book(),id:'private',published:false,coverSrc:'/assets/photography/book-cover-private.jpg'}],photography:[]};
+ await publish({data,baseline:empty(),images:{'assets/photography/book-cover-new.jpg':'YWJj','assets/photography/book-cover-private.jpg':'YWJj','assets/photography/unused.jpg':'YWJj'},api});
+ const tree=calls.find(c=>c.path==='/git/trees').body.tree;
+ assert.deepEqual(tree.map(x=>x.path),['data/books.json','assets/photography/book-cover-new.jpg']);
+ const saved=JSON.parse(tree[0].content)[0];assert.equal(saved.rating,'5');assert.equal(saved.finished,'2026-09-01');
+ assert.throws(()=>validate({books:[{...book(),coverSrc:'https://evil.test/c.jpg'}],photography:[]}),/cover path/);
+});

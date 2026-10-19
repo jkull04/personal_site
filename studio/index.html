@@ -20,16 +20,16 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://covers.openlibrary.org https://jameskull-studio-storage.fitzykull.workers.dev; connect-src 'self' https://api.github.com https://openlibrary.org https://jameskull-studio-storage.fitzykull.workers.dev; object-src 'none'; base-uri 'self'; form-action 'none'" />
     <meta name="robots" content="noindex,nofollow" />
     <meta name="referrer" content="no-referrer" />
-    <link rel="stylesheet" href="/css/studio.css?v=gallery-next-1" />
-    <script defer src="/js/studio-storage.js?v=r2-1"></script>
+    <link rel="stylesheet" href="/css/studio.css?v=book-editions-1" />
+    <script defer src="/js/studio-storage.js?v=book-editions-1"></script>
     <script defer src="/js/studio-access.js?v=r2-1"></script>
     <link rel="stylesheet" href="/css/writing.css?v=r2-1" />
     <script defer src="/js/writing-data.js?v=r2-1"></script>
     <script defer src="/js/writing-editor.js?v=r2-1"></script>
-    <script defer src="/js/studio-core.js?v=r2-1"></script>
-    <script defer src="/js/book-data.js?v=gallery-next-1"></script>
+    <script defer src="/js/studio-core.js?v=book-editions-1"></script>
+    <script defer src="/js/book-data.js?v=book-editions-1"></script>
     <script defer src="/js/photo-data.js?v=gallery-next-1"></script>
-    <script defer src="/js/studio.js?v=gallery-next-1"></script>
+    <script defer src="/js/studio.js?v=book-editions-1"></script>
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
@@ -76,7 +76,7 @@
       <section id="books-editor" aria-labelledby="books-heading"><div class="studio-section-head"><div><h2 id="books-heading">Reading shelf</h2><p>Finished books appear as covers, grouped by the year you read them.</p></div><button id="add-book" type="button" disabled>Add manually</button></div><section class="shelf-panel" aria-labelledby="shelf-count"><h3 id="shelf-count">Your added books</h3><p>Click a cover to edit. “Not published” books are saved in this browser until you publish.</p><div id="shelf-overview" class="shelf-overview"></div></section><div class="catalog-search">
         <label for="book-search">Find a book</label>
         <div class="studio-actions"><input id="book-search" type="search" placeholder="Type a title or ISBN…" autocomplete="off" maxlength="200" disabled /><button id="search-books" type="button" disabled>Search</button></div>
-        <label class="checkbox"><input id="english-only" type="checkbox" checked disabled />English editions only (single and batch search)</label><p class="catalog-help">Choose a match to fill in the author and cover. Use an ISBN to find a specific edition. Catalog and covers from <a href="https://openlibrary.org" target="_blank" rel="noopener noreferrer">Open Library</a>.</p>
+        <label class="checkbox"><input id="english-only" type="checkbox" checked disabled />English editions only (single and batch search)</label><p class="catalog-help">Choose a match to fill in the author and cover. Use an ISBN to find a specific edition. After adding, choose a different cover from your shelf. Catalog and covers from <a href="https://openlibrary.org" target="_blank" rel="noopener noreferrer">Open Library</a>.</p>
         <p id="catalog-status" role="status" aria-live="polite"></p><div id="catalog-results" class="catalog-results"></div>
       </div>
       <details class="batch-books"><summary>Add several books at once</summary>
@@ -93,6 +93,14 @@
         <p id="writing-count"></p><div id="writing-edit-list"></div>
         <aside class="studio-panel"><h3>Already on Substack?</h3><p>Your existing Substack posts still sync automatically. Edit those posts on Substack. New Studio writings appear alongside them on your <a href="/writings/" target="_blank" rel="noopener">writings page</a>. Choose Project as the category to publish to your Projects page. Existing Substack projects continue to sync.</p></aside>
       </section>
+      <dialog id="book-cover-dialog" class="book-cover-dialog" aria-labelledby="cover-heading">
+        <div class="studio-section-head"><div><h2 id="cover-heading">Choose a cover</h2><p id="cover-book-title"></p></div><button id="cover-close" type="button" aria-label="Close cover picker">Close ×</button></div>
+        <div class="cover-current-row"><div id="cover-current"></div><div><p>Pick an edition’s cover or upload your own. Your title, author, dates, and rating stay the same.</p><button id="cover-reset" type="button" hidden>Use catalog cover again</button></div></div>
+        <label class="checkbox"><input id="cover-english" type="checkbox" checked />English editions only</label>
+        <p id="cover-status" role="status" aria-live="polite"></p><div id="cover-options" class="edition-cover-grid"></div>
+        <button id="cover-more" type="button" hidden>Load more editions</button>
+        <label class="cover-upload" for="book-cover-upload">Upload a replacement cover<input id="book-cover-upload" type="file" accept="image/jpeg,image/png,image/webp" /><small>JPEG, PNG, or WebP. Saved in your draft; appears on the site after publishing.</small></label>
+      </dialog>
       </div>
       <noscript>Studio is locked. Enable JavaScript to enter your password.</noscript>
     </main>

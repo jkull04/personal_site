@@ -133,3 +133,21 @@ details[open] summary { margin-bottom: 12px; }
  .batch-row { grid-template-columns:64px minmax(0,1fr); }
  .batch-row select { max-width:100%; }
 }
+
+.book-cover-dialog { width: min(760px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); box-sizing: border-box; overflow: auto; border: 1px solid #b9b4a5; padding: clamp(18px, 4vw, 32px); background: #f7f5f0; color: #5f584e; }
+.book-cover-dialog::backdrop { background: rgb(28 27 23 / 70%); }
+.book-cover-dialog h2 { margin: 0; }
+.book-cover-dialog .studio-section-head { align-items: flex-start; gap: 18px; }
+.cover-current-row { display: flex; gap: 20px; align-items: center; margin: 20px 0; }
+.cover-current-row .catalog-cover { width: 80px; height: 120px; }
+.cover-current-row > div:last-child { flex: 1; }
+.edition-cover-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 14px; margin: 20px 0; }
+.edition-cover-choice { min-width: 0; text-align: left; padding: 10px; display: flex; flex-direction: column; gap: 8px; background: transparent; border: 1px solid #d5d0c5; }
+.edition-cover-choice[aria-pressed="true"] { border: 2px solid #74785d; }
+.edition-cover-choice .catalog-cover { width: 100%; height: 180px; }
+.edition-cover-choice .catalog-cover img { width: 100%; height: 100%; object-fit: contain; }
+.edition-cover-choice strong, .edition-cover-choice small { overflow-wrap: anywhere; font-size: 12px; line-height: 1.4; }
+.cover-upload { display: grid; gap: 10px; border-top: 1px solid #d5d0c5; margin-top: 24px; padding-top: 20px; }
+.cover-upload input { max-width: 100%; }
+.edit-book > div:first-child { display: grid; align-content: start; gap: 8px; }
+@media (max-width: 480px) { .edition-cover-grid { grid-template-columns: repeat(2, minmax(0,1fr)); } .edition-cover-choice .catalog-cover { height: 150px; } }
