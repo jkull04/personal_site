@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en" id="top" class="defer-dino-atlases">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>James Kull | Books</title>
+    <meta name="description" content="A reading shelf. Books, ideas, and notes worth keeping." />
+    <link rel="icon" type="image/png" href="/assets/icons/favicon-32.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/css/base.css" />
+    <link rel="stylesheet" href="/css/components.css" />
+    <link rel="stylesheet" href="/css/dinos.css" />
+    <script defer src="/js/dinos.js"></script>
+    <link rel="stylesheet" href="/css/collections.css" />
+    <script defer src="/js/collections.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="page-header site-shell">
+      <nav class="top-nav" aria-label="Primary">
+        <a class="brand" href="/">
+          <img class="icon-endcap" src="/assets/icons/favicon-32.png" width="16" height="16" alt="" />
+          <span>JFK</span>
+        </a>
+        <ul class="nav-links">
+          <li><a href="/">Home</a></li>
+          <li><a href="/projects/">Projects</a></li>
+          <li><a href="/writings/">Writings</a></li>
+          <li><a class="is-active" aria-current="page" href="/books/">Books</a></li>
+          <li><a href="/photography/">Photography</a></li>
+          <li><a href="/contact/">Contact</a></li>
+        </ul>
+      </nav>
+    </header>
+
+    <main id="main" class="site-shell collection-page" data-collection="books">
+      <header class="collection-intro">
+        <p class="eyebrow">The reading room</p>
+        <h1>Books</h1><p class="hero-lead">A reading shelf. Books, ideas, and notes worth keeping.</p>
+      </header>
+      <div class="collection-controls" role="group" aria-label="Books filters">
+        <label>Search<input id="collection-search" type="search" placeholder="Title, author, or note" /></label>
+        <label>Shelf<select id="collection-filter"><option value="">Every shelf</option><option>Reading</option><option>Read</option><option>Want to read</option></select></label>
+        <p id="collection-count" role="status"></p>
+      </div>
+      <section id="collection-list" class="book-list" aria-label="Books"><p>Loading books…</p></section>
+      <noscript><p>Enable JavaScript to view this collection.</p></noscript>
+      <dialog id="photo-viewer" aria-label="Photograph viewer">
+        <button class="viewer-close" type="button" aria-label="Close photograph">Close ×</button>
+        <figure><img id="viewer-image" alt="" /><figcaption id="viewer-caption"></figcaption></figure>
+        <div class="viewer-controls"><button id="viewer-prev" type="button">← Previous</button><span id="viewer-count"></span><button id="viewer-next" type="button">Next →</button></div>
+      </dialog>
+    </main>
+    <footer class="footer site-shell">
+      <p>James Kull | Classics and Economics, Washington and Lee University.</p>
+      <button class="footer-contact footer-copy copy-trigger" type="button" data-copy-email data-email="jkull@mail.wlu.edu">
+        Email
+      </button>
+    </footer>
+  </body>
+</html>
+

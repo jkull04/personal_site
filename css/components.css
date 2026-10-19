@@ -1184,3 +1184,8 @@
     align-items: flex-start;
   }
 }
+
+
+/* Six primary destinations retain the original compact navigation. */
+.nav-links { flex-wrap: wrap; justify-content: flex-end; }
+@media (max-width: 800px) { .top-nav { align-items: start; flex-direction: column; } .nav-links { justify-content: flex-start; gap: 8px 16px; } }

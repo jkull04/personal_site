@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en" id="top" class="defer-dino-atlases">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>James Kull | Studio</title>
+    <meta name="description" content="A reading shelf. Books, ideas, and notes worth keeping." />
+    <link rel="icon" type="image/png" href="/assets/icons/favicon-32.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/css/base.css" />
+    <link rel="stylesheet" href="/css/components.css" />
+    <link rel="stylesheet" href="/css/dinos.css" />
+    <script defer src="/js/dinos.js"></script>
+    <link rel="stylesheet" href="/css/collections.css" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.github.com; object-src 'none'; base-uri 'self'; form-action 'none'" />
+    <meta name="robots" content="noindex,nofollow" />
+    <meta name="referrer" content="no-referrer" />
+    <link rel="stylesheet" href="/css/studio.css" />
+    <script defer src="/js/studio-core.js"></script>
+    <script defer src="/js/studio.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="page-header site-shell">
+      <nav class="top-nav" aria-label="Primary">
+        <a class="brand" href="/">
+          <img class="icon-endcap" src="/assets/icons/favicon-32.png" width="16" height="16" alt="" />
+          <span>JFK</span>
+        </a>
+        <ul class="nav-links">
+          <li><a href="/">Home</a></li>
+          <li><a href="/projects/">Projects</a></li>
+          <li><a href="/writings/">Writings</a></li>
+          <li><a href="/books/">Books</a></li>
+          <li><a href="/photography/">Photography</a></li>
+          <li><a href="/contact/">Contact</a></li>
+        </ul>
+      </nav>
+    </header>
+
+    <main id="main" class="site-shell studio">
+      <header class="collection-intro"><p class="eyebrow">Owner’s desk</p><h1>Studio</h1><p class="hero-lead">Keep the shelf and the gallery growing.</p></header>
+      <p id="studio-status" role="status" aria-live="polite">Opening your desk…</p>
+      <section class="studio-panel" aria-labelledby="publish-heading">
+        <h2 id="publish-heading">Save here. Publish when ready.</h2>
+        <p>Changes are saved as drafts in this browser. Publish sends the included entries to your website. Keep a backup before switching devices.</p>
+        <div class="studio-actions"><button id="publish" type="button" disabled>Publish updates</button><button id="backup" type="button" disabled>Download backup</button><label class="studio-button" for="restore">Restore backup</label><input id="restore" class="sr-only" type="file" accept="application/json,.json" /><button id="reload" type="button" disabled>Reload published content</button></div>
+        <p id="publish-result" role="status"></p>
+        <details id="connection"><summary>GitHub connection</summary><p>One-time setup: <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">create a fine-grained token</a> for <strong>jkull04 / personal_site only</strong>, with <strong>Contents: Read and write</strong>. Choose an expiration. Paste it here when publishing; the token is held in memory only and cleared when you leave this page.</p><label for="github-token">GitHub token</label><div class="studio-actions"><input id="github-token" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your repository token" /><button id="disconnect" type="button">Clear token</button></div></details>
+      </section>
+      <div class="studio-tabs" role="group" aria-label="Edit collection"><button type="button" data-tab="books" aria-pressed="true">Books</button><button type="button" data-tab="photography" aria-pressed="false">Photography</button></div>
+      <section id="books-editor" aria-labelledby="books-heading"><div class="studio-section-head"><div><h2 id="books-heading">Reading shelf</h2><p>What you’re reading, what stayed with you, and what’s next.</p></div><button id="add-book" type="button" disabled>Add book</button></div><div id="book-edit-list"></div></section>
+      <section id="photography-editor" aria-labelledby="photos-heading" hidden><div class="studio-section-head"><div><h2 id="photos-heading">Photographs</h2><p>Arrange photographs in the order you want them to appear.</p></div><a href="/photography/" target="_blank" rel="noopener">View gallery ↗</a></div><label class="drop-zone" id="drop-zone" for="photo-upload"><strong>Add photographs</strong><span>Drop files here or choose photos · JPEG, PNG, WebP</span><span>Up to 20 at a time. Images are resized and location metadata is removed. Export HEIC or RAW files as JPEG first.</span><input id="photo-upload" type="file" accept="image/jpeg,image/png,image/webp" multiple disabled /></label><p id="upload-status" role="status"></p><div id="photo-edit-list"></div></section>
+      <aside class="studio-panel"><h2>Writings &amp; projects</h2><p>Continue publishing these on <a href="https://jameskull.substack.com" target="_blank" rel="noopener">Substack</a>. Your existing sync stays in place. Books and photographs are maintained here.</p></aside>
+      <noscript>This editor requires JavaScript.</noscript>
+    </main>
+    <footer class="footer site-shell">
+      <p>James Kull | Classics and Economics, Washington and Lee University.</p>
+      <button class="footer-contact footer-copy copy-trigger" type="button" data-copy-email data-email="jkull@mail.wlu.edu">
+        Email
+      </button>
+    </footer>
+  </body>
+</html>
+

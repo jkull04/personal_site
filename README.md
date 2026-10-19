@@ -571,3 +571,47 @@ Maintenance expectations:
 
 - Keep canonical trailing-slash routes.
 - Ensure legacy `*.html` shims continue redirecting to canonical paths.
+
+
+
+## Books, photography, and Studio
+
+Open `/studio/` to maintain the two collections. The existing Living Ruins theme,
+static hosting, arena, Substack pipeline, and domain are unchanged.
+
+1. **Books:** choose Add book, enter title/author, choose a shelf, and optionally
+   add a rating, finished date, and reading note.
+2. **Photography:** choose or drop up to 20 JPEG/PNG/WebP images. The editor makes
+   a 2400px full image and a 960px thumbnail, corrects image orientation, and
+   re-encodes JPEGs without EXIF/GPS metadata. Export HEIC/RAW as JPEG first.
+3. Add photo descriptions for accessibility, captions, places, and collections.
+   Move entries up/down to control display order.
+4. Check **Include on public site** for entries ready to publish. Unchecked
+   entries remain only in the browser draft, not in the public repository.
+5. Expand GitHub connection. Create a fine-grained GitHub token scoped to
+   `jkull04/personal_site` with **Contents: Read and write**, choose an expiration,
+   and paste it into Studio. No OAuth service or paid CMS is required. The token
+   is never saved in IndexedDB, backups, localStorage, or the repository. Clear
+   it when done; leaving the page also clears it.
+6. Choose **Publish updates**. This makes one atomic Git commit to `main`,
+   triggering the existing GitHub Pages deployment. Follow the deployment link
+   for completion; a saved commit is not the same as a completed deployment.
+
+Drafts autosave in IndexedDB in the current browser. Download a backup before
+changing devices or clearing browser data. Backups contain unpublished entries
+and pending image uploads, but not a GitHub token. Already published photographs
+remain in the repository. Restore a backup in Studio to continue editing.
+
+The editor reads the latest GitHub commit, compares both published collections
+with its saved baseline, and refuses to overwrite newer content. If another
+browser changes a collection, download your draft backup, reload published
+content, and reapply your edits. A non-forced ref update also rejects concurrent
+commits safely. Unrelated Substack updates are preserved.
+
+Public collection files are `data/books.json` and `data/photography.json`.
+Photographs live under `assets/photography/`. Removing an entry unlists it on the
+next publish; its old image file and Git history remain. Do not upload private
+photographs expecting a later removal to erase repository history.
+
+Tests: `node --test tests/studio.test.js`. New routes use the existing canonical
+trailing-slash convention: `/books/`, `/photography/`, and `/studio/`.
