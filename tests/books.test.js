@@ -34,6 +34,7 @@ test('English search requests matching editions and uses their title and cover',
   const {searchParams}=require('../js/book-data.js');
   const params=searchParams('Crime and Punishment');
   assert.match(params.get('q'),/language:eng/);
+  assert.equal(searchParams('978-0-345-53980-9').get('q'),'isbn:9780345539809 language:eng');
   assert.match(params.get('fields'),/editions.cover_i/);
   assert.doesNotMatch(searchParams('Crime and Punishment',false).get('q'),/language:eng/);
   const [book]=catalogResults({docs:[{title:'Преступление и наказание',key:'/works/OL1W',cover_i:1,author_name:['Dostoevsky'],editions:{docs:[{title:'Crime and Punishment',cover_i:2,language:['eng']}]}}]});

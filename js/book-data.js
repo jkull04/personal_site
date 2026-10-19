@@ -15,7 +15,9 @@
   }
   function searchParams(title,english=true) {
     const quoted=String(title).replace(/\\/g,'\\\\').replace(/"/g,'\\"');
-    return new URLSearchParams({q:`title:"${quoted}"${english?' language:eng':''}`,fields:'key,title,author_name,cover_i,first_publish_year,editions,editions.title,editions.cover_i,editions.language',limit:'8',lang:'en'});
+    const isbn=String(title).replace(/[\s-]/g,'');
+    const query=/^(?:\d{9}[\dXx]|\d{13})$/.test(isbn) ? `isbn:${isbn}` : `title:"${quoted}"`;
+    return new URLSearchParams({q:`${query}${english?' language:eng':''}`,fields:'key,title,author_name,cover_i,first_publish_year,editions,editions.title,editions.cover_i,editions.language',limit:'8',lang:'en'});
   }
   function findExisting(books,book) {
     const norm=value=>String(value || '').normalize('NFKC').trim().replace(/\s+/g,' ').toLowerCase();

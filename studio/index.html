@@ -20,10 +20,10 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://covers.openlibrary.org; connect-src 'self' https://api.github.com https://openlibrary.org; object-src 'none'; base-uri 'self'; form-action 'none'" />
     <meta name="robots" content="noindex,nofollow" />
     <meta name="referrer" content="no-referrer" />
-    <link rel="stylesheet" href="/css/studio.css?v=books-shelf-2" />
-    <script defer src="/js/studio-core.js?v=books-shelf-2"></script>
-    <script defer src="/js/book-data.js?v=books-shelf-2"></script>
-    <script defer src="/js/studio.js?v=books-shelf-2"></script>
+    <link rel="stylesheet" href="/css/studio.css?v=books-shelf-3" />
+    <script defer src="/js/studio-core.js?v=books-shelf-3"></script>
+    <script defer src="/js/book-data.js?v=books-shelf-3"></script>
+    <script defer src="/js/studio.js?v=books-shelf-3"></script>
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
@@ -57,8 +57,8 @@
       <div class="studio-tabs" role="group" aria-label="Edit collection"><button type="button" data-tab="books" aria-pressed="true">Books</button><button type="button" data-tab="photography" aria-pressed="false">Photos</button></div>
       <section id="books-editor" aria-labelledby="books-heading"><div class="studio-section-head"><div><h2 id="books-heading">Reading shelf</h2><p>Finished books appear as covers, grouped by the year you read them.</p></div><button id="add-book" type="button" disabled>Add manually</button></div><section class="shelf-panel" aria-labelledby="shelf-count"><h3 id="shelf-count">Your added books</h3><p>Click a cover to edit. “Not published” books are saved in this browser until you publish.</p><div id="shelf-overview" class="shelf-overview"></div></section><div class="catalog-search">
         <label for="book-search">Find a book</label>
-        <div class="studio-actions"><input id="book-search" type="search" placeholder="Type a book title…" autocomplete="off" maxlength="200" disabled /><button id="search-books" type="button" disabled>Search</button></div>
-        <label class="checkbox"><input id="english-only" type="checkbox" checked disabled />English editions only (single and batch search)</label><p class="catalog-help">Choose a match to fill in the author and cover. Catalog and covers from <a href="https://openlibrary.org" target="_blank" rel="noopener noreferrer">Open Library</a>.</p>
+        <div class="studio-actions"><input id="book-search" type="search" placeholder="Type a title or ISBN…" autocomplete="off" maxlength="200" disabled /><button id="search-books" type="button" disabled>Search</button></div>
+        <label class="checkbox"><input id="english-only" type="checkbox" checked disabled />English editions only (single and batch search)</label><p class="catalog-help">Choose a match to fill in the author and cover. Use an ISBN to find a specific edition. Catalog and covers from <a href="https://openlibrary.org" target="_blank" rel="noopener noreferrer">Open Library</a>.</p>
         <p id="catalog-status" role="status" aria-live="polite"></p><div id="catalog-results" class="catalog-results"></div>
       </div>
       <details class="batch-books"><summary>Add several books at once</summary>
