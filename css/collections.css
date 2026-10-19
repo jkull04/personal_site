@@ -130,26 +130,64 @@ button:disabled { opacity: .55; cursor: wait; }
 }
 @media(prefers-reduced-motion:reduce) { .album-mosaic { transition:none; } .album-trigger:hover .album-mosaic { transform:none; } }
 
-/* Keep the familiar header and a rim of the page around the focused album. */
-.album-explorer { padding:0 24px 24px; background:transparent; overflow:hidden; }
-.album-explorer[open] { display:flex; flex-direction:column; gap:16px; }
-.album-explorer::backdrop { background:rgba(247,245,240,.7); }
-.album-explorer > .page-header { flex-shrink:0; background:var(--bg); margin-bottom:0; }
-.album-explorer .album-spread-shell { flex:1; min-height:0; width:100%; padding:16px 24px; border:1px solid var(--border-soft); background:var(--bg); margin:0 auto; overflow:hidden; }
-.album-spread-bar,.album-subfilters,.album-pagination { flex-shrink:0; }
-.album-explorer .album-spread { flex:1; height:auto; min-height:0; padding:16px 0; }
+/* A focused photo spread, with the original page still visibly underneath. */
+body:has([data-collection="photography"]) > .page-header { position:sticky; top:0; z-index:10; background:var(--bg); }
+.album-explorer { inset:92px 0 24px; width:calc(100% - 96px); max-width:1040px; height:calc(100dvh - 116px); max-height:720px; padding:0; margin:auto; background:transparent; overflow:visible; }
+.album-explorer[open] { display:flex; flex-direction:column; animation:album-arrive 240ms ease-out both; }
+.album-explorer::backdrop { background:rgba(55,49,40,.12); animation:album-backdrop-arrive 240ms ease-out both; }
+.album-explorer .album-spread-shell { position:relative; flex:1; min-height:0; width:100%; padding:28px 32px; border:1px solid var(--border-soft); background:var(--bg); margin:0 auto; overflow:hidden; box-shadow:0 14px 48px rgba(45,35,22,.12); }
+.album-dismiss { position:absolute; top:8px; right:12px; z-index:2; padding:5px 9px; border:0; background:transparent; font-size:24px; line-height:1; color:var(--muted); }
+.album-dismiss:hover { background:transparent; color:var(--text); }
+.album-subfilters,.album-pagination { flex-shrink:0; }
+.album-explorer .album-subfilters { padding:0 24px 8px; }
+.album-explorer .album-spread { flex:1; height:auto; min-height:0; padding:12px 0; }
 .album-explorer .album-spread .photo-card { min-height:0; }
+html:has([data-collection="photography"]) { scrollbar-gutter:stable; }
+.album-explorer.is-entering .photo-card { opacity:0; }
+.album-explorer.is-closing { animation:album-depart 260ms ease-in both; }
+.album-explorer.is-closing::backdrop { animation:album-backdrop-depart 260ms ease-in both; }
+.album-explorer[data-input="pointer"] button:focus,
+#photo-viewer[data-input="pointer"] button:focus { outline:none; box-shadow:none; }
+@keyframes album-arrive { from { opacity:0; transform:scale(.97); } to { opacity:1; transform:scale(1); } }
+@keyframes album-depart { from { opacity:1; transform:scale(1); } to { opacity:0; transform:scale(.97); } }
+@keyframes album-backdrop-arrive { from { background:rgba(55,49,40,0); } to { background:rgba(55,49,40,.12); } }
+@keyframes album-backdrop-depart { from { background:rgba(55,49,40,.12); } to { background:rgba(55,49,40,0); } }
+@media(max-width:800px) {
+ .album-explorer { top:150px; bottom:16px; width:calc(100% - 32px); height:calc(100dvh - 166px); }
+}
 @media(max-width:700px) {
- .album-explorer { padding:0 12px 12px; }
- .album-explorer[open] { gap:12px; }
- .album-explorer > .page-header { width:100%; }
- .album-explorer .album-spread-shell { padding:12px; }
+ .album-explorer .album-spread-shell { padding:28px 16px 12px; }
  .album-explorer .album-spread { grid-template-rows:auto repeat(var(--spread-rows),minmax(0,1fr)); gap:12px; }
  .album-explorer .album-spread .photo-card:nth-of-type(n) { height:100%; min-height:0; }
  .album-explorer .album-center { padding:0; }
  .album-explorer .album-center h2 { font-size:1.15rem; }
  .album-explorer .album-center p { margin-top:4px; font-size:.75rem; }
  .album-explorer .album-center-rule { display:none; }
- .album-explorer .album-subfilters { gap:4px 12px; padding-top:8px; }
+ .album-explorer .album-subfilters { gap:4px 12px; padding:0 12px 6px; }
  .album-explorer .album-pagination { padding-top:6px; gap:12px; }
+}
+
+/* Individual photos float above the spread without replacing it with another page. */
+#photo-viewer { inset:92px 0 24px; width:fit-content; max-width:calc(100% - 80px); max-height:calc(100dvh - 116px); margin:auto; padding:36px 0 0; border:0; background:transparent; overflow:visible; }
+#photo-viewer[open] { display:flex; flex-direction:column; align-items:center; animation:photo-arrive 220ms ease-out both; }
+#photo-viewer::backdrop { background:rgba(20,18,15,.88); }
+#photo-viewer figure { margin:0; min-height:0; }
+#viewer-image { display:block; width:auto; height:auto; max-width:100%; max-height:calc(100dvh - 210px); filter:drop-shadow(0 8px 24px rgba(30,25,20,.2)); }
+#photo-viewer .viewer-close { position:absolute; right:0; top:-8px; display:grid; place-items:center; width:32px; height:32px; margin:0; border:1px solid rgba(255,255,255,.25); border-radius:50%; background:rgba(255,255,255,.04); color:rgba(255,255,255,.85); padding:0; font:24px/1 var(--font-body); transition:background 160ms ease,border-color 160ms ease; }
+#photo-viewer .viewer-close:hover { background:rgba(255,255,255,.12); border-color:rgba(255,255,255,.6); }
+#photo-viewer .viewer-controls { align-self:stretch; margin-top:12px; padding:0; background:transparent; color:rgba(255,255,255,.5); font-size:.75rem; letter-spacing:.04em; }
+#photo-viewer .viewer-controls button { background:transparent; border:0; padding:8px 0; color:rgba(255,255,255,.8); font-size:.8rem; transition:color 160ms ease; }
+#photo-viewer .viewer-controls button:hover { color:#fff; }
+#photo-viewer button:focus-visible { outline:1px solid rgba(255,255,255,.85); outline-offset:4px; }
+#photo-viewer .viewer-controls button:disabled { cursor:default; opacity:.3; }
+#photo-viewer.is-closing { animation:photo-depart 180ms ease-in both; }
+.album-grid[data-input="pointer"] button:focus { outline:none; box-shadow:none; }
+@keyframes photo-arrive { from { opacity:0; transform:scale(.98); } to { opacity:1; transform:scale(1); } }
+@keyframes photo-depart { from { opacity:1; transform:scale(1); } to { opacity:0; transform:scale(.98); } }
+@media(max-width:800px) {
+ #photo-viewer { inset:150px 0 16px; max-width:calc(100% - 48px); max-height:calc(100dvh - 166px); }
+ #viewer-image { max-height:calc(100dvh - 250px); }
+}
+@media(prefers-reduced-motion:reduce) {
+ .album-explorer[open],.album-explorer::backdrop,#photo-viewer[open] { animation:none; }
 }
