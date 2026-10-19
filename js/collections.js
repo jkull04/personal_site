@@ -5,7 +5,7 @@
   const list = $('collection-list'), search = $('collection-search'), count = $('collection-count');
   const dialog = $('photo-viewer');
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const safeImage = path => /^\/assets\/photography\/[a-zA-Z0-9_-]+\.jpg$/.test(path || '') ? path : '';
+  const safeImage = path => /^(?:\/assets\/photography\/[a-zA-Z0-9_-]+\.jpg|https:\/\/jameskull-studio-storage\.fitzykull\.workers\.dev\/photos\/[a-f0-9]{64}\.jpg)$/.test(path || '') ? path : '';
   const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
   const batchSize = 8;
   let keyboardInput = false, photoOrigin = null, photoClosing = false;

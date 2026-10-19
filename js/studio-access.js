@@ -10,15 +10,17 @@
     return Uint8Array.from(value.match(/../g), b => parseInt(b,16));
   };
   function createAccess(storage) {
-    let key;
+    let key, serviceKey;
     const requireUnlocked = () => { if(!key) throw Error('Unlock Studio first.'); };
     async function accept(raw) {
       if(raw.byteLength !== 32 || hex(await crypto.subtle.digest('SHA-256',raw)) !== VERIFIER) return false;
+      serviceKey = hex(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('studio-service-v1:'+hex(raw))));
       key = await crypto.subtle.importKey('raw',raw,'AES-GCM',false,['encrypt','decrypt']);
       return true;
     }
     return {
       requireUnlocked,
+      async serviceCredential() { requireUnlocked(); return serviceKey; },
       async unlock(password) {
         const material = await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveBits']);
         const raw = await crypto.subtle.deriveBits({name:'PBKDF2',salt:bytes(SALT),iterations:600000,hash:'SHA-256'},material,256);
@@ -31,7 +33,7 @@
         try { storage.removeItem(SESSION); } catch {}
         return false;
       },
-      lock() { key=undefined; try { storage.removeItem(SESSION); } catch {} },
+      lock() { key=undefined; serviceKey=undefined; try { storage.removeItem(SESSION); } catch {} },
       async seal(value) {
         requireUnlocked();
         const iv=crypto.getRandomValues(new Uint8Array(12));
