@@ -14,3 +14,5 @@
 @media(max-width:560px) { .book-cover-grid { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 24px 14px; } .book-cover-fallback { padding: 8px; font-size: .8rem; } }
 
 .book-caption { text-align: center; font-size: .95rem; line-height: 1.35; overflow-wrap: anywhere; }
+
+.book-rating { display: inline-block; margin-left: .5em; font-size: .55rem; line-height: 1; letter-spacing: .04em; color: #85734b; white-space: nowrap; vertical-align: .12em; }
