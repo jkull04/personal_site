@@ -1,5 +1,31 @@
 [
   {
+    "title": "The King Must Die",
+    "author": "Mary Renault",
+    "catalogKey": "/works/OL3906336W",
+    "coverId": 15132297,
+    "year": "1952",
+    "id": "05e6450b-c45b-4336-b80a-a55f30e9e2b3",
+    "status": "Read",
+    "finished": "2026-02-03",
+    "rating": "",
+    "note": "",
+    "published": true
+  },
+  {
+    "title": "Angels and Demons",
+    "author": "Dan Brown",
+    "catalogKey": "/works/OL76833W",
+    "coverId": 10578364,
+    "year": "2000",
+    "id": "244ef353-eb04-45fa-85e2-825d7478b92b",
+    "status": "Read",
+    "finished": "2026-02-11",
+    "rating": "4",
+    "note": "",
+    "published": true
+  },
+  {
     "title": "Light Bringer",
     "author": "Pierce Brown",
     "catalogKey": "/works/OL26353967W",
