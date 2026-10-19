@@ -17,6 +17,30 @@
       .sort((a,b)=>String(b.book.finished || '').localeCompare(String(a.book.finished || '')) || a.index-b.index)
       .slice(0,limit).map(({book})=>book);
   }
-  root.BookData = {coverURL,catalogResults,recentlyFinished};
+  function finishYear(book) {
+    const date=/^(\d{4})-\d{2}-\d{2}$/.exec(book.finished || '');
+    return date ? date[1] : /^\d{4}$/.test(String(book.finishedYear || '')) ? String(book.finishedYear) : 'Undated';
+  }
+  function finishedByYear(books) {
+    const groups=new Map();
+    for(const book of recentlyFinished(books,Infinity)) {
+      const year=finishYear(book);
+      if(!groups.has(year)) groups.set(year,[]);
+      groups.get(year).push(book);
+    }
+    return [...groups].sort(([a],[b])=>a==='Undated'?1:b==='Undated'?-1:b.localeCompare(a));
+  }
+  function addBatch(current,picks,year,makeId) {
+    if(!/^\d{4}$/.test(String(year))) throw Error('Enter a four-digit finish year.');
+    const books=[...current]; let added=0,skipped=0;
+    const norm=value=>String(value || '').trim().toLowerCase();
+    for(const book of picks) {
+      if(books.some(existing=>(book.catalogKey && existing.catalogKey===book.catalogKey) ||
+        (norm(existing.title)===norm(book.title) && (!existing.author || norm(existing.author)===norm(book.author))))) {skipped++;continue;}
+      books.push({...book,id:makeId(),status:'Read',finished:'',finishedYear:String(year),rating:'',note:'',published:true}); added++;
+    }
+    return {books,added,skipped};
+  }
+  root.BookData = {coverURL,catalogResults,recentlyFinished,finishYear,finishedByYear,addBatch};
   if (typeof module !== 'undefined') module.exports = root.BookData;
 })(globalThis);

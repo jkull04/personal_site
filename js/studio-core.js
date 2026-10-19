@@ -17,6 +17,7 @@
         if (publishing && entry.published !== false && (!entry.title?.trim() || (kind === 'books' ? !entry.author?.trim() : !entry.alt?.trim()))) throw Error(kind === 'books' ? 'Add a title and author to every included book.' : 'Add a title and image description to every included photo.');
         if (kind === 'books' && !['Reading','Read','Want to read'].includes(entry.status)) throw Error('Choose a valid reading status.');
         if (kind === 'books' && entry.rating && !['1','2','3','4','5'].includes(String(entry.rating))) throw Error('Ratings must be from 1 to 5.');
+        if (kind === 'books' && entry.finishedYear && !/^\d{4}$/.test(String(entry.finishedYear))) throw Error('Use four digits for the finish year.');
         if (kind === 'photography' && (!imagePath.test(String(entry.src).replace(/^\//,'')) || !imagePath.test(String(entry.thumb).replace(/^\//,'')))) throw Error('Invalid photograph path.');
       }
     }

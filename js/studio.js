@@ -61,7 +61,7 @@
     for (const kind of ['books','photography']) {
       const holder = $(kind==='books'?'book-edit-list':'photo-edit-list');
       holder.innerHTML = state.data[kind].map((e,i)=>{
-        const fields = kind==='books' ? field(kind,e,'title','Title')+field(kind,e,'author','Author')+field(kind,e,'status','Shelf','status')+field(kind,e,'rating','Rating (optional)','rating')+field(kind,e,'finished','Date finished (newest appear first)','date')+field(kind,e,'note','Your reading note','textarea',true) : field(kind,e,'title','Title')+field(kind,e,'collection','Collection')+field(kind,e,'location','Place (optional)')+field(kind,e,'date','Date taken (optional)','date')+field(kind,e,'alt','Image description (required when publishing)','text',true)+field(kind,e,'caption','Caption (optional)','textarea',true);
+        const fields = kind==='books' ? field(kind,e,'title','Title')+field(kind,e,'author','Author')+field(kind,e,'status','Shelf','status')+field(kind,e,'rating','Rating (optional)','rating')+field(kind,e,'finished','Date finished (optional)','date')+field(kind,e,'finishedYear','Finish year (if date unknown)','number')+field(kind,e,'note','Your reading note','textarea',true) : field(kind,e,'title','Title')+field(kind,e,'collection','Collection')+field(kind,e,'location','Place (optional)')+field(kind,e,'date','Date taken (optional)','date')+field(kind,e,'alt','Image description (required when publishing)','text',true)+field(kind,e,'caption','Caption (optional)','textarea',true);
         const thumb = kind==='photography' ? ((state.images[e.thumb.slice(1)] || previews[e.thumb.slice(1)]) ? 'data:image/jpeg;base64,'+(state.images[e.thumb.slice(1)] || previews[e.thumb.slice(1)]) : e.thumb) : BookData.coverURL(e.coverId);
         const cover = kind==='books' ? `<div>${bookCover(thumb,e.title)}<button type="button" data-lookup-book="${e.id}">Find cover &amp; author</button></div>` : (thumb?`<img src="${esc(thumb)}" alt="${esc(e.alt || 'Uploaded photograph preview')}" />`:'');
         return `<article class="edit-card" data-kind="${kind}" data-id="${e.id}"><h3>${kind==='books'?'Book':'Photograph'} ${i+1}</h3><div class="${kind==='photography'?'edit-photo':'edit-book'}">${cover}<div><div class="edit-fields">${fields}</div>${actions(kind,e,i)}</div></div></article>`;
@@ -132,6 +132,68 @@
     render(); save().catch(()=>{});
     $('catalog-status').textContent='Added to your draft as finished today. Adjust the date below, then publish when ready.';
     $('book-edit-list').querySelector('input').focus();
+  };
+  let batchRows=[], batchController;
+  $('batch-year').value=String(new Date().getFullYear());
+  function renderBatch() {
+    $('batch-results').innerHTML=batchRows.map((row,i)=>`<div class="batch-row"><div id="batch-cover-${i}">${bookCover('',row.title)}</div><label for="batch-match-${i}">${esc(row.title)}<select id="batch-match-${i}" data-batch-row="${i}"><option value="">${row.error?'Search unavailable — retry below':'Choose a match or leave out'}</option>${row.matches.map((book,j)=>`<option value="${j}" ${row.selected===j?'selected':''}>${esc(book.title)} — ${esc(book.author || 'Unknown author')}${book.year?' ('+esc(book.year)+')':''}</option>`).join('')}</select></label></div>`).join('');
+    $('batch-add').hidden=!batchRows.some(row=>row.matches.length);
+  }
+  $('batch-results').onchange=event=>{
+    const index=Number(event.target.dataset.batchRow); if(!Number.isInteger(index) || !batchRows[index]) return;
+    const row=batchRows[index]; row.selected=event.target.value===''?null:Number(event.target.value);
+    const book=row.matches[row.selected]; $('batch-cover-'+index).innerHTML=bookCover(book?BookData.coverURL(book.coverId):'',book?.title || row.title);
+    const count=batchRows.filter(row=>row.selected!==null).length;
+    $('batch-add').textContent=`Add ${count || 'selected'} book${count===1?'':'s'}`;
+  };
+  $('batch-cancel').onclick=()=>batchController?.abort();
+  $('batch-find').onclick=async()=>{
+    if(busy) return;
+    const titles=$('batch-titles').value.split(/\r?\n/).map(title=>title.trim()).filter(Boolean);
+    if(!titles.length || titles.length>20) {$('batch-status').textContent='Enter between 1 and 20 titles, one per line.';return;}
+    if(!/^\d{4}$/.test($('batch-year').value)) {$('batch-status').textContent='Enter a four-digit finish year.';return;}
+    clearTimeout(catalogTimer); catalogController?.abort(); ++catalogVersion;
+    batchRows=[]; renderBatch(); batchController=new AbortController();
+    const signal=batchController.signal;
+    setBusy(true); $('batch-cancel').hidden=false; $('batch-cancel').disabled=false;
+    let failures=0;
+    try {
+      for(const [i,title] of titles.entries()) {
+        if(signal.aborted) break;
+        $('batch-status').textContent=`Finding ${i+1} of ${titles.length}: ${title}…`;
+        let matches=catalogCache.get(title.toLowerCase()),failed=false;
+        if(!matches) {
+          await new Promise(resolve=>setTimeout(resolve,Math.max(0,1100-(Date.now()-lastSearch))));
+          if(signal.aborted) break;
+          const request=new AbortController();
+          const abort=()=>request.abort(); signal.addEventListener('abort',abort,{once:true});
+          const timeout=setTimeout(abort,15000);
+          try {
+            lastSearch=Date.now();
+            const params=new URLSearchParams({title,fields:'key,title,author_name,cover_i,first_publish_year',limit:'8',lang:'en'});
+            const response=await fetch('https://openlibrary.org/search.json?'+params,{signal:request.signal,credentials:'omit',referrerPolicy:'no-referrer'});
+            if(!response.ok) throw Error();
+            matches=BookData.catalogResults(await response.json());catalogCache.set(title.toLowerCase(),matches);
+          } catch(error) {if(signal.aborted) break; matches=[];failed=true;failures++;}
+          finally {clearTimeout(timeout);signal.removeEventListener('abort',abort);}
+        }
+        batchRows.push({title,matches,selected:null,error:failed});
+      }
+    } finally {
+      renderBatch();setBusy(false);$('batch-cancel').hidden=true;
+      $('batch-status').textContent=(signal.aborted?'Search cancelled. ':'')+`Found results for ${batchRows.filter(row=>row.matches.length).length} of ${titles.length} titles. Choose a match for each book you want to add.`+(failures?' Some searches failed; Find books retries them.':'');
+    }
+  };
+  $('batch-add').onclick=()=>{
+    if(busy) return;
+    const picks=batchRows.filter(row=>row.selected!==null).map(row=>row.matches[row.selected]).filter(Boolean);
+    if(!picks.length) {$('batch-status').textContent='Choose at least one catalog match first.';return;}
+    try {
+      const result=BookData.addBatch(state.data.books,picks,$('batch-year').value,()=>crypto.randomUUID());
+      state.data.books=result.books;render();save().catch(()=>{});
+      batchRows=[];renderBatch();
+      $('batch-status').textContent=`${result.added} books added to your draft for ${$('batch-year').value}. ${result.skipped?result.skipped+' already on your shelf were skipped. ':''}Publish when ready.`;
+    } catch(error) {$('batch-status').textContent=error.message;}
   };
   function downloadBackup() {
     const blob = new Blob([JSON.stringify(state)],{type:'application/json'});
