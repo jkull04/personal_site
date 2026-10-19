@@ -1,5 +1,5 @@
 {
-  "enabled": false,
+  "enabled": true,
   "apiOrigin": "https://jameskull-studio-storage.fitzykull.workers.dev",
   "mediaOrigin": "https://jameskull-studio-storage.fitzykull.workers.dev"
 }
