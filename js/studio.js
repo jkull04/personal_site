@@ -63,7 +63,7 @@
       holder.innerHTML = state.data[kind].map((e,i)=>{
         const fields = kind==='books' ? field(kind,e,'title','Title')+field(kind,e,'author','Author')+field(kind,e,'status','Shelf','status')+field(kind,e,'rating','Rating (optional)','rating')+field(kind,e,'finished','Date finished (newest appear first)','date')+field(kind,e,'note','Your reading note','textarea',true) : field(kind,e,'title','Title')+field(kind,e,'collection','Collection')+field(kind,e,'location','Place (optional)')+field(kind,e,'date','Date taken (optional)','date')+field(kind,e,'alt','Image description (required when publishing)','text',true)+field(kind,e,'caption','Caption (optional)','textarea',true);
         const thumb = kind==='photography' ? ((state.images[e.thumb.slice(1)] || previews[e.thumb.slice(1)]) ? 'data:image/jpeg;base64,'+(state.images[e.thumb.slice(1)] || previews[e.thumb.slice(1)]) : e.thumb) : BookData.coverURL(e.coverId);
-        const cover = kind==='books' ? bookCover(thumb,e.title) : (thumb?`<img src="${esc(thumb)}" alt="${esc(e.alt || 'Uploaded photograph preview')}" />`:'');
+        const cover = kind==='books' ? `<div>${bookCover(thumb,e.title)}<button type="button" data-lookup-book="${e.id}">Find cover &amp; author</button></div>` : (thumb?`<img src="${esc(thumb)}" alt="${esc(e.alt || 'Uploaded photograph preview')}" />`:'');
         return `<article class="edit-card" data-kind="${kind}" data-id="${e.id}"><h3>${kind==='books'?'Book':'Photograph'} ${i+1}</h3><div class="${kind==='photography'?'edit-photo':'edit-book'}">${cover}<div><div class="edit-fields">${fields}</div>${actions(kind,e,i)}</div></div></article>`;
       }).join('') || `<p>No ${kind==='books'?'books':'photographs'} yet. Add your first one above.</p>`;
     }
@@ -74,7 +74,7 @@
   document.querySelector('main').addEventListener('error',event=>{
     if(event.target.matches('.catalog-cover img')) {event.target.hidden=true;event.target.nextElementSibling.hidden=false;}
   },true);
-  let catalogMatches=[], catalogController, catalogTimer, catalogVersion=0, lastSearch=0;
+  let catalogMatches=[], catalogController, catalogTimer, catalogVersion=0, lastSearch=0, catalogTarget='';
   const catalogCache=new Map();
   function showCatalog(matches) {
     catalogMatches=matches;
@@ -108,13 +108,25 @@
     $('catalog-status').textContent='Looking for matching books…';
     catalogTimer=setTimeout(()=>searchBooks(version),Math.max(immediate?0:650,1100-(Date.now()-lastSearch)));
   }
-  $('book-search').oninput=()=>queueBookSearch();
+  $('book-search').oninput=()=>{catalogTarget='';queueBookSearch();};
   $('book-search').onkeydown=event=>{if(event.key==='Enter'){event.preventDefault();queueBookSearch(true);}};
   $('search-books').onclick=()=>queueBookSearch(true);
+  document.querySelector('main').addEventListener('click',event=>{
+    const button=event.target.closest('[data-lookup-book]'); if(!button || busy) return;
+    const entry=state.data.books.find(book=>book.id===button.dataset.lookupBook); if(!entry) return;
+    catalogTarget=entry.id; $('book-search').value=entry.title; queueBookSearch(true);
+    $('book-search').scrollIntoView({block:'center'}); $('book-search').focus();
+  });
   $('catalog-results').onclick=event=>{
     const button=event.target.closest('[data-catalog-index]'); if(!button || busy) return;
     const book=catalogMatches[Number(button.dataset.catalogIndex)]; if(!book) return;
-    if(book.catalogKey && state.data.books.some(e=>e.catalogKey===book.catalogKey)) {$('catalog-status').textContent='This book is already on your shelf. Edit its existing entry below.';return;}
+    if(book.catalogKey && state.data.books.some(e=>e.catalogKey===book.catalogKey && e.id!==catalogTarget)) {$('catalog-status').textContent='This book is already on your shelf. Edit its existing entry below.';return;}
+    const existing=state.data.books.find(e=>e.id===catalogTarget) || state.data.books.find(e=>!e.catalogKey && e.title.trim().toLowerCase()===book.title.trim().toLowerCase());
+    if(existing) {
+      Object.assign(existing,book); render(); save().catch(()=>{});
+      $('catalog-status').textContent='Author and cover filled in. Your shelf, date, and notes are unchanged.';
+      document.getElementById(existing.id+'-title').focus(); return;
+    }
     const today=new Date(); today.setMinutes(today.getMinutes()-today.getTimezoneOffset());
     state.data.books.unshift({...book,id:crypto.randomUUID(),status:'Read',finished:today.toISOString().slice(0,10),rating:'',note:'',published:true});
     render(); save().catch(()=>{});
