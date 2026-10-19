@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>James Kull | Books</title>
-    <meta name="description" content="A reading shelf. Books, ideas, and notes worth keeping." />
+    <meta name="description" content="Recently finished." />
     <link rel="icon" type="image/png" href="/assets/icons/favicon-32.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -17,7 +17,9 @@
     <link rel="stylesheet" href="/css/dinos.css" />
     <script defer src="/js/dinos.js"></script>
     <link rel="stylesheet" href="/css/collections.css" />
-    <script defer src="/js/collections.js"></script>
+    <link rel="stylesheet" href="/css/books.css" />
+    <script defer src="/js/book-data.js"></script>
+    <script defer src="/js/books.js"></script>
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
@@ -41,20 +43,10 @@
     <main id="main" class="site-shell collection-page" data-collection="books">
       <header class="collection-intro">
         <p class="eyebrow">The reading room</p>
-        <h1>Books</h1><p class="hero-lead">A reading shelf. Books, ideas, and notes worth keeping.</p>
+        <h1>Books</h1><p class="hero-lead">Recently finished.</p>
       </header>
-      <div class="collection-controls" role="group" aria-label="Books filters">
-        <label>Search<input id="collection-search" type="search" placeholder="Title, author, or note" /></label>
-        <label>Shelf<select id="collection-filter"><option value="">Every shelf</option><option>Reading</option><option>Read</option><option>Want to read</option></select></label>
-        <p id="collection-count" role="status"></p>
-      </div>
-      <section id="collection-list" class="book-list" aria-label="Books"><p>Loading books…</p></section>
+      <section id="collection-list" class="book-cover-grid" aria-label="Recently finished books"><p>Loading books…</p></section>
       <noscript><p>Enable JavaScript to view this collection.</p></noscript>
-      <dialog id="photo-viewer" aria-label="Photograph viewer">
-        <button class="viewer-close" type="button" aria-label="Close photograph">Close ×</button>
-        <figure><img id="viewer-image" alt="" /><figcaption id="viewer-caption"></figcaption></figure>
-        <div class="viewer-controls"><button id="viewer-prev" type="button">← Previous</button><span id="viewer-count"></span><button id="viewer-next" type="button">Next →</button></div>
-      </dialog>
     </main>
     <footer class="footer site-shell">
       <p>James Kull | Classics and Economics, Washington and Lee University.</p>

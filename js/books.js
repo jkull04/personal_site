@@ -1,0 +1,15 @@
+(() => {
+  'use strict';
+  const list = document.getElementById('collection-list');
+  const esc = value => String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  fetch('/data/books.json').then(response=>{if(!response.ok) throw Error(); return response.json();}).then(data=>{
+    if(!Array.isArray(data)) throw Error();
+    const books = BookData.recentlyFinished(data);
+    list.innerHTML = books.length ? books.map(book=>{
+      const cover=BookData.coverURL(book.coverId,'L');
+      const label=[book.title,book.author].filter(Boolean).join(' — ');
+      return `<figure class="book-cover" title="${esc(label)}">${cover?`<img src="${esc(cover)}" alt="${esc(label)}" width="240" height="360" loading="lazy" decoding="async" referrerpolicy="no-referrer" />`:''}<figcaption class="book-cover-fallback" ${cover?'hidden':''}><span>${esc(book.title)}</span><small>Cover unavailable</small></figcaption></figure>`;
+    }).join('') : '<p class="books-empty">Finished books will appear here.</p>';
+    list.querySelectorAll('img').forEach(img=>img.addEventListener('error',()=>{img.hidden=true;img.nextElementSibling.hidden=false;}));
+  }).catch(()=>{list.innerHTML='<p>Could not load the bookshelf. Please refresh to try again.</p>';});
+})();

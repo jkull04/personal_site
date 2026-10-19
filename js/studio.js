@@ -61,12 +61,66 @@
     for (const kind of ['books','photography']) {
       const holder = $(kind==='books'?'book-edit-list':'photo-edit-list');
       holder.innerHTML = state.data[kind].map((e,i)=>{
-        const fields = kind==='books' ? field(kind,e,'title','Title')+field(kind,e,'author','Author')+field(kind,e,'status','Shelf','status')+field(kind,e,'rating','Rating (optional)','rating')+field(kind,e,'finished','Date finished (optional)','date')+field(kind,e,'note','Your reading note','textarea',true) : field(kind,e,'title','Title')+field(kind,e,'collection','Collection')+field(kind,e,'location','Place (optional)')+field(kind,e,'date','Date taken (optional)','date')+field(kind,e,'alt','Image description (required when publishing)','text',true)+field(kind,e,'caption','Caption (optional)','textarea',true);
-        const thumb = kind==='photography' ? ((state.images[e.thumb.slice(1)] || previews[e.thumb.slice(1)]) ? 'data:image/jpeg;base64,'+(state.images[e.thumb.slice(1)] || previews[e.thumb.slice(1)]) : e.thumb) : '';
-        return `<article class="edit-card" data-kind="${kind}" data-id="${e.id}"><h3>${kind==='books'?'Book':'Photograph'} ${i+1}</h3><div class="${kind==='photography'?'edit-photo':''}">${thumb?`<img src="${esc(thumb)}" alt="${esc(e.alt || 'Uploaded photograph preview')}" />`:''}<div><div class="edit-fields">${fields}</div>${actions(kind,e,i)}</div></div></article>`;
+        const fields = kind==='books' ? field(kind,e,'title','Title')+field(kind,e,'author','Author')+field(kind,e,'status','Shelf','status')+field(kind,e,'rating','Rating (optional)','rating')+field(kind,e,'finished','Date finished (newest appear first)','date')+field(kind,e,'note','Your reading note','textarea',true) : field(kind,e,'title','Title')+field(kind,e,'collection','Collection')+field(kind,e,'location','Place (optional)')+field(kind,e,'date','Date taken (optional)','date')+field(kind,e,'alt','Image description (required when publishing)','text',true)+field(kind,e,'caption','Caption (optional)','textarea',true);
+        const thumb = kind==='photography' ? ((state.images[e.thumb.slice(1)] || previews[e.thumb.slice(1)]) ? 'data:image/jpeg;base64,'+(state.images[e.thumb.slice(1)] || previews[e.thumb.slice(1)]) : e.thumb) : BookData.coverURL(e.coverId);
+        const cover = kind==='books' ? bookCover(thumb,e.title) : (thumb?`<img src="${esc(thumb)}" alt="${esc(e.alt || 'Uploaded photograph preview')}" />`:'');
+        return `<article class="edit-card" data-kind="${kind}" data-id="${e.id}"><h3>${kind==='books'?'Book':'Photograph'} ${i+1}</h3><div class="${kind==='photography'?'edit-photo':'edit-book'}">${cover}<div><div class="edit-fields">${fields}</div>${actions(kind,e,i)}</div></div></article>`;
       }).join('') || `<p>No ${kind==='books'?'books':'photographs'} yet. Add your first one above.</p>`;
     }
   }
+  function bookCover(url,title) {
+    return `<div class="catalog-cover">${url?`<img src="${esc(url)}" alt="Cover of ${esc(title)}" loading="lazy" referrerpolicy="no-referrer" />`:''}<span ${url?'hidden':''}>No cover available</span></div>`;
+  }
+  document.querySelector('main').addEventListener('error',event=>{
+    if(event.target.matches('.catalog-cover img')) {event.target.hidden=true;event.target.nextElementSibling.hidden=false;}
+  },true);
+  let catalogMatches=[], catalogController, catalogTimer, catalogVersion=0, lastSearch=0;
+  const catalogCache=new Map();
+  function showCatalog(matches) {
+    catalogMatches=matches;
+    $('catalog-results').innerHTML=matches.map((book,i)=>`<button class="catalog-result" type="button" data-catalog-index="${i}" ${busy?'disabled':''}>${bookCover(BookData.coverURL(book.coverId),book.title)}<span><strong>${esc(book.title)}</strong><span>${esc(book.author || 'Author unavailable')}</span><small>${esc(book.year)}</small></span></button>`).join('');
+    $('catalog-status').textContent=matches.length?'Choose the book you finished.':'No matches found. Try another title, or add the book manually.';
+  }
+  async function searchBooks(version) {
+    if(busy || version!==catalogVersion) return;
+    const query=$('book-search').value.trim();
+    if(query.length<2) return;
+    if(catalogCache.has(query.toLowerCase())) {showCatalog(catalogCache.get(query.toLowerCase()));return;}
+    catalogController=new AbortController();
+    const controller=catalogController;
+    const timeout=setTimeout(()=>controller.abort(),15000);
+    lastSearch=Date.now(); $('catalog-status').textContent='Searching the catalog…';
+    try {
+      const params=new URLSearchParams({title:query,fields:'key,title,author_name,cover_i,first_publish_year',limit:'8',lang:'en'});
+      const response=await fetch('https://openlibrary.org/search.json?'+params,{signal:controller.signal,credentials:'omit',referrerPolicy:'no-referrer'});
+      if(!response.ok) throw Error();
+      const matches=BookData.catalogResults(await response.json());
+      if(version!==catalogVersion) return;
+      catalogCache.set(query.toLowerCase(),matches); showCatalog(matches);
+    } catch(error) {
+      if(version===catalogVersion) $('catalog-status').textContent='The catalog is unavailable right now. Try Search again, or add the book manually.';
+    } finally {clearTimeout(timeout);}
+  }
+  function queueBookSearch(immediate=false) {
+    clearTimeout(catalogTimer); catalogController?.abort(); const version=++catalogVersion;
+    catalogMatches=[]; $('catalog-results').innerHTML='';
+    if($('book-search').value.trim().length<2) {$('catalog-status').textContent='Enter at least two characters.';return;}
+    $('catalog-status').textContent='Looking for matching books…';
+    catalogTimer=setTimeout(()=>searchBooks(version),Math.max(immediate?0:650,1100-(Date.now()-lastSearch)));
+  }
+  $('book-search').oninput=()=>queueBookSearch();
+  $('book-search').onkeydown=event=>{if(event.key==='Enter'){event.preventDefault();queueBookSearch(true);}};
+  $('search-books').onclick=()=>queueBookSearch(true);
+  $('catalog-results').onclick=event=>{
+    const button=event.target.closest('[data-catalog-index]'); if(!button || busy) return;
+    const book=catalogMatches[Number(button.dataset.catalogIndex)]; if(!book) return;
+    if(book.catalogKey && state.data.books.some(e=>e.catalogKey===book.catalogKey)) {$('catalog-status').textContent='This book is already on your shelf. Edit its existing entry below.';return;}
+    const today=new Date(); today.setMinutes(today.getMinutes()-today.getTimezoneOffset());
+    state.data.books.unshift({...book,id:crypto.randomUUID(),status:'Read',finished:today.toISOString().slice(0,10),rating:'',note:'',published:true});
+    render(); save().catch(()=>{});
+    $('catalog-status').textContent='Added to your draft as finished today. Adjust the date below, then publish when ready.';
+    $('book-edit-list').querySelector('input').focus();
+  };
   function downloadBackup() {
     const blob = new Blob([JSON.stringify(state)],{type:'application/json'});
     const url = URL.createObjectURL(blob); const a = document.createElement('a');

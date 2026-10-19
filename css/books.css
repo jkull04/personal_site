@@ -1,0 +1,9 @@
+.book-cover-grid { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); gap: 36px 28px; padding: 32px 0 64px; border-top: 1px solid var(--border-soft); }
+.book-cover { margin: 0; min-width: 0; aspect-ratio: 2 / 3; display: flex; align-items: end; }
+.book-cover img { display: block; width: 100%; height: 100%; object-fit: contain; object-position: bottom; image-rendering: auto; }
+.book-cover-fallback { width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; text-align: center; gap: 16px; padding: 18px; border: 1px solid var(--border-soft); background: var(--surface); }
+.book-cover-fallback small { font-size: .75rem; color: var(--text-muted); }
+.book-cover [hidden] { display: none; }
+.books-empty { grid-column: 1 / -1; padding: 32px 0; }
+@media(max-width:900px) { .book-cover-grid { grid-template-columns: repeat(4,minmax(0,1fr)); gap: 24px; } }
+@media(max-width:560px) { .book-cover-grid { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 24px 14px; } .book-cover-fallback { padding: 8px; font-size: .8rem; } }
