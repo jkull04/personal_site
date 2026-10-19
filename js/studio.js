@@ -47,14 +47,22 @@
     if (!response.ok) throw Error('Cannot load the latest site from GitHub. Try again shortly.');
     const ref = await response.json();
     const data = {};
-    for (const kind of ['books','photography']) {
-      const r = await fetch('https://api.github.com/repos/jkull04/personal_site/contents/data/'+kind+'.json?ref='+ref.object.sha,{cache:'no-store'});
+    for (const kind of ['books','photography','writings']) {
+      const r = await fetch('https://api.github.com/repos/jkull04/personal_site/contents/data/'+(kind==='writings'?'writings-local':kind)+'.json?ref='+ref.object.sha,{cache:'no-store'});
       if (!r.ok) throw Error('Cannot load '+kind+' from GitHub. Try again after deployment.');
       const file = await r.json();
       data[kind] = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(file.content.replace(/\s/g,'')), c=>c.charCodeAt(0))));
     }
     StudioCore.validate(data);
     return {version:1,data,baseline:structuredClone(data),images:{}};
+  }
+  async function upgradeWritings(value,current) {
+    if(value.data.writings===undefined || value.baseline.writings===undefined) {
+      const source=current || await fetchPublished();
+      value.data.writings=structuredClone(source.data.writings);
+      value.baseline.writings=structuredClone(source.baseline.writings);
+    }
+    return value;
   }
   function field(kind,e,key,label,type='text',wide=false) {
     const id = e.id+'-'+key;
@@ -79,6 +87,7 @@
         return `<article class="edit-card" data-kind="${kind}" data-id="${e.id}"><label class="entry-select"><input type="checkbox" data-select-entry aria-label="Select ${esc(e.title || 'untitled entry')}" ${selection[kind].has(e.id)?'checked':''} /></label><details ${openIds.has(e.id)?'open':''}><summary class="entry-summary">${kind==='books'?bookCover(thumb,e.title):`<img class="entry-thumb" src="${esc(thumb)}" alt="" loading="lazy" />`}<span><strong class="entry-title">${esc(e.title || 'Untitled')}</strong><span class="entry-meta">${esc(entryLabel(kind,e))}</span><span class="entry-state book-badge">${esc(publication(kind,e))}</span></span><span class="entry-edit-hint">Edit</span></summary><div class="${kind==='photography'?'edit-photo':'edit-book'}">${cover}<div><div class="edit-fields">${fields}</div>${actions(kind,e,i)}</div></div></details></article>`;
       }).join('') || `<p>No ${kind==='books'?'books':'photographs'} yet. Add your first one above.</p>`;
     }
+    writingEditor.render();
     refreshBookOverview();
     if(catalogMatches.length) showCatalog(catalogMatches,false);
     renderBatch();
@@ -273,7 +282,7 @@
   document.querySelectorAll('[data-tab]').forEach(button=>button.onclick=()=>{
     if (busy) return;
     document.querySelectorAll('[data-tab]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));
-    $('books-editor').hidden=button.dataset.tab!=='books'; $('photography-editor').hidden=button.dataset.tab!=='photography';
+    $('books-editor').hidden=button.dataset.tab!=='books'; $('photography-editor').hidden=button.dataset.tab!=='photography'; $('writings-editor').hidden=button.dataset.tab!=='writings';
   });
   document.querySelector('main').addEventListener('input',event=>{
     if (busy || !event.target.dataset.key) return;
@@ -361,6 +370,7 @@
       if(file.size>70*1024*1024) throw Error('Backup is too large.');
       const imported=JSON.parse(await file.text());
       if(imported.version!==1 || !imported.images || typeof imported.images!=='object') throw Error('Unsupported backup.');
+      await upgradeWritings(imported,state);
       StudioCore.validate(imported.data); StudioCore.validate(imported.baseline);
       for(const [path,content] of Object.entries(imported.images)) if(!StudioCore.imagePath.test(path) || typeof content!=='string' || !/^[A-Za-z0-9+/=]+$/.test(content)) throw Error('Invalid image in backup.');
       if(!confirm('Replace this browser’s draft with the backup? Download the current draft first if you want to keep it.')) return;
@@ -379,6 +389,7 @@
     try {
       const result=await StudioCore.publish({data:state.data,baseline:state.baseline,images:state.images,api});
       state.baseline=structuredClone(result.published);
+      writingEditor.render();
       undoDraft=null;
       // Uploaded images no longer count against the pending upload budget.
       // Keep a memory-only preview while GitHub Pages finishes deploying.
@@ -500,6 +511,12 @@
       }
       pending+=state.baseline[kind].filter(e=>!state.data[kind].some(d=>d.id===e.id)).length;
     }
+    for(const entry of state.data.writings || []) {
+      if(entry.published!==false) included++;
+      if(['Removal pending','Not published','Changes to publish'].includes(publication('writings',entry))) pending++;
+    }
+    pending+=(state.baseline.writings || []).filter(e=>!state.data.writings.some(d=>d.id===e.id)).length;
+    writingEditor.refresh();
     $('draft-summary').textContent=`${pending} pending ${pending===1?'change':'changes'} · ${included} entries included in the next publish`;
   }
   function rememberBulk() { undoDraft=structuredClone(state.data); }
@@ -557,6 +574,7 @@
       $(kind+'-feedback').textContent=action==='undo'?'Restored the draft from before the last bulk action.':'Draft updated. Review your entries, then publish when ready.';
     } catch(error) {$(kind+'-feedback').textContent=error.message;}
   });
+  const writingEditor=createWritingEditor({getState:()=>state,save,isBusy:()=>busy,onChange:()=>{undoDraft=null;managedKinds.forEach(updateSelectionControls);}});
   setupManagers();
 
   async function init() {
@@ -565,6 +583,7 @@
       state=await new Promise((resolve,reject)=>{const request=db.transaction('drafts').objectStore('drafts').get('current');request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
       state=await StudioAccess.open(state);
       if(!state) state=await fetchPublished();
+      await upgradeWritings(state);
       StudioCore.validate(state.data);
       await save();
       StudioCore.validate(state.data); render(); setBusy(false); status('Your draft is ready. Changes save automatically in this browser.');
@@ -573,5 +592,3 @@
   setBusy(true);
   init();
 })();
-
-

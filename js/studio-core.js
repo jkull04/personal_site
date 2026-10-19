@@ -1,16 +1,19 @@
 /* No credentials or drafts are stored by this module. */
 ((root) => {
   'use strict';
-  const paths = {books:'data/books.json', photography:'data/photography.json'};
+  const writing = root.WritingData || (typeof require === 'function' ? require('./writing-data.js') : null);
+  const paths = {writings:'data/writings-local.json',books:'data/books.json', photography:'data/photography.json'};
   const imagePath = /^assets\/photography\/[a-zA-Z0-9_-]+\.jpg$/;
   const canonical = value => JSON.stringify(value);
   function validate(data, publishing = false) {
     for (const kind of Object.keys(paths)) {
+      if (kind==='writings' && data[kind]===undefined) continue; // Older browser drafts and backups.
       if (!Array.isArray(data[kind]) || data[kind].length > 1000) throw Error('Invalid '+kind+' collection.');
       const ids = new Set();
       for (const entry of data[kind]) {
         if (!entry || typeof entry !== 'object' || !/^[a-zA-Z0-9_-]+$/.test(entry.id) || ids.has(entry.id)) throw Error('Every entry needs a unique ID.');
         ids.add(entry.id);
+        if(kind==='writings') {writing.validate(entry,publishing);continue;}
         for (const [key, value] of Object.entries(entry)) {
           if (!['string','boolean','number'].includes(typeof value) || String(value).length > 20000) throw Error('Invalid entry field: '+key);
         }
@@ -28,19 +31,30 @@
   }
   async function publish({data, baseline, images, api}) {
     validate(data, true);
-    const published = Object.fromEntries(Object.keys(paths).map(k=>[k,data[k].filter(e=>e.published !== false)]));
+    const kinds = Object.keys(paths).filter(k=>data[k]!==undefined);
+    const published = Object.fromEntries(kinds.map(k=>[k,data[k].filter(e=>e.published !== false)]));
+    if(published.writings && new TextEncoder().encode(JSON.stringify(published.writings,null,2)).length>900000) throw Error('The published writing collection is too large (900 KB maximum). Shorten the articles or keep some as private drafts before publishing.');
     const ref = await api('/git/ref/heads/main');
     const head = ref.object.sha;
     // Read at one immutable commit. Never overwrite another device's content changes.
-    for (const kind of Object.keys(paths)) {
+    for (const kind of kinds) {
       const file = await api('/contents/'+paths[kind]+'?ref='+head);
       const raw = new TextDecoder().decode(Uint8Array.from(atob(file.content.replace(/\s/g,'')), c=>c.charCodeAt(0)));
       if (canonical(JSON.parse(raw)) !== canonical(baseline[kind])) throw Error('Published content changed on another device. Download your backup, then reload published content before applying your edits. Nothing was overwritten.');
     }
-    const changed = Object.keys(paths).filter(k=>canonical(published[k]) !== canonical(baseline[k]));
+    const changed = kinds.filter(k=>canonical(published[k]) !== canonical(baseline[k]));
     if (!changed.length) return {unchanged:true, published};
     const commit = await api('/git/commits/'+head);
     const tree = changed.map(k=>({path:paths[k],mode:'100644',type:'blob',content:JSON.stringify(published[k],null,2)+'\n'}));
+    if(changed.includes('writings')) {
+      for(const entry of published.writings) tree.push({path:writing.href(entry).slice(1)+'index.html',mode:'100644',type:'blob',content:writing.page(entry)});
+      for(const entry of baseline.writings) {
+        if(!published.writings.some(e=>e.id===entry.id)) {
+          if(!/^[a-zA-Z0-9_-]+$/.test(entry.id)) throw Error('Invalid writing ID in baseline.');
+          tree.push({path:writing.href(entry).slice(1)+'index.html',mode:'100644',type:'blob',sha:null});
+        }
+      }
+    }
     const needed = new Set(published.photography.flatMap(p=>[p.src.slice(1),p.thumb.slice(1)]));
     for (const [path, content] of Object.entries(images)) {
       if (!needed.has(path)) continue;
@@ -49,7 +63,7 @@
       tree.push({path,mode:'100644',type:'blob',sha:blob.sha});
     }
     const createdTree = await api('/git/trees','POST',{base_tree:commit.tree.sha,tree});
-    const createdCommit = await api('/git/commits','POST',{message:'Update books and photography from Studio',tree:createdTree.sha,parents:[head]});
+    const createdCommit = await api('/git/commits','POST',{message:'Update writings, books and photography from Studio',tree:createdTree.sha,parents:[head]});
     // Non-forced update is atomic; a concurrent commit rejects this operation.
     await api('/git/refs/heads/main','PATCH',{sha:createdCommit.sha,force:false});
     return {sha:createdCommit.sha,published};

@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>James Kull | Studio</title>
-    <meta name="description" content="Private workspace for managing books and photographs." />
+    <meta name="description" content="Private workspace for managing writings, books, and photographs." />
     <link rel="icon" type="image/png" href="/assets/icons/favicon-32.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -20,12 +20,15 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://covers.openlibrary.org; connect-src 'self' https://api.github.com https://openlibrary.org; object-src 'none'; base-uri 'self'; form-action 'none'" />
     <meta name="robots" content="noindex,nofollow" />
     <meta name="referrer" content="no-referrer" />
-    <link rel="stylesheet" href="/css/studio.css?v=management-1" />
+    <link rel="stylesheet" href="/css/studio.css?v=writings-1" />
     <script defer src="/js/studio-access.js?v=security-1"></script>
-    <script defer src="/js/studio-core.js?v=management-1"></script>
-    <script defer src="/js/book-data.js?v=management-1"></script>
-    <script defer src="/js/photo-data.js?v=management-1"></script>
-    <script defer src="/js/studio.js?v=management-1"></script>
+    <link rel="stylesheet" href="/css/writing.css?v=writings-1" />
+    <script defer src="/js/writing-data.js?v=writings-1"></script>
+    <script defer src="/js/writing-editor.js?v=writings-1"></script>
+    <script defer src="/js/studio-core.js?v=writings-1"></script>
+    <script defer src="/js/book-data.js?v=writings-1"></script>
+    <script defer src="/js/photo-data.js?v=writings-1"></script>
+    <script defer src="/js/studio.js?v=writings-1"></script>
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
@@ -47,10 +50,10 @@
     </header>
 
     <main id="main" class="site-shell studio">
-      <header class="collection-intro"><p class="eyebrow">Owner’s desk</p><h1>Studio</h1><p class="hero-lead">Keep the shelf and the gallery growing.</p></header>
+      <header class="collection-intro"><p class="eyebrow">Owner’s desk</p><h1>Studio</h1><p class="hero-lead">A place for your writings, reading shelf, and photographs.</p></header>
       <section id="studio-gate" class="studio-panel studio-gate" aria-labelledby="unlock-heading">
         <h2 id="unlock-heading">Unlock Studio</h2>
-        <p>Enter your password to manage books and photographs. Studio stays unlocked for this tab’s session.</p>
+        <p>Enter your password to manage writings, books, and photographs. Studio stays unlocked for this tab’s session.</p>
         <form id="studio-login">
           <label for="studio-password">Password</label>
           <div class="studio-actions"><input id="studio-password" type="password" autocomplete="current-password" required /><button type="submit">Unlock</button></div>
@@ -67,7 +70,7 @@
         <p id="draft-summary"></p><p id="publish-result" role="status"></p>
         <details id="connection"><summary>GitHub connection</summary><p>One-time setup: <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">create a fine-grained token</a> for <strong>jkull04 / personal_site only</strong>, with <strong>Contents: Read and write</strong>. Choose an expiration. Paste it here when publishing; the token is held in memory only and cleared when you leave this page.</p><label for="github-token">GitHub token</label><div class="studio-actions"><input id="github-token" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your repository token" /><button id="disconnect" type="button">Clear token</button></div></details>
       </section>
-      <div class="studio-tabs" role="group" aria-label="Edit collection"><button type="button" data-tab="books" aria-pressed="true">Books</button><button type="button" data-tab="photography" aria-pressed="false">Photos</button></div>
+      <div class="studio-tabs" role="group" aria-label="Edit collection"><button type="button" data-tab="books" aria-pressed="true">Books</button><button type="button" data-tab="photography" aria-pressed="false">Photos</button><button type="button" data-tab="writings" aria-pressed="false">Writings</button></div>
       <section id="books-editor" aria-labelledby="books-heading"><div class="studio-section-head"><div><h2 id="books-heading">Reading shelf</h2><p>Finished books appear as covers, grouped by the year you read them.</p></div><button id="add-book" type="button" disabled>Add manually</button></div><section class="shelf-panel" aria-labelledby="shelf-count"><h3 id="shelf-count">Your added books</h3><p>Click a cover to edit. “Not published” books are saved in this browser until you publish.</p><div id="shelf-overview" class="shelf-overview"></div></section><div class="catalog-search">
         <label for="book-search">Find a book</label>
         <div class="studio-actions"><input id="book-search" type="search" placeholder="Type a title or ISBN…" autocomplete="off" maxlength="200" disabled /><button id="search-books" type="button" disabled>Search</button></div>
@@ -83,7 +86,11 @@
         <button id="batch-add" type="button" hidden>Add selected books</button>
       </details><div id="books-manager"></div><div id="book-edit-list"></div></section>
       <section id="photography-editor" aria-labelledby="photos-heading" hidden><div class="studio-section-head"><div><h2 id="photos-heading">Photographs</h2><p>Organize photos into groups and subgroups. Select several to move or update them together.</p></div><a href="/photography/" target="_blank" rel="noopener">View gallery ↗</a></div><div class="upload-destination"><label for="upload-group">Group for new photos<input id="upload-group" list="photo-groups" maxlength="100" placeholder="e.g. New Zealand" /></label><label for="upload-subgroup">Subgroup (optional)<input id="upload-subgroup" list="photo-subgroups" maxlength="100" placeholder="e.g. South Island" /></label></div><datalist id="photo-groups"></datalist><datalist id="photo-subgroups"></datalist><label class="drop-zone" id="drop-zone" for="photo-upload"><strong>Add photographs</strong><span>Drop files here or choose photos · JPEG, PNG, WebP</span><span>Up to 20 at a time. Images are resized and location metadata is removed. Export HEIC or RAW files as JPEG first.</span><input id="photo-upload" type="file" accept="image/jpeg,image/png,image/webp" multiple disabled /></label><p id="upload-status" role="status"></p><div id="photography-manager"></div><div id="photo-edit-list"></div></section>
-      <aside class="studio-panel"><h2>Writings &amp; projects</h2><p>Continue publishing these on <a href="https://jameskull.substack.com" target="_blank" rel="noopener">Substack</a>. Your existing sync stays in place. Books and photographs are maintained here.</p></aside>
+      <section id="writings-editor" aria-labelledby="writings-heading" hidden>
+        <div class="studio-section-head"><div><h2 id="writings-heading">Writings</h2><p>Draft an essay or note, publish it here, then bring it to Substack.</p></div><button id="add-writing" type="button" disabled>Add writing</button></div>
+        <p id="writing-count"></p><div id="writing-edit-list"></div>
+        <aside class="studio-panel"><h3>Already on Substack?</h3><p>Your existing Substack posts still sync automatically. Edit those posts on Substack. New Studio writings appear alongside them on your <a href="/writings/" target="_blank" rel="noopener">writings page</a>. Projects continue to sync from Substack.</p></aside>
+      </section>
       </div>
       <noscript>Studio is locked. Enable JavaScript to enter your password.</noscript>
     </main>

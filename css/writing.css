@@ -1,0 +1,17 @@
+.writing-article { max-width: 740px; margin: 32px auto 80px; overflow-wrap: anywhere; }
+.writing-article > header { margin: 40px 0; }
+.writing-article h1 { font-size: clamp(2rem,5vw,3.4rem); line-height: 1.2; margin: 16px 0; }
+.writing-subtitle { font-size: 1.35rem; color: var(--text-muted); margin: 20px 0; }
+.writing-prose { font-size: 1.1rem; line-height: 1.85; }
+.writing-prose p, .writing-prose ul, .writing-prose ol, .writing-prose pre, .writing-prose blockquote { margin: 0 0 1.3em; }
+.writing-prose ul, .writing-prose ol { padding-left: 1.6em; }
+.writing-prose ul { list-style: disc; }
+.writing-prose ol { list-style: decimal; }
+.writing-prose h2, .writing-prose h3, .writing-prose h4 { margin: 1.8em 0 .7em; line-height: 1.35; }
+.writing-prose h2 { font-size: 1.6rem; }
+.writing-prose h3 { font-size: 1.35rem; }
+.writing-prose h4 { font-size: 1.15rem; }
+.writing-prose blockquote { border-left: 3px solid var(--accent); padding-left: 22px; color: var(--text-muted); }
+.writing-prose pre { padding: 16px; overflow: auto; background: var(--surface); font-size: .9rem; }
+.writing-prose a { text-decoration: underline; }
+.writing-crosspost { border-top: 1px solid var(--border-soft); margin-top: 40px; padding-top: 24px; }
