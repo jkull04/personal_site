@@ -1189,3 +1189,38 @@
 /* Six primary destinations retain the original compact navigation. */
 .nav-links { flex-wrap: wrap; justify-content: flex-end; }
 @media (max-width: 800px) { .top-nav { align-items: start; flex-direction: column; } .nav-links { justify-content: flex-start; gap: 8px 16px; } }
+
+/* Center the two secondary homepage routes beneath the original three. */
+.arena-routes--home {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.arena-routes--home > .arena-route {
+  grid-column: span 2;
+}
+
+.arena-routes--home > .arena-route:nth-child(4) {
+  grid-column: 2 / span 2;
+}
+
+@media (max-width: 720px) {
+  .arena-routes--home {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 400px) {
+  .arena-routes--home {
+    gap: 8px;
+  }
+
+  .arena-routes--home .arena-route {
+    padding: 5px;
+  }
+
+  .arena-routes--home .arena-route-label {
+    font-size: 0.68rem;
+    letter-spacing: 0.04em;
+    padding-inline: 2px;
+  }
+}
