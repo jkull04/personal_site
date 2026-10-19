@@ -615,3 +615,45 @@ photographs expecting a later removal to erase repository history.
 
 Tests: `node --test tests/studio.test.js`. New routes use the existing canonical
 trailing-slash convention: `/books/`, `/photography/`, and `/studio/`.
+
+## Writing in Studio
+
+The Writings tab in `/studio/` supports essays and notes with a title, subtitle,
+date, topics, summary, and body. Drafts use the existing password-unlocked,
+encrypted browser storage and backup workflow. Older drafts and backups acquire
+the new writing collection without replacing saved books or photographs.
+
+Body text supports paragraphs, `#`/`##`/`###` headings, **bold**, *italic*, inline
+code, fenced code, bullet/numbered lists, blockquotes, and HTTP(S) links. Raw HTML
+is escaped. Preview uses the same renderer as published articles.
+
+Check **Include on public site**, then **Publish updates**. Studio commits
+`data/writings-local.json` and full static pages at
+`/writings/posts/<stable-id>/` together. Unpublished drafts are excluded entirely.
+Unpublishing/removing an entry deletes its public page on the next publish;
+previous versions remain in Git history. Publish retains the existing optimistic
+conflict checks and non-forced atomic commit. GitHub Pages deployment must finish
+before the website changes are live.
+
+The public writings index merges the Studio collection with `data/writings.json`.
+Substack refresh scripts continue to own the latter file only. Projects continue
+to be managed on Substack.
+
+### Substack handoff
+
+After publishing a writing's latest version here, use **Copy title**, optional
+**Copy subtitle**, and **Copy for Substack**. The last button copies rich text
+plus a plain-text fallback and includes an original-article link. Open the
+Substack dashboard, create a post, paste into the corresponding fields, review,
+and publish there. Studio does not automatically create a Substack draft, send
+email, or publish on Substack. A Markdown download is available when clipboard
+access is unavailable.
+
+After publishing there, paste the `https://jameskull.substack.com/p/...` URL into
+Studio and publish updates again. The article gains an “Also on Substack” link,
+and its exact linked Substack copy is omitted from the combined index. Edits to
+the two versions are independent. The URL field records a user-provided link;
+it does not verify publication or read private Substack drafts.
+
+Verification: `node --test tests/*.test.js` includes publishing, draft exclusion,
+page removal, crosspost matching, conflict rejection, and rendering safety.

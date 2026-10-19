@@ -88,3 +88,17 @@ details[open] summary { margin-bottom: 12px; }
 .studio-gate label { display: block; margin-block: 20px 8px; }
 .studio-gate input { min-width: 0; flex: 1; }
 
+.writing-edit-card { border: 1px solid var(--border-soft); padding: 24px; margin: 20px 0; }
+.writing-edit-card > details > summary { padding: 8px 0; }
+.writing-edit-card > details[open] > summary { padding-bottom: 20px; border-bottom: 1px solid var(--border-soft); margin-bottom: 24px; }
+.writing-edit-card textarea[data-writing-key=body] { min-height: 360px; line-height: 1.7; }
+.writing-format-help { font-size: .9rem; color: var(--text-muted); margin: 14px 0; }
+.writing-preview { margin: 24px 0; border-block: 1px solid var(--border-soft); padding: 20px 0; }
+.writing-preview [data-preview-content] { max-width: 740px; padding: 24px 0; overflow-wrap: anywhere; }
+.writing-inclusion { display: flex; align-items: center; gap: 10px; margin: 24px 0 12px; }
+.writing-crosspost-panel { background: var(--surface); border: 1px solid var(--border-soft); padding: 24px; margin-top: 24px; }
+.writing-crosspost-panel h3 { margin-bottom: 12px; }
+.writing-crosspost-panel label { display: grid; gap: 8px; }
+[data-writing-feedback] { margin-top: 16px; overflow-wrap: anywhere; }
+.studio-tabs { flex-wrap: wrap; }
+@media(max-width:640px) { .writing-edit-card,.writing-crosspost-panel { padding: 16px; } }
