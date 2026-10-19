@@ -11,6 +11,52 @@
     "thumb": "/assets/photography/cf0c4f04-545e-450e-baaa-8b20134b26f4-thumb.jpg",
     "width": 1800,
     "height": 2400,
+    "published": true,
+    "subgroup": "Peru"
+  },
+  {
+    "id": "d649a02d-172e-4b86-9824-77266c5f65b1",
+    "title": "Snow Capped Mountains",
+    "collection": "Abroad",
+    "subgroup": "Peru",
+    "location": "",
+    "date": "2027-04-06",
+    "caption": "",
+    "alt": "Mountains",
+    "src": "/assets/photography/d649a02d-172e-4b86-9824-77266c5f65b1.jpg",
+    "thumb": "/assets/photography/d649a02d-172e-4b86-9824-77266c5f65b1-thumb.jpg",
+    "width": 1800,
+    "height": 2400,
+    "published": true
+  },
+  {
+    "id": "218b04e7-33b1-4f71-8dc0-8bf94dd80ba6",
+    "title": "Unreal",
+    "collection": "Abroad",
+    "subgroup": "Peru",
+    "location": "",
+    "date": "2026-04-06",
+    "caption": "",
+    "alt": "Mountain",
+    "src": "/assets/photography/218b04e7-33b1-4f71-8dc0-8bf94dd80ba6.jpg",
+    "thumb": "/assets/photography/218b04e7-33b1-4f71-8dc0-8bf94dd80ba6-thumb.jpg",
+    "width": 1800,
+    "height": 2400,
+    "published": true
+  },
+  {
+    "id": "5c188827-d9ef-435d-a63e-8890d195056c",
+    "title": "Summit",
+    "collection": "Abroad",
+    "subgroup": "Peru",
+    "location": "",
+    "date": "2026-04-08",
+    "caption": "",
+    "alt": "Mountain",
+    "src": "/assets/photography/5c188827-d9ef-435d-a63e-8890d195056c.jpg",
+    "thumb": "/assets/photography/5c188827-d9ef-435d-a63e-8890d195056c-thumb.jpg",
+    "width": 1800,
+    "height": 2400,
     "published": true
   }
 ]
