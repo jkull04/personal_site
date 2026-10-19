@@ -145,7 +145,7 @@
       const dateIso = resolveProjectDate(project);
       const summary =
         String(project.summary || "").trim() ||
-        "Project notes published on Substack.";
+        (project.source === "studio" ? "Project notes by James Kull." : "Project notes published on Substack.");
 
       const links = (Array.isArray(project.links) ? project.links : []).filter(
         (link) => link && String(link.href || "").trim()
@@ -155,8 +155,8 @@
       const primaryLinkHtml = primaryLink
         ? `
           <div class="substack-cta">
-            <p class="meta-line substack-source">${entry.source === "studio" ? "Published here" : "Published on Substack"}</p>
-            <a class="action-link card-cta" href="${escapeHtml(primaryLink.href)}" target="_blank" rel="noopener noreferrer">
+            <p class="meta-line substack-source">${project.source === "studio" ? "Published here" : "Published on Substack"}</p>
+            <a class="action-link card-cta" href="${escapeHtml(primaryLink.href)}" ${project.source === "studio" ? "" : 'target="_blank" rel="noopener noreferrer"'}>
               Read full project
               ${externalIconSvg()}
             </a>
@@ -616,11 +616,11 @@
       needsSiteContent ? readJson("/data/site.json").catch(() => null) : Promise.resolve(null),
       needsProjectsContent ? readJson("/data/works-substack.json").catch(() => null) : Promise.resolve(null),
       needsWritingsContent ? readJson("/data/writings.json").catch(() => null) : Promise.resolve(null),
-      needsWritingsContent ? readJson("/data/writings-local.json").catch(() => null) : Promise.resolve(null)
+      (needsWritingsContent || needsProjectsContent) ? readJson("/data/writings-local.json").catch(() => null) : Promise.resolve(null)
     ]);
 
     if (needsSiteContent) renderSiteContent(site);
-    if (needsProjectsContent) renderProjects(projects);
+    if (needsProjectsContent) renderProjects(Array.isArray(projects) || Array.isArray(localWritings) ? WritingData.projects(localWritings,projects) : null);
     if (needsWritingsContent) renderWritings(Array.isArray(writings) || Array.isArray(localWritings) ? WritingData.listing(localWritings,writings) : null);
     initializeBackToTopFab();
 

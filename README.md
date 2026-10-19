@@ -618,7 +618,7 @@ trailing-slash convention: `/books/`, `/photography/`, and `/studio/`.
 
 ## Writing in Studio
 
-The Writings tab in `/studio/` supports essays and notes with a title, subtitle,
+The Writings tab in `/studio/` supports essays, notes, and projects with a title, subtitle,
 date, topics, summary, and body. Drafts use the existing password-unlocked,
 encrypted browser storage and backup workflow. Older drafts and backups acquire
 the new writing collection without replacing saved books or photographs.
@@ -636,8 +636,10 @@ conflict checks and non-forced atomic commit. GitHub Pages deployment must finis
 before the website changes are live.
 
 The public writings index merges the Studio collection with `data/writings.json`.
-Substack refresh scripts continue to own the latter file only. Projects continue
-to be managed on Substack.
+Substack refresh scripts continue to own the latter file only. Projects can also be written in Studio by choosing the Project category. Add
+Problem, Approach, and Output; the main body is optional additional detail. They
+appear on `/projects/`, with stable full article URLs. The Substack handoff
+includes the required H4 headings; add the Projects tag when posting on Substack.
 
 ### Substack handoff
 
