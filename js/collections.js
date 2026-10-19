@@ -59,10 +59,10 @@
     const child = activeSubgroup ? JSON.parse(activeSubgroup) : undefined;
     visible = album.subgroups.filter(s => child === undefined || s.name === child).flatMap(s => s.photos);
     const start = page*batchSize, photos = visible.slice(start,start+batchSize), total = visible.length;
-    panel.innerHTML = `<div class="album-spread-shell">
+    panel.innerHTML = `${document.querySelector('body > .page-header').outerHTML}<div class="album-spread-shell">
       <div class="album-spread-bar"><span>Photos <span aria-hidden="true">/</span> ${esc(album.name || 'Other photos')}</span><button type="button" data-close-album aria-label="Close ${esc(album.name || 'Other photos')}">Back to categories <span aria-hidden="true">×</span></button></div>
       ${album.subgroups.some(s=>s.name) ? `<div class="album-subfilters" role="group" aria-label="Filter subgroups"><button type="button" data-subgroup="" aria-pressed="${!activeSubgroup}">All</button>${album.subgroups.map(s=>`<button type="button" data-subgroup="${esc(JSON.stringify(s.name))}" aria-pressed="${child===s.name}">${esc(s.name || 'Other photos')} <span>${s.photos.length}</span></button>`).join('')}</div>` : ''}
-      <div class="album-spread" data-count="${photos.length}"><div class="album-center"><h2 id="album-detail-title">${esc(album.name || 'Other photos')}</h2><p>${child ? esc(child)+' · ' : ''}${total} ${photoWord(total)}</p><span class="album-center-rule" aria-hidden="true"></span></div>${photos.map((p,i)=>photoCard(p,start+i)).join('')}</div>
+      <div class="album-spread" data-count="${photos.length}" style="--spread-rows:${Math.ceil(photos.length/2)}"><div class="album-center"><h2 id="album-detail-title">${esc(album.name || 'Other photos')}</h2><p>${child ? esc(child)+' · ' : ''}${total} ${photoWord(total)}</p><span class="album-center-rule" aria-hidden="true"></span></div>${photos.map((p,i)=>photoCard(p,start+i)).join('')}</div>
       ${total > batchSize ? `<nav class="album-pagination" aria-label="Album pages"><button type="button" data-page="-1" ${page===0?'disabled':''}>← Previous</button><p role="status">${start+1}–${Math.min(start+batchSize,total)} of ${total}</p><button type="button" data-page="1" ${start+batchSize>=total?'disabled':''}>Next →</button></nav>` : ''}
     </div>`;
     if (animate) { origin = {x:innerWidth/2,y:innerHeight/2}; animateSpread(); }
@@ -79,7 +79,7 @@
     panel.addEventListener('cancel',event=>{event.preventDefault();closePanel();});
     button.setAttribute('aria-expanded','true'); button.setAttribute('aria-controls',panel.id);
     document.documentElement.style.overflow = 'hidden';
-    panel.showModal(); animateSpread();
+    panel.showModal(); panel.querySelector('[data-close-album]').focus({preventScroll:true}); animateSpread();
   }
   function handleDetails(event) {
     const button = event.target.closest('button'); if (!button || closing) return;
