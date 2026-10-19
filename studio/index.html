@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>James Kull | Studio</title>
-    <meta name="description" content="A reading shelf. Books, ideas, and notes worth keeping." />
+    <meta name="description" content="Private workspace for managing books and photographs." />
     <link rel="icon" type="image/png" href="/assets/icons/favicon-32.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -20,10 +20,11 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://covers.openlibrary.org; connect-src 'self' https://api.github.com https://openlibrary.org; object-src 'none'; base-uri 'self'; form-action 'none'" />
     <meta name="robots" content="noindex,nofollow" />
     <meta name="referrer" content="no-referrer" />
-    <link rel="stylesheet" href="/css/studio.css?v=books-shelf-4" />
+    <link rel="stylesheet" href="/css/studio.css?v=security-1" />
+    <script defer src="/js/studio-access.js?v=security-1"></script>
     <script defer src="/js/studio-core.js?v=books-shelf-4"></script>
     <script defer src="/js/book-data.js?v=books-shelf-4"></script>
-    <script defer src="/js/studio.js?v=books-shelf-4"></script>
+    <script defer src="/js/studio.js?v=security-1"></script>
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
@@ -46,6 +47,17 @@
 
     <main id="main" class="site-shell studio">
       <header class="collection-intro"><p class="eyebrow">Owner’s desk</p><h1>Studio</h1><p class="hero-lead">Keep the shelf and the gallery growing.</p></header>
+      <section id="studio-gate" class="studio-panel studio-gate" aria-labelledby="unlock-heading">
+        <h2 id="unlock-heading">Unlock Studio</h2>
+        <p>Enter your password to manage books and photographs. Studio stays unlocked for this tab’s session.</p>
+        <form id="studio-login">
+          <label for="studio-password">Password</label>
+          <div class="studio-actions"><input id="studio-password" type="password" autocomplete="current-password" required /><button type="submit">Unlock</button></div>
+          <p id="login-status" role="status" aria-live="polite"></p>
+        </form>
+      </section>
+      <div id="studio-editor" hidden inert>
+      <div class="studio-actions"><button id="lock-studio" type="button">Lock Studio</button></div>
       <p id="studio-status" role="status" aria-live="polite">Opening your desk…</p>
       <section class="studio-panel" aria-labelledby="publish-heading">
         <h2 id="publish-heading">Save here. Publish when ready.</h2>
@@ -71,7 +83,8 @@
       </details><div id="book-edit-list"></div></section>
       <section id="photography-editor" aria-labelledby="photos-heading" hidden><div class="studio-section-head"><div><h2 id="photos-heading">Photographs</h2><p>Arrange photographs in the order you want them to appear.</p></div><a href="/photography/" target="_blank" rel="noopener">View gallery ↗</a></div><label class="drop-zone" id="drop-zone" for="photo-upload"><strong>Add photographs</strong><span>Drop files here or choose photos · JPEG, PNG, WebP</span><span>Up to 20 at a time. Images are resized and location metadata is removed. Export HEIC or RAW files as JPEG first.</span><input id="photo-upload" type="file" accept="image/jpeg,image/png,image/webp" multiple disabled /></label><p id="upload-status" role="status"></p><div id="photo-edit-list"></div></section>
       <aside class="studio-panel"><h2>Writings &amp; projects</h2><p>Continue publishing these on <a href="https://jameskull.substack.com" target="_blank" rel="noopener">Substack</a>. Your existing sync stays in place. Books and photographs are maintained here.</p></aside>
-      <noscript>This editor requires JavaScript.</noscript>
+      </div>
+      <noscript>Studio is locked. Enable JavaScript to enter your password.</noscript>
     </main>
     <footer class="footer site-shell">
       <p>James Kull | Classics and Economics, Washington and Lee University.</p>
@@ -81,4 +94,5 @@
     </footer>
   </body>
 </html>
+
 

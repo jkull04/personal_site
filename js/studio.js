@@ -1,27 +1,34 @@
-(() => {
+(async () => {
   'use strict';
+  if(!window.StudioAccess) return;
+  await StudioAccess.ready;
   const $ = id => document.getElementById(id);
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   let state, db, busy = false, saveQueue = Promise.resolve();
   const previews = {};
   const status = message => { $('studio-status').textContent = message; };
   function save() {
+    StudioAccess.requireUnlocked();
     refreshBookOverview();
     const snapshot = structuredClone(state);
-    saveQueue = saveQueue.catch(()=>{}).then(()=>new Promise((resolve,reject)=>{
+    saveQueue = saveQueue.catch(()=>{}).then(async()=>{
+      const encrypted=await StudioAccess.seal(snapshot);
+      return new Promise((resolve,reject)=>{
       const tx = db.transaction('drafts','readwrite');
-      tx.objectStore('drafts').put(snapshot,'current');
+      tx.objectStore('drafts').put(encrypted,'current');
       tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); tx.onabort = () => reject(tx.error);
-    }));
+      });
+    });
     saveQueue.then(()=>status('Draft saved in this browser. Publish when ready.')).catch(()=>status('Browser storage is full or unavailable. Download a backup now; your latest edits are only in memory.'));
     return saveQueue;
   }
   function setBusy(value) {
     busy = value;
-    document.querySelectorAll('main button, main input, main textarea, main select').forEach(el=>el.disabled=value);
+    document.querySelectorAll('#studio-editor button, #studio-editor input, #studio-editor textarea, #studio-editor select').forEach(el=>el.disabled=value);
     updateBatchButton();
   }
   async function api(path, method='GET', body) {
+    StudioAccess.requireUnlocked();
     const token = $('github-token').value.trim();
     if (!token) throw Error('Paste your GitHub token under GitHub connection to publish.');
     const response = await fetch('https://api.github.com/repos/jkull04/personal_site'+path,{method,headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+token,'Content-Type':'application/json','X-GitHub-Api-Version':'2022-11-28'},body:body ? JSON.stringify(body) : undefined,cache:'no-store'});
@@ -326,6 +333,14 @@
   drop.ondragover=event=>{event.preventDefault();drop.classList.add('dragging');};
   drop.ondragleave=()=>drop.classList.remove('dragging');
   drop.ondrop=event=>{event.preventDefault();drop.classList.remove('dragging');upload([...event.dataTransfer.files]);};
+  $('lock-studio').onclick=async()=>{
+    if(busy) return;
+    setBusy(true);
+    try {
+      await saveQueue;
+      $('github-token').value=''; StudioAccess.lock(); location.reload();
+    } catch { status('Draft could not be saved. Download a backup before locking.'); setBusy(false); }
+  };
   $('backup').onclick=downloadBackup;
   $('disconnect').onclick=()=>{ $('github-token').value=''; status('GitHub token cleared. Your draft is still saved.'); };
   window.addEventListener('pagehide',()=>{ $('github-token').value=''; });
@@ -368,9 +383,14 @@
     try {
       db=await new Promise((resolve,reject)=>{const request=indexedDB.open('jameskull-studio',1); request.onupgradeneeded=()=>request.result.createObjectStore('drafts');request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
       state=await new Promise((resolve,reject)=>{const request=db.transaction('drafts').objectStore('drafts').get('current');request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
-      if(!state) {state=await fetchPublished(); await save();}
+      state=await StudioAccess.open(state);
+      if(!state) state=await fetchPublished();
+      StudioCore.validate(state.data);
+      await save();
       StudioCore.validate(state.data); render(); setBusy(false); status('Your draft is ready. Changes save automatically in this browser.');
     } catch(error) { status('Could not open Studio: '+error.message+' Refresh to try again.'); }
   }
+  setBusy(true);
   init();
 })();
+

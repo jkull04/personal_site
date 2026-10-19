@@ -59,3 +59,8 @@ details[open] summary { margin-bottom: 12px; }
 .batch-row { padding: 12px; border: 1px solid var(--border-soft); }
 .batch-row.is-added { border-color: var(--accent); }
 .catalog-search > .checkbox { display: flex; align-items: center; gap: 10px; }
+
+
+.studio-gate { max-width: 540px; margin-inline: auto; }
+.studio-gate label { display: block; margin-block: 20px 8px; }
+.studio-gate input { min-width: 0; flex: 1; }
