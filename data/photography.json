@@ -1,1 +1,16 @@
-[]
+[
+  {
+    "id": "cf0c4f04-545e-450e-baaa-8b20134b26f4",
+    "title": "Grazing Goats",
+    "collection": "Abroad",
+    "location": "Cuzco, Peru",
+    "date": "2026-04-05",
+    "caption": "",
+    "alt": "Peru Goats",
+    "src": "/assets/photography/cf0c4f04-545e-450e-baaa-8b20134b26f4.jpg",
+    "thumb": "/assets/photography/cf0c4f04-545e-450e-baaa-8b20134b26f4-thumb.jpg",
+    "width": 1800,
+    "height": 2400,
+    "published": true
+  }
+]
