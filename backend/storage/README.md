@@ -64,15 +64,27 @@ browser/edge cached copies can persist, as with any public photo.
    Free, and $1/$5 account alerts are configured. Keep these settings.
 2. Use the existing `fitzykull.workers.dev` subdomain. No website DNS changes
    are needed. The feature flag remains off until live verification completes.
-3. On a machine with npm and Cloudflare access, run `npx wrangler@4 login` from this directory. The `jameskull-photos` bucket already exists.
-   Keep the bucket private; use Standard storage only. No paid plan is required.
-4. Run `python3 configure-secrets.py`. It prompts without echoing for the existing
-   Studio password and a GitHub token scoped to `jkull04/personal_site` with
-   Contents read/write. Secrets go to Wrangler via stdin, never files/arguments.
-   Approve the requested service access before provisioning credentials.
-5. Run `npx wrangler@4 deploy --dry-run`, then `npx wrangler@4 deploy`.
-   Confirm the workers.dev address is active and the SQLite migration succeeded.
-6. Add account-wide $1 and $5 budget alerts to the account's billing email.
+3. The restricted user token `Website storage deployment` has Workers Scripts
+   edit and Workers R2 Storage edit for this account only. Save it as the
+   encrypted GitHub Actions repository secret `STUDIO_CLOUDFLARE_API_TOKEN`
+   after approval. The workflow `.github/workflows/deploy-studio-storage.yml`
+   runs the tests, bundles with Wrangler, then deploys. It has read-only
+   repository access and does not run on pull-request events. GitHub Pages
+   deployment remains separate. The Cloudflare Builds UI did not list this
+   custom token, so that broader auto-token route is not used.
+4. Create a GitHub token scoped to `jkull04/personal_site` with Contents
+   read/write, and configure the Worker's three runtime secrets after approval:
+   `GITHUB_TOKEN`, `STUDIO_AUTH_SHA256`, and `SESSION_SECRET`. The last two can
+   be provisioned by `python3 configure-secrets.py` on a machine with Wrangler
+   access. It prompts without echoing for the existing Studio password,
+   verifies the password, and derives a separate authentication hash. No raw
+   password or browser encryption key is sent to Cloudflare. Secrets go to
+   Wrangler via stdin, never files/arguments. Runtime secrets are separate
+   from the deployment token; do not commit either kind.
+5. Merge the disabled integration and run the storage deployment workflow.
+   Confirm the workers.dev address and SQLite migration are active. Without
+   runtime secrets, authenticated storage routes remain unavailable.
+6. Confirm the account-wide $1 and $5 budget alerts remain enabled.
 7. Test a small image upload, publish, reload, retry, and removal in a staging
    environment first. Confirm unauthenticated writes fail and public R2 access
    is disabled. Confirm the real browser session derives the same service key.
