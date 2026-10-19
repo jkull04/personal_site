@@ -4,11 +4,18 @@
   const writing = root.WritingData || (typeof require === 'function' ? require('./writing-data.js') : null);
   const paths = {writings:'data/writings-local.json',books:'data/books.json', photography:'data/photography.json'};
   const imagePath = /^assets\/photography\/[a-zA-Z0-9_-]+\.jpg$/;
+  const remoteImage = /^https:\/\/images\.jameskull\.com\/photos\/[a-f0-9]{64}\.jpg$/;
+  const validPhoto = path => imagePath.test(String(path).replace(/^\//,'')) || remoteImage.test(path);
+  async function readCollection(api,path) {
+    const file=await api(path);
+    if(Array.isArray(file)) return file; // Raw Contents API response, including files over 1 MB.
+    return JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(file.content.replace(/\s/g,'')),c=>c.charCodeAt(0))));
+  }
   const canonical = value => JSON.stringify(value);
   function validate(data, publishing = false) {
     for (const kind of Object.keys(paths)) {
       if (kind==='writings' && data[kind]===undefined) continue; // Older browser drafts and backups.
-      if (!Array.isArray(data[kind]) || data[kind].length > 1000) throw Error('Invalid '+kind+' collection.');
+      if (!Array.isArray(data[kind]) || data[kind].length > (kind==='writings'?1000:50000)) throw Error('Invalid '+kind+' collection.');
       const ids = new Set();
       for (const entry of data[kind]) {
         if (!entry || typeof entry !== 'object' || !/^[a-zA-Z0-9_-]+$/.test(entry.id) || ids.has(entry.id)) throw Error('Every entry needs a unique ID.');
@@ -25,7 +32,7 @@
           if (['collection','subgroup'].some(key=>entry[key] !== undefined && (typeof entry[key] !== 'string' || entry[key].length > 100))) throw Error('Group names must be 100 characters or fewer.');
           if (publishing && entry.published !== false && entry.subgroup?.trim() && !entry.collection?.trim()) throw Error('Choose a group for every photo with a subgroup.');
         }
-        if (kind === 'photography' && (!imagePath.test(String(entry.src).replace(/^\//,'')) || !imagePath.test(String(entry.thumb).replace(/^\//,'')))) throw Error('Invalid photograph path.');
+        if (kind === 'photography' && (!validPhoto(entry.src) || !validPhoto(entry.thumb))) throw Error('Invalid photograph path.');
       }
     }
   }
@@ -38,9 +45,8 @@
     const head = ref.object.sha;
     // Read at one immutable commit. Never overwrite another device's content changes.
     for (const kind of kinds) {
-      const file = await api('/contents/'+paths[kind]+'?ref='+head);
-      const raw = new TextDecoder().decode(Uint8Array.from(atob(file.content.replace(/\s/g,'')), c=>c.charCodeAt(0)));
-      if (canonical(JSON.parse(raw)) !== canonical(baseline[kind])) throw Error('Published content changed on another device. Download your backup, then reload published content before applying your edits. Nothing was overwritten.');
+      const remote = await readCollection(api,'/contents/'+paths[kind]+'?ref='+head);
+      if (canonical(remote) !== canonical(baseline[kind])) throw Error('Published content changed on another device. Download your backup, then reload published content before applying your edits. Nothing was overwritten.');
     }
     const changed = kinds.filter(k=>canonical(published[k]) !== canonical(baseline[k]));
     if (!changed.length) return {unchanged:true, published};
@@ -68,7 +74,7 @@
     await api('/git/refs/heads/main','PATCH',{sha:createdCommit.sha,force:false});
     return {sha:createdCommit.sha,published};
   }
-  const core = {validate,publish,imagePath};
+  const core = {validate,publish,imagePath,validPhoto,readCollection};
   root.StudioCore = core;
   if (typeof module !== 'undefined') module.exports = core;
 })(globalThis);

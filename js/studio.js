@@ -33,7 +33,7 @@
     StudioAccess.requireUnlocked();
     const token = $('github-token').value.trim();
     if (!token) throw Error('Paste your GitHub token under GitHub connection to publish.');
-    const response = await fetch('https://api.github.com/repos/jkull04/personal_site'+path,{method,headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+token,'Content-Type':'application/json','X-GitHub-Api-Version':'2022-11-28'},body:body ? JSON.stringify(body) : undefined,cache:'no-store'});
+    const response = await fetch('https://api.github.com/repos/jkull04/personal_site'+path,{method,headers:{Accept:path.startsWith('/contents/')?'application/vnd.github.raw+json':'application/vnd.github+json',Authorization:'Bearer '+token,'Content-Type':'application/json','X-GitHub-Api-Version':'2022-11-28'},body:body ? JSON.stringify(body) : undefined,cache:'no-store'});
     if (!response.ok) {
       if (response.status===401 || response.status===403) throw Error('GitHub could not authorize this update. Check the token’s expiration, personal_site repository access, and Contents: Read and write permission.');
       if (response.status===409 || response.status===422) throw Error('GitHub rejected the update, possibly because the site changed while publishing. Your draft is safe. Retry; if content changed, reload it after downloading a backup.');
@@ -48,10 +48,9 @@
     const ref = await response.json();
     const data = {};
     for (const kind of ['books','photography','writings']) {
-      const r = await fetch('https://api.github.com/repos/jkull04/personal_site/contents/data/'+(kind==='writings'?'writings-local':kind)+'.json?ref='+ref.object.sha,{cache:'no-store'});
+      const r = await fetch('https://api.github.com/repos/jkull04/personal_site/contents/data/'+(kind==='writings'?'writings-local':kind)+'.json?ref='+ref.object.sha,{cache:'no-store',headers:{Accept:'application/vnd.github.raw+json'}});
       if (!r.ok) throw Error('Cannot load '+kind+' from GitHub. Try again after deployment.');
-      const file = await r.json();
-      data[kind] = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(file.content.replace(/\s/g,'')), c=>c.charCodeAt(0))));
+      data[kind] = await r.json();
     }
     StudioCore.validate(data);
     return {version:1,data,baseline:structuredClone(data),images:{}};
@@ -358,7 +357,7 @@
     setBusy(true);
     try {
       await saveQueue;
-      $('github-token').value=''; StudioAccess.lock(); location.reload();
+      $('github-token').value=''; StudioStorage.clear(); StudioAccess.lock(); location.reload();
     } catch { status('Draft could not be saved. Download a backup before locking.'); setBusy(false); }
   };
   $('backup').onclick=downloadBackup;
@@ -383,27 +382,52 @@
     setBusy(true);
     try { const next=await fetchPublished(); state=next;undoDraft=null;managedKinds.forEach(k=>selection[k].clear());render(); await save(); status('Loaded the latest published content.'); } catch(error) {status(error.message);} finally {setBusy(false);}
   };
-  $('publish').onclick=async()=>{
-    if(!$('github-token').value.trim()) { $('connection').open=true; $('github-token').focus(); status('Connect GitHub below to publish.'); return; }
+  async function publishUpdates(migrate=false) {
+    if(busy)return;
+    try {await StudioStorage.ready;} catch(error) {status(error.message);return;}
+    if(!StudioStorage.enabled && !$('github-token').value.trim()) { $('connection').open=true; $('github-token').focus(); status('Connect GitHub below to publish.'); return; }
     setBusy(true); $('publish-result').textContent='Publishing your included entries…';
     try {
-      const result=await StudioCore.publish({data:state.data,baseline:state.baseline,images:state.images,api});
+      const previousPhotos=structuredClone(state.data.photography);
+      const result=StudioStorage.enabled
+        ? await StudioStorage.publish({data:state.data,baseline:state.baseline,images:state.images,migrate,progress:text=>$('publish-result').textContent=text})
+        : await StudioCore.publish({data:state.data,baseline:state.baseline,images:state.images,api});
       state.baseline=structuredClone(result.published);
       writingEditor.render();
       undoDraft=null;
       // Uploaded images no longer count against the pending upload budget.
       // Keep a memory-only preview while GitHub Pages finishes deploying.
-      for (const photo of result.published.photography) {
+      for (const photo of previousPhotos.filter(p=>result.published.photography.some(e=>e.id===p.id))) {
         for (const path of [photo.src.slice(1),photo.thumb.slice(1)]) {
           if (state.images[path]) { previews[path]=state.images[path]; delete state.images[path]; }
         }
       }
+      for(const photo of result.published.photography) {
+        const local=state.data.photography.find(p=>p.id===photo.id);
+        if(local) {local.src=photo.src;local.thumb=photo.thumb;}
+      }
+      render();
       const retained=new Set(state.data.photography.flatMap(p=>[p.src.slice(1),p.thumb.slice(1)]));
       for(const path of Object.keys(state.images)) if(!retained.has(path)) delete state.images[path];
       await save().catch(()=>{});
+      if(StudioStorage.enabled) refreshStorage();
       $('publish-result').innerHTML=result.unchanged?'No public changes to publish.':`Saved to GitHub. The website will update after deployment finishes. <a href="https://github.com/jkull04/personal_site/actions" target="_blank" rel="noopener">Check deployment ↗</a>`;
     } catch(error) { $('publish-result').textContent=error.message; } finally {setBusy(false);}
   };
+  $('publish').onclick=()=>publishUpdates();
+  $('storage-migrate').onclick=()=>{
+    if(confirm('Move included photos to cloud storage and publish your current included changes? Existing photos stay available during deployment.')) publishUpdates(true);
+  };
+  async function refreshStorage() {
+    try {const usage=await StudioStorage.usage();$('storage-status').textContent=`Cloud photos: ${(usage.bytes/1000000000).toFixed(3)} / 8 GB reserved · ${usage.objects} image files · ${usage.daily.writes}/1,000 uploads today. `+(usage.bytes>=usage.limits.warningBytes?'Storage is nearing its safety limit. New uploads stop at 8 GB.':'Safety limits active. Uncached image requests stop at 20,000 per day.');}
+    catch(error) {$('storage-status').textContent=error.message;}
+  }
+  $('storage-refresh').onclick=refreshStorage;
+  StudioStorage.ready.then(config=>{
+    $('connection').hidden=config.enabled;
+    $('cloud-storage').hidden=!config.enabled;
+    if(config.enabled) refreshStorage();
+  }).catch(error=>status(error.message));
   const selection = {books:new Set(), photography:new Set()};
   let undoDraft = null;
   const managedKinds = ['books','photography'];
