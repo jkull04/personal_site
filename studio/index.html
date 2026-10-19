@@ -37,7 +37,7 @@
           <li><a href="/projects/">Projects</a></li>
           <li><a href="/writings/">Writings</a></li>
           <li><a href="/books/">Books</a></li>
-          <li><a href="/photography/">Photography</a></li>
+          <li><a href="/photography/">Photos</a></li>
           <li><a href="/contact/">Contact</a></li>
         </ul>
       </nav>
@@ -53,7 +53,7 @@
         <p id="publish-result" role="status"></p>
         <details id="connection"><summary>GitHub connection</summary><p>One-time setup: <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">create a fine-grained token</a> for <strong>jkull04 / personal_site only</strong>, with <strong>Contents: Read and write</strong>. Choose an expiration. Paste it here when publishing; the token is held in memory only and cleared when you leave this page.</p><label for="github-token">GitHub token</label><div class="studio-actions"><input id="github-token" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your repository token" /><button id="disconnect" type="button">Clear token</button></div></details>
       </section>
-      <div class="studio-tabs" role="group" aria-label="Edit collection"><button type="button" data-tab="books" aria-pressed="true">Books</button><button type="button" data-tab="photography" aria-pressed="false">Photography</button></div>
+      <div class="studio-tabs" role="group" aria-label="Edit collection"><button type="button" data-tab="books" aria-pressed="true">Books</button><button type="button" data-tab="photography" aria-pressed="false">Photos</button></div>
       <section id="books-editor" aria-labelledby="books-heading"><div class="studio-section-head"><div><h2 id="books-heading">Reading shelf</h2><p>What you’re reading, what stayed with you, and what’s next.</p></div><button id="add-book" type="button" disabled>Add book</button></div><div id="book-edit-list"></div></section>
       <section id="photography-editor" aria-labelledby="photos-heading" hidden><div class="studio-section-head"><div><h2 id="photos-heading">Photographs</h2><p>Arrange photographs in the order you want them to appear.</p></div><a href="/photography/" target="_blank" rel="noopener">View gallery ↗</a></div><label class="drop-zone" id="drop-zone" for="photo-upload"><strong>Add photographs</strong><span>Drop files here or choose photos · JPEG, PNG, WebP</span><span>Up to 20 at a time. Images are resized and location metadata is removed. Export HEIC or RAW files as JPEG first.</span><input id="photo-upload" type="file" accept="image/jpeg,image/png,image/webp" multiple disabled /></label><p id="upload-status" role="status"></p><div id="photo-edit-list"></div></section>
       <aside class="studio-panel"><h2>Writings &amp; projects</h2><p>Continue publishing these on <a href="https://jameskull.substack.com" target="_blank" rel="noopener">Substack</a>. Your existing sync stays in place. Books and photographs are maintained here.</p></aside>
