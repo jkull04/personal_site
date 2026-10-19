@@ -335,7 +335,7 @@
       const art = scene.parentElement.querySelector(".monument-img").getBoundingClientRect();
       const width = art.width, height = art.height;
       const left = art.left - rect.left, top = art.top - rect.top;
-      scene.style.setProperty("--arena-dino-scale", String(clamp(width / 1000, .48, .72)));
+      scene.style.setProperty("--arena-dino-scale", String(clamp(width / 740, .65, .98)));
       // The runtime illustrations share transparent margins and a ground line
       // at ~74% of the image; figure height also includes a responsive caption.
       return { minX: left + width * .22, maxX: left + width * .82, minY: top + height * .725,
@@ -434,7 +434,7 @@
 
   function inspectionSpot(target) {
     const rect = target.getBoundingClientRect();
-    const width = 56, height = 64;
+    const width = 72, height = 80;
     const candidates = [
       { x: rect.right + 8, y: rect.top + Math.min(rect.height, 110) - height },
       { x: rect.left - width - 8, y: rect.top + Math.min(rect.height, 110) - height },
@@ -499,7 +499,7 @@
       return false;
     }
     const progress = clamp01((now - visit.started) / 1300);
-    setRoamerPosition(state.roamer, visit.face === 1 ? -15 + progress * 43 : 71 - progress * 43, 61);
+    setRoamerPosition(state.roamer, visit.face === 1 ? -32 + progress * 68 : 104 - progress * 68, 77);
     setFacing(state.dino, visit.face);
     state.dino.classList.toggle("play-loop-walk", progress < 1);
     state.dino.classList.toggle("is-idle", progress === 1);

@@ -78,11 +78,11 @@
   outline-offset: 3px;
 }
 .arena-scene.dino-inspection-scene {
-  --arena-dino-scale: .48;
+  --arena-dino-scale: .65;
   position: absolute;
   inset: auto;
-  width: 56px;
-  height: 64px;
+  width: 72px;
+  height: 80px;
   pointer-events: none;
   overflow: hidden;
   z-index: 5;
