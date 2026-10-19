@@ -1,1 +1,15 @@
-[]
+[
+  {
+    "id": "68a67f0c-06d1-4f4d-ad05-e8775ae1292b",
+    "title": "Red Rising",
+    "author": "Pierce Brown",
+    "status": "Read",
+    "rating": "5",
+    "finished": "2026-08-31",
+    "note": "",
+    "published": true,
+    "catalogKey": "/works/OL17076473W",
+    "coverId": 7316188,
+    "year": "2014"
+  }
+]
