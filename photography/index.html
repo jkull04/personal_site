@@ -16,8 +16,9 @@
     <link rel="stylesheet" href="/css/components.css" />
     <link rel="stylesheet" href="/css/dinos.css" />
     <script defer src="/js/dinos.js"></script>
-    <link rel="stylesheet" href="/css/collections.css" />
-    <script defer src="/js/collections.js"></script>
+    <link rel="stylesheet" href="/css/collections.css?v=management-1" />
+    <script defer src="/js/photo-data.js?v=management-1"></script>
+    <script defer src="/js/collections.js?v=management-1"></script>
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
@@ -52,10 +53,11 @@
       </section>
       <div class="collection-controls" role="group" aria-label="Photos filters">
         <label>Search<input id="collection-search" type="search" placeholder="Title, place, or caption" /></label>
-        <label>Collection<select id="collection-filter"><option value="">All collections</option></select></label>
+        <label>Group<select id="collection-filter"><option value="">All groups</option></select></label>
+        <label>Subgroup<select id="collection-subgroup" disabled><option value="">All subgroups</option></select></label>
         <p id="collection-count" role="status"></p>
       </div>
-      <section id="collection-list" class="photo-grid" aria-label="Photos"><p>Loading photos…</p></section>
+      <section id="collection-list" class="photo-groups" aria-label="Photos"><p>Loading photos…</p></section>
       <noscript><p>Enable JavaScript to view this collection.</p></noscript>
       <dialog id="photo-viewer" aria-label="Photograph viewer">
         <button class="viewer-close" type="button" aria-label="Close photograph">Close ×</button>

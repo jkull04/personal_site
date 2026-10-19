@@ -20,11 +20,12 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://covers.openlibrary.org; connect-src 'self' https://api.github.com https://openlibrary.org; object-src 'none'; base-uri 'self'; form-action 'none'" />
     <meta name="robots" content="noindex,nofollow" />
     <meta name="referrer" content="no-referrer" />
-    <link rel="stylesheet" href="/css/studio.css?v=security-1" />
+    <link rel="stylesheet" href="/css/studio.css?v=management-1" />
     <script defer src="/js/studio-access.js?v=security-1"></script>
-    <script defer src="/js/studio-core.js?v=books-shelf-4"></script>
-    <script defer src="/js/book-data.js?v=books-shelf-4"></script>
-    <script defer src="/js/studio.js?v=security-1"></script>
+    <script defer src="/js/studio-core.js?v=management-1"></script>
+    <script defer src="/js/book-data.js?v=management-1"></script>
+    <script defer src="/js/photo-data.js?v=management-1"></script>
+    <script defer src="/js/studio.js?v=management-1"></script>
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
@@ -63,7 +64,7 @@
         <h2 id="publish-heading">Save here. Publish when ready.</h2>
         <p>Changes are saved as drafts in this browser. Publish sends the included entries to your website. Keep a backup before switching devices.</p>
         <div class="studio-actions"><button id="publish" type="button" disabled>Publish updates</button><button id="backup" type="button" disabled>Download backup</button><label class="studio-button" for="restore">Restore backup</label><input id="restore" class="sr-only" type="file" accept="application/json,.json" /><button id="reload" type="button" disabled>Reload published content</button></div>
-        <p id="publish-result" role="status"></p>
+        <p id="draft-summary"></p><p id="publish-result" role="status"></p>
         <details id="connection"><summary>GitHub connection</summary><p>One-time setup: <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">create a fine-grained token</a> for <strong>jkull04 / personal_site only</strong>, with <strong>Contents: Read and write</strong>. Choose an expiration. Paste it here when publishing; the token is held in memory only and cleared when you leave this page.</p><label for="github-token">GitHub token</label><div class="studio-actions"><input id="github-token" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your repository token" /><button id="disconnect" type="button">Clear token</button></div></details>
       </section>
       <div class="studio-tabs" role="group" aria-label="Edit collection"><button type="button" data-tab="books" aria-pressed="true">Books</button><button type="button" data-tab="photography" aria-pressed="false">Photos</button></div>
@@ -80,8 +81,8 @@
         <div class="studio-actions"><button id="batch-find" type="button" disabled>Find books</button><button id="batch-cancel" type="button" hidden>Cancel search</button></div>
         <p id="batch-status" role="status" aria-live="polite"></p><div id="batch-results"></div>
         <button id="batch-add" type="button" hidden>Add selected books</button>
-      </details><div id="book-edit-list"></div></section>
-      <section id="photography-editor" aria-labelledby="photos-heading" hidden><div class="studio-section-head"><div><h2 id="photos-heading">Photographs</h2><p>Arrange photographs in the order you want them to appear.</p></div><a href="/photography/" target="_blank" rel="noopener">View gallery ↗</a></div><label class="drop-zone" id="drop-zone" for="photo-upload"><strong>Add photographs</strong><span>Drop files here or choose photos · JPEG, PNG, WebP</span><span>Up to 20 at a time. Images are resized and location metadata is removed. Export HEIC or RAW files as JPEG first.</span><input id="photo-upload" type="file" accept="image/jpeg,image/png,image/webp" multiple disabled /></label><p id="upload-status" role="status"></p><div id="photo-edit-list"></div></section>
+      </details><div id="books-manager"></div><div id="book-edit-list"></div></section>
+      <section id="photography-editor" aria-labelledby="photos-heading" hidden><div class="studio-section-head"><div><h2 id="photos-heading">Photographs</h2><p>Organize photos into groups and subgroups. Select several to move or update them together.</p></div><a href="/photography/" target="_blank" rel="noopener">View gallery ↗</a></div><div class="upload-destination"><label for="upload-group">Group for new photos<input id="upload-group" list="photo-groups" maxlength="100" placeholder="e.g. New Zealand" /></label><label for="upload-subgroup">Subgroup (optional)<input id="upload-subgroup" list="photo-subgroups" maxlength="100" placeholder="e.g. South Island" /></label></div><datalist id="photo-groups"></datalist><datalist id="photo-subgroups"></datalist><label class="drop-zone" id="drop-zone" for="photo-upload"><strong>Add photographs</strong><span>Drop files here or choose photos · JPEG, PNG, WebP</span><span>Up to 20 at a time. Images are resized and location metadata is removed. Export HEIC or RAW files as JPEG first.</span><input id="photo-upload" type="file" accept="image/jpeg,image/png,image/webp" multiple disabled /></label><p id="upload-status" role="status"></p><div id="photography-manager"></div><div id="photo-edit-list"></div></section>
       <aside class="studio-panel"><h2>Writings &amp; projects</h2><p>Continue publishing these on <a href="https://jameskull.substack.com" target="_blank" rel="noopener">Substack</a>. Your existing sync stays in place. Books and photographs are maintained here.</p></aside>
       </div>
       <noscript>Studio is locked. Enable JavaScript to enter your password.</noscript>
@@ -94,5 +95,4 @@
     </footer>
   </body>
 </html>
-
 

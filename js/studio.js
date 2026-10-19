@@ -10,6 +10,7 @@
   function save() {
     StudioAccess.requireUnlocked();
     refreshBookOverview();
+    refreshManagementSummary();
     const snapshot = structuredClone(state);
     saveQueue = saveQueue.catch(()=>{}).then(async()=>{
       const encrypted=await StudioAccess.seal(snapshot);
@@ -26,6 +27,7 @@
     busy = value;
     document.querySelectorAll('#studio-editor button, #studio-editor input, #studio-editor textarea, #studio-editor select').forEach(el=>el.disabled=value);
     updateBatchButton();
+    if(state) { refreshManagerOptions(); managedKinds.forEach(updateSelectionControls); }
   }
   async function api(path, method='GET', body) {
     StudioAccess.requireUnlocked();
@@ -60,25 +62,29 @@
     if (type==='textarea') control = `<textarea id="${id}" data-key="${key}" maxlength="10000">${esc(e[key])}</textarea>`;
     else if (type==='status') control = `<select id="${id}" data-key="${key}">${['Reading','Read','Want to read'].map(v=>`<option ${e[key]===v?'selected':''}>${v}</option>`).join('')}</select>`;
     else if (type==='rating') control = `<select id="${id}" data-key="${key}"><option value="">No rating</option>${[1,2,3,4,5].map(v=>`<option value="${v}" ${String(e[key])===String(v)?'selected':''}>${v} / 5</option>`).join('')}</select>`;
-    else control = `<input id="${id}" type="${type}" data-key="${key}" value="${esc(e[key])}" maxlength="500" />`;
+    else control = `<input id="${id}" type="${type}" data-key="${key}" value="${esc(e[key])}" maxlength="${['collection','subgroup'].includes(key)?100:500}" ${key==='collection'?'list="photo-groups"':key==='subgroup'?'list="photo-subgroups"':''} />`;
     return `<label class="${wide?'wide':''}" for="${id}">${label}${control}</label>`;
   }
   function actions(kind,e,i) {
     return `<div class="studio-actions"><button type="button" data-action="up" ${i===0?'disabled':''}>Move up</button><button type="button" data-action="down" ${i===state.data[kind].length-1?'disabled':''}>Move down</button><button type="button" data-action="remove">Remove</button></div><label class="checkbox"><input type="checkbox" data-key="published" ${e.published!==false?'checked':''} />Include on public site</label>`;
   }
   function render() {
+    const openIds=new Set([...document.querySelectorAll('.edit-card details[open]')].map(d=>d.closest('[data-id]').dataset.id));
     for (const kind of ['books','photography']) {
       const holder = $(kind==='books'?'book-edit-list':'photo-edit-list');
       holder.innerHTML = state.data[kind].map((e,i)=>{
-        const fields = kind==='books' ? field(kind,e,'title','Title')+field(kind,e,'author','Author')+field(kind,e,'status','Shelf','status')+field(kind,e,'rating','Rating (optional)','rating')+field(kind,e,'finished','Date finished (optional)','date')+field(kind,e,'finishedYear','Finish year (if date unknown)','number')+field(kind,e,'note','Your reading note','textarea',true) : field(kind,e,'title','Title')+field(kind,e,'collection','Collection')+field(kind,e,'location','Place (optional)')+field(kind,e,'date','Date taken (optional)','date')+field(kind,e,'alt','Image description (required when publishing)','text',true)+field(kind,e,'caption','Caption (optional)','textarea',true);
+        const fields = kind==='books' ? field(kind,e,'title','Title')+field(kind,e,'author','Author')+field(kind,e,'status','Shelf','status')+field(kind,e,'rating','Rating (optional)','rating')+field(kind,e,'finished','Date finished (optional)','date')+field(kind,e,'finishedYear','Finish year (if date unknown)','number')+field(kind,e,'note','Your reading note','textarea',true) : field(kind,e,'title','Title')+field(kind,e,'collection','Group')+field(kind,e,'subgroup','Subgroup (optional)')+field(kind,e,'location','Place (optional)')+field(kind,e,'date','Date taken (optional)','date')+field(kind,e,'alt','Image description (required when publishing)','text',true)+field(kind,e,'caption','Caption (optional)','textarea',true);
         const thumb = kind==='photography' ? ((state.images[e.thumb.slice(1)] || previews[e.thumb.slice(1)]) ? 'data:image/jpeg;base64,'+(state.images[e.thumb.slice(1)] || previews[e.thumb.slice(1)]) : e.thumb) : BookData.coverURL(e.coverId);
         const cover = kind==='books' ? `<div>${bookCover(thumb,e.title)}<button type="button" data-lookup-book="${e.id}">Find cover &amp; author</button></div>` : (thumb?`<img src="${esc(thumb)}" alt="${esc(e.alt || 'Uploaded photograph preview')}" />`:'');
-        return `<article class="edit-card" data-kind="${kind}" data-id="${e.id}"><h3>${kind==='books'?'Book':'Photograph'} ${i+1}</h3><div class="${kind==='photography'?'edit-photo':'edit-book'}">${cover}<div><div class="edit-fields">${fields}</div>${actions(kind,e,i)}</div></div></article>`;
+        return `<article class="edit-card" data-kind="${kind}" data-id="${e.id}"><label class="entry-select"><input type="checkbox" data-select-entry aria-label="Select ${esc(e.title || 'untitled entry')}" ${selection[kind].has(e.id)?'checked':''} /></label><details ${openIds.has(e.id)?'open':''}><summary class="entry-summary">${kind==='books'?bookCover(thumb,e.title):`<img class="entry-thumb" src="${esc(thumb)}" alt="" loading="lazy" />`}<span><strong class="entry-title">${esc(e.title || 'Untitled')}</strong><span class="entry-meta">${esc(entryLabel(kind,e))}</span><span class="entry-state book-badge">${esc(publication(kind,e))}</span></span><span class="entry-edit-hint">Edit</span></summary><div class="${kind==='photography'?'edit-photo':'edit-book'}">${cover}<div><div class="edit-fields">${fields}</div>${actions(kind,e,i)}</div></div></details></article>`;
       }).join('') || `<p>No ${kind==='books'?'books':'photographs'} yet. Add your first one above.</p>`;
     }
     refreshBookOverview();
     if(catalogMatches.length) showCatalog(catalogMatches,false);
     renderBatch();
+    refreshManagerOptions();
+    managedKinds.forEach(applyManagerView);
+    refreshManagementSummary();
   }
   function bookCover(url,title) {
     return `<div class="catalog-cover">${url?`<img src="${esc(url)}" alt="Cover of ${esc(title)}" loading="lazy" referrerpolicy="no-referrer" />`:''}<span ${url?'hidden':''}>No cover available</span></div>`;
@@ -102,7 +108,7 @@
   }
   function focusBook(id) {
     const input=$(id+'-title');
-    if(input) {input.closest('.edit-card').scrollIntoView({block:'start'});input.focus({preventScroll:true});}
+    if(input) {const card=input.closest('.edit-card'); card.hidden=false;card.querySelector('details').open=true;input.closest('.edit-card').scrollIntoView({block:'start'});input.focus({preventScroll:true});}
   }
   $('shelf-overview').onclick=event=>{
     const button=event.target.closest('[data-edit-book]');
@@ -169,12 +175,12 @@
     }
     const existing=state.data.books.find(e=>e.id===catalogTarget);
     if(existing) {
-      Object.assign(existing,book); catalogTarget=''; render(); save().catch(()=>{});
+      undoDraft=null;Object.assign(existing,book); catalogTarget=''; render(); save().catch(()=>{});
       $('catalog-status').textContent='Author and cover filled in. Your shelf, date, and notes are unchanged.';
-      document.getElementById(existing.id+'-title').focus(); return;
+      focusBook(existing.id); return;
     }
     const today=new Date(); today.setMinutes(today.getMinutes()-today.getTimezoneOffset());
-    state.data.books.unshift({...book,id:crypto.randomUUID(),status:'Read',finished:today.toISOString().slice(0,10),rating:'',note:'',published:true});
+    undoDraft=null;state.data.books.unshift({...book,id:crypto.randomUUID(),status:'Read',finished:today.toISOString().slice(0,10),rating:'',note:'',published:true});
     render(); save().catch(()=>{});
     $('catalog-status').textContent='Added to your draft as finished today. Adjust the date below, then publish when ready.';
     $('catalog-results').querySelector(`[data-catalog-index="${button.dataset.catalogIndex}"]`)?.focus({preventScroll:true});
@@ -253,7 +259,7 @@
     if(!picks.length) {$('batch-status').textContent='Choose at least one catalog match first.';return;}
     try {
       const result=BookData.addBatch(state.data.books,picks,$('batch-year').value,()=>crypto.randomUUID());
-      state.data.books=result.books;render();save().catch(()=>{});
+      undoDraft=null;state.data.books=result.books;render();save().catch(()=>{});
       renderBatch();
       $('batch-status').textContent=`${result.added} books added to your draft for ${$('batch-year').value}. ${result.skipped?result.skipped+' already on your shelf were skipped. ':''}Publish when ready.`;
     } catch(error) {$('batch-status').textContent=error.message;}
@@ -273,7 +279,9 @@
     if (busy || !event.target.dataset.key) return;
     const card = event.target.closest('[data-id]');
     const entry = state.data[card.dataset.kind].find(e=>e.id===card.dataset.id);
+    undoDraft=null;managedKinds.forEach(updateSelectionControls);
     entry[event.target.dataset.key] = event.target.type==='checkbox' ? event.target.checked : event.target.value;
+    if(card.dataset.kind==='photography' && event.target.dataset.key==='collection' && !entry.collection.trim()) {entry.subgroup='';$(entry.id+'-subgroup').value='';}
     save().catch(()=>{});
   });
   document.querySelector('main').addEventListener('click',event=>{
@@ -290,11 +298,13 @@
       if (j<0 || j>=entries.length) return;
       [entries[i],entries[j]]=[entries[j],entries[i]];
     }
+    undoDraft=null;selection[card.dataset.kind].delete(card.dataset.id);
     render(); save().catch(()=>{});
   });
   $('add-book').onclick=()=>{
+    undoDraft=null;
     state.data.books.unshift({id:crypto.randomUUID(),title:'',author:'',status:'Reading',rating:'',finished:'',note:'',published:false});
-    render(); save().catch(()=>{}); $('book-edit-list').querySelector('input').focus();
+    render(); save().catch(()=>{}); focusBook(state.data.books[0].id);
   };
   async function resizePhoto(file) {
     if (!['image/jpeg','image/png','image/webp'].includes(file.type)) throw Error('Please use JPEG, PNG, or WebP.');
@@ -311,8 +321,9 @@
   }
   async function upload(files) {
     if (busy || !state) return;
+    if($('upload-subgroup').value.trim() && !$('upload-group').value.trim()) { $('upload-status').textContent='Choose a group before adding a subgroup.'; return; }
     if (files.length>20) { $('upload-status').textContent='Choose up to 20 photos at a time.'; return; }
-    setBusy(true); let added=0; const errors=[];
+    undoDraft=null;setBusy(true); let added=0; const errors=[];
     for (const file of files) {
       $('upload-status').textContent='Preparing '+file.name+'…';
       try {
@@ -321,7 +332,7 @@
         const total=Object.values(state.images).reduce((n,v)=>n+v.length,0)+photo.full.content.length+photo.thumb.content.length;
         if(total>45*1024*1024) throw Error('Publish this batch or remove photos before adding more.');
         state.images[path+'.jpg']=photo.full.content; state.images[path+'-thumb.jpg']=photo.thumb.content;
-        state.data.photography.push({id,title:file.name.replace(/\.[^.]+$/,'').replace(/[_-]+/g,' '),collection:'',location:'',date:'',caption:'',alt:'',src:'/'+path+'.jpg',thumb:'/'+path+'-thumb.jpg',width:photo.full.width,height:photo.full.height,published:false});
+        state.data.photography.push({id,title:file.name.replace(/\.[^.]+$/,'').replace(/[_-]+/g,' '),collection:$('upload-group').value.trim(),subgroup:$('upload-subgroup').value.trim(),location:'',date:'',caption:'',alt:'',src:'/'+path+'.jpg',thumb:'/'+path+'-thumb.jpg',width:photo.full.width,height:photo.full.height,published:false});
         added++;
       } catch(error) { errors.push(file.name+': '+error.message); }
     }
@@ -353,14 +364,14 @@
       StudioCore.validate(imported.data); StudioCore.validate(imported.baseline);
       for(const [path,content] of Object.entries(imported.images)) if(!StudioCore.imagePath.test(path) || typeof content!=='string' || !/^[A-Za-z0-9+/=]+$/.test(content)) throw Error('Invalid image in backup.');
       if(!confirm('Replace this browser’s draft with the backup? Download the current draft first if you want to keep it.')) return;
-      state={version:1,data:imported.data,baseline:imported.baseline,images:imported.images}; render(); await save(); setBusy(false);
+      state={version:1,data:imported.data,baseline:imported.baseline,images:imported.images}; undoDraft=null;managedKinds.forEach(k=>selection[k].clear());render(); await save(); setBusy(false);
     } catch(error) { status('Could not restore: '+error.message); }
     event.target.value='';
   };
   $('reload').onclick=async()=>{
     if(!confirm('Replace your local draft with the published collections? Download a backup first to keep unpublished edits and photos.')) return;
     setBusy(true);
-    try { const next=await fetchPublished(); state=next; render(); await save(); status('Loaded the latest published content.'); } catch(error) {status(error.message);} finally {setBusy(false);}
+    try { const next=await fetchPublished(); state=next;undoDraft=null;managedKinds.forEach(k=>selection[k].clear());render(); await save(); status('Loaded the latest published content.'); } catch(error) {status(error.message);} finally {setBusy(false);}
   };
   $('publish').onclick=async()=>{
     if(!$('github-token').value.trim()) { $('connection').open=true; $('github-token').focus(); status('Connect GitHub below to publish.'); return; }
@@ -368,6 +379,7 @@
     try {
       const result=await StudioCore.publish({data:state.data,baseline:state.baseline,images:state.images,api});
       state.baseline=structuredClone(result.published);
+      undoDraft=null;
       // Uploaded images no longer count against the pending upload budget.
       // Keep a memory-only preview while GitHub Pages finishes deploying.
       for (const photo of result.published.photography) {
@@ -375,10 +387,178 @@
           if (state.images[path]) { previews[path]=state.images[path]; delete state.images[path]; }
         }
       }
+      const retained=new Set(state.data.photography.flatMap(p=>[p.src.slice(1),p.thumb.slice(1)]));
+      for(const path of Object.keys(state.images)) if(!retained.has(path)) delete state.images[path];
       await save().catch(()=>{});
       $('publish-result').innerHTML=result.unchanged?'No public changes to publish.':`Saved to GitHub. The website will update after deployment finishes. <a href="https://github.com/jkull04/personal_site/actions" target="_blank" rel="noopener">Check deployment ↗</a>`;
     } catch(error) { $('publish-result').textContent=error.message; } finally {setBusy(false);}
   };
+  const selection = {books:new Set(), photography:new Set()};
+  let undoDraft = null;
+  const managedKinds = ['books','photography'];
+  const managerValue = (kind, key) => $(kind+'-'+key).value;
+  const selectedGroup = value => value === '' ? undefined : JSON.parse(value);
+  function entryLabel(kind, entry) {
+    if(kind === 'books') return [entry.author, entry.status, BookData.finishYear(entry)].filter(Boolean).join(' · ');
+    return [PhotoData.group(entry) || 'Ungrouped', PhotoData.subgroup(entry), entry.location].filter(Boolean).join(' · ');
+  }
+  function publication(kind, entry) {
+    if(kind === 'books') return bookStatus(entry);
+    const saved=state.baseline[kind].find(e=>e.id===entry.id);
+    if(entry.published===false) return saved ? 'Removal pending' : 'Private draft';
+    if(!saved) return 'Not published';
+    return JSON.stringify(entry)===JSON.stringify(saved) ? 'Published' : 'Changes to publish';
+  }
+  function setupManagers() {
+    for(const kind of managedKinds) {
+      const photo=kind==='photography';
+      const field=(key,label,control)=>`<label for="${kind}-${key}">${label}${control.replace('CONTROL',`id="${kind}-${key}"`)}</label>`;
+      const select=(key,label,options)=>field(key,label,`<select CONTROL>${options}</select>`);
+      const option=(value,label)=>`<option value="${value}">${label}</option>`;
+      $(kind+'-manager').innerHTML=`<section class="manager-panel" aria-label="Manage ${photo?'photos':'books'}"><h3>Manage ${photo?'photos':'books'}</h3><div class="manager-filters">
+        ${field('search','Search your '+(photo?'photos':'shelf'),'<input CONTROL type="search" placeholder="'+(photo?'Title, place, group…':'Title or author…')+'" />')}
+        ${select('visibility','Visibility',option('','All entries')+option('pending','Pending changes')+option('included','Included on site')+option('private','Private drafts'))}
+        ${photo?select('group','Group',option('','All groups'))+select('subgroup','Subgroup',option('','All subgroups')):select('shelf','Reading status',option('','All statuses')+['Read','Reading','Want to read'].map(v=>option(v,v)).join(''))+select('year','Year finished',option('','All years'))}
+        ${select('sort','Sort',option('order','Your order')+option('title','Title A–Z')+option('date','Newest '+(photo?'photo':'finish')+' first'))}
+      </div><p id="${kind}-count" role="status"></p><div class="studio-actions"><button type="button" data-manage="select" data-kind="${kind}">Select shown</button><button type="button" data-manage="clear" data-kind="${kind}">Clear selection</button><button type="button" data-manage="undo" data-kind="${kind}" disabled>Undo last bulk action</button></div>
+      <details class="bulk-panel"><summary>Update selected <span id="${kind}-selected">(0)</span></summary><p>Changes affect every selected entry. Publish when ready.</p><div class="manager-filters">
+      ${photo?field('move-group','Move to group','<input CONTROL list="photo-groups" maxlength="100" placeholder="Blank = ungrouped" />')+field('move-subgroup','Move to subgroup','<input CONTROL list="photo-subgroups" maxlength="100" placeholder="Optional" />'):select('bulk-shelf','Reading status',option('','Keep current')+['Read','Reading','Want to read'].map(v=>option(v,v)).join(''))+field('bulk-year','Finish year (replaces exact date)','<input CONTROL type="number" min="1000" max="9999" placeholder="Keep current" />')+select('bulk-rating','Rating',option('','Keep current')+option('none','No rating')+[1,2,3,4,5].map(v=>option(v,v+' / 5')).join(''))}
+      </div><div class="studio-actions"><button type="button" data-manage="apply" data-kind="${kind}">${photo?'Move selected':'Apply to selected'}</button><button type="button" data-manage="include" data-kind="${kind}">Include on site</button><button type="button" data-manage="private" data-kind="${kind}">Make private</button><button type="button" data-manage="remove" data-kind="${kind}">Remove selected</button></div></details>
+      ${photo?'<details class="group-tools"><summary>Rename a group or subgroup</summary><p>Choose a group in the filters above. Select a subgroup too to rename only that subgroup. Matching photos move together; an existing name combines the groups.</p><label for="rename-group">New name<input id="rename-group" maxlength="100" /></label><button type="button" data-manage="rename" data-kind="photography">Rename filtered group</button></details>':''}<p id="${kind}-feedback" role="status"></p></section>`;
+      for(const key of ['search','visibility','sort',...(photo?['group','subgroup']:['shelf','year'])]) {
+        $(kind+'-'+key).addEventListener(key==='search'?'input':'change',()=>{
+          selection[kind].clear();
+          if(key==='group') { $(kind+'-subgroup').value=''; refreshManagerOptions(); }
+          applyManagerView(kind);
+        });
+      }
+    }
+  }
+  function optionList(id, values, label, blankLabel) {
+    const select=$(id), previous=select.value;
+    select.replaceChildren(new Option(label,''));
+    values.forEach(value=>select.add(new Option(value || blankLabel,JSON.stringify(value))));
+    select.value=[...select.options].some(o=>o.value===previous)?previous:'';
+  }
+  function refreshManagerOptions() {
+    if(!state) return;
+    optionList('books-year',[...new Set(state.data.books.map(BookData.finishYear))].sort().reverse(),'All years');
+    const groups=[...new Set(state.data.photography.map(PhotoData.group))].sort();
+    optionList('photography-group',groups,'All groups','Ungrouped');
+    const parent=selectedGroup(managerValue('photography','group'));
+    optionList('photography-subgroup',[...new Set(state.data.photography.filter(e=>parent!==undefined && PhotoData.group(e)===parent).map(PhotoData.subgroup))].sort(),'All subgroups','No subgroup');
+    $('photography-subgroup').disabled=busy || parent===undefined;
+    $('photo-groups').innerHTML=groups.filter(Boolean).map(v=>`<option value="${esc(v)}"></option>`).join('');
+    $('photo-subgroups').innerHTML=[...new Set(state.data.photography.map(PhotoData.subgroup))].filter(Boolean).sort().map(v=>`<option value="${esc(v)}"></option>`).join('');
+  }
+  function managerEntries(kind) {
+    const term=managerValue(kind,'search').trim().toLowerCase(), visibility=managerValue(kind,'visibility');
+    let entries=state.data[kind].filter(e=>{
+      if(![e.title,e.author,e.location,e.caption,e.note,e.collection,e.subgroup].join(' ').toLowerCase().includes(term)) return false;
+      if(visibility==='private' && e.published!==false || visibility==='included' && e.published===false) return false;
+      if(visibility==='pending' && ['Published','Published · not finished','Private draft'].includes(publication(kind,e))) return false;
+      if(kind==='photography') return PhotoData.matches(e,selectedGroup(managerValue(kind,'group')),selectedGroup(managerValue(kind,'subgroup')));
+      return (!managerValue(kind,'shelf') || e.status===managerValue(kind,'shelf')) && (!managerValue(kind,'year') || BookData.finishYear(e)===selectedGroup(managerValue(kind,'year')));
+    });
+    const sort=managerValue(kind,'sort');
+    if(sort==='title') entries.sort((a,b)=>(a.title||'').localeCompare(b.title||''));
+    if(sort==='date') entries.sort((a,b)=>String(b.finished||b.finishedYear||b.date||'').localeCompare(String(a.finished||a.finishedYear||a.date||'')));
+    return entries;
+  }
+  function updateSelectionControls(kind) {
+    const size=selection[kind].size;
+    $(kind+'-selected').textContent=`(${size})`;
+    document.querySelectorAll(`[data-manage][data-kind="${kind}"]`).forEach(button=>{
+      const action=button.dataset.manage;
+      button.disabled=busy || (action==='undo'? !undoDraft : ['clear','apply','include','private','remove'].includes(action)?!size:false);
+    });
+    document.querySelectorAll(`.edit-card[data-kind="${kind}"] [data-select-entry]`).forEach(input=>input.checked=selection[kind].has(input.closest('[data-id]').dataset.id));
+  }
+  function applyManagerView(kind) {
+    if(!state) return;
+    const entries=managerEntries(kind), ids=new Set(entries.map(e=>e.id));
+    const holder=$(kind==='books'?'book-edit-list':'photo-edit-list');
+    const cards=new Map([...holder.querySelectorAll('.edit-card')].map(card=>[card.dataset.id,card]));
+    cards.forEach((card,id)=>card.hidden=!ids.has(id));
+    entries.forEach(e=>{if(cards.has(e.id))holder.append(cards.get(e.id));});
+    $(''+kind+'-count').textContent=`${entries.length} of ${state.data[kind].length} ${kind==='books'?'books':'photos'} shown`;
+    updateSelectionControls(kind);
+  }
+  function refreshManagementSummary() {
+    if(!state) return;
+    let pending=0, included=0;
+    for(const kind of managedKinds) {
+      for(const entry of state.data[kind]) {
+        if(entry.published!==false) included++;
+        if(['Removal pending','Not published','Changes to publish'].includes(publication(kind,entry))) pending++;
+        const card=document.querySelector(`.edit-card[data-id="${entry.id}"]`);
+        if(card) {
+          card.querySelector('.entry-title').textContent=entry.title || 'Untitled';
+          card.querySelector('.entry-meta').textContent=entryLabel(kind,entry);
+          card.querySelector('.entry-state').textContent=publication(kind,entry);
+        }
+      }
+      pending+=state.baseline[kind].filter(e=>!state.data[kind].some(d=>d.id===e.id)).length;
+    }
+    $('draft-summary').textContent=`${pending} pending ${pending===1?'change':'changes'} · ${included} entries included in the next publish`;
+  }
+  function rememberBulk() { undoDraft=structuredClone(state.data); }
+  document.querySelector('main').addEventListener('change',event=>{
+    if(busy) return;
+    if(event.target.matches('[data-select-entry]')) {
+      const card=event.target.closest('[data-id]'), chosen=selection[card.dataset.kind];
+      event.target.checked?chosen.add(card.dataset.id):chosen.delete(card.dataset.id);
+      updateSelectionControls(card.dataset.kind);
+    }
+    if(event.target.dataset.key) {refreshManagerOptions();}
+  });
+  document.querySelector('main').addEventListener('click',event=>{
+    const button=event.target.closest('[data-manage]'); if(!button || busy) return;
+    const kind=button.dataset.kind, action=button.dataset.manage, ids=selection[kind];
+    try {
+      if(action==='select') { managerEntries(kind).forEach(e=>ids.add(e.id)); updateSelectionControls(kind); return; }
+      if(action==='clear') {ids.clear();updateSelectionControls(kind);return;}
+      if(action==='undo') {
+        if(!undoDraft) return;
+        state.data=undoDraft;undoDraft=null;
+        managedKinds.forEach(k=>selection[k].clear());
+      } else if(action==='rename') {
+        const parent=selectedGroup(managerValue(kind,'group')), child=selectedGroup(managerValue(kind,'subgroup'));
+        if(parent===undefined || !parent) throw Error('Choose a named group in the filters first.');
+        const next=PhotoData.rename(state.data.photography,parent,child,$('rename-group').value);
+        rememberBulk();state.data.photography=next;
+        $('photography-group').value='';$('photography-subgroup').value='';
+      } else {
+        if(!ids.size) throw Error('Select at least one entry first.');
+        let next=state.data[kind];
+        if(action==='remove') {
+          if(!confirm(`Remove ${ids.size} selected ${kind==='books'?'books':'photos'} from this draft? You can undo this before publishing.`)) return;
+          next=next.filter(e=>!ids.has(e.id));
+        } else if(action==='apply' && kind==='photography') {
+          next=PhotoData.move(next,ids,managerValue(kind,'move-group'),managerValue(kind,'move-subgroup'));
+        } else {
+          const patch={};
+          if(action==='include' || action==='private') patch.published=action==='include';
+          else {
+            const year=managerValue(kind,'bulk-year'), shelf=managerValue(kind,'bulk-shelf'), rating=managerValue(kind,'bulk-rating');
+            if(year && !/^\d{4}$/.test(year)) throw Error('Enter a four-digit finish year.');
+            if(year) Object.assign(patch,{finished:'',finishedYear:year});
+            if(shelf) patch.status=shelf;
+            if(rating) patch.rating=rating==='none'?'':rating;
+            if(!Object.keys(patch).length) throw Error('Choose at least one field to update.');
+          }
+          next=next.map(e=>ids.has(e.id)?{...e,...patch}:e);
+        }
+        const data={...state.data,[kind]:next};StudioCore.validate(data);
+        rememberBulk();state.data=data;
+        if(action==='remove') ids.clear();
+      }
+      render();save().catch(()=>{});
+      $(kind+'-feedback').textContent=action==='undo'?'Restored the draft from before the last bulk action.':'Draft updated. Review your entries, then publish when ready.';
+    } catch(error) {$(kind+'-feedback').textContent=error.message;}
+  });
+  setupManagers();
+
   async function init() {
     try {
       db=await new Promise((resolve,reject)=>{const request=indexedDB.open('jameskull-studio',1); request.onupgradeneeded=()=>request.result.createObjectStore('drafts');request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
@@ -393,4 +573,5 @@
   setBusy(true);
   init();
 })();
+
 

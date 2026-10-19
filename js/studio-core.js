@@ -18,6 +18,10 @@
         if (kind === 'books' && !['Reading','Read','Want to read'].includes(entry.status)) throw Error('Choose a valid reading status.');
         if (kind === 'books' && entry.rating && !['1','2','3','4','5'].includes(String(entry.rating))) throw Error('Ratings must be from 1 to 5.');
         if (kind === 'books' && entry.finishedYear && !/^\d{4}$/.test(String(entry.finishedYear))) throw Error('Use four digits for the finish year.');
+        if (kind === 'photography') {
+          if (['collection','subgroup'].some(key=>entry[key] !== undefined && (typeof entry[key] !== 'string' || entry[key].length > 100))) throw Error('Group names must be 100 characters or fewer.');
+          if (publishing && entry.published !== false && entry.subgroup?.trim() && !entry.collection?.trim()) throw Error('Choose a group for every photo with a subgroup.');
+        }
         if (kind === 'photography' && (!imagePath.test(String(entry.src).replace(/^\//,'')) || !imagePath.test(String(entry.thumb).replace(/^\//,'')))) throw Error('Invalid photograph path.');
       }
     }
