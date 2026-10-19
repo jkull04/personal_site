@@ -5,7 +5,7 @@ const vm = require('node:vm');
 
 // Deterministic clock and a minimal scene let us run minutes of actual steering,
 // including resize and pointer lifecycles, without sleeping or launching a browser.
-function arena(seed = 7, reduced = false, width = 900) {
+function arena(seed = 7, reduced = false, width = 900, journeyStorage = null) {
   let now = 0, frameId = 0;
   const frames = new Map();
   class Element {
@@ -50,8 +50,11 @@ function arena(seed = 7, reduced = false, width = 900) {
   const motion = { matches: reduced, addEventListener(type, fn) { this.changed = fn; } };
   const math = Object.create(Math); math.random = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
   const window = new Element(); Object.assign(window, { matchMedia: () => motion, requestAnimationFrame: fn => { frames.set(++frameId, fn); return frameId; }, cancelAnimationFrame: id => frames.delete(id), setTimeout: () => 1, clearTimeout() {}, getComputedStyle: () => ({ getPropertyValue: () => '' }) });
-  const context = vm.createContext({ window, document, Math: math, performance: { now: () => now }, Date, navigator: {}, console });
-  const source = fs.readFileSync(require.resolve('../js/dinos.js'), 'utf8').replace(/\}\)\(\);\s*$/, 'globalThis.inspect = { habitats, arenaMotion, remapArenaRoamers, dropFood };})();');
+  const epoch = Date.now();
+  class Clock extends Date { static now() { return epoch + now; } }
+  if (journeyStorage) Object.assign(window, { DinoJourneys: require('../js/dino-journeys.js'), location: { pathname: '/' }, sessionStorage: journeyStorage });
+  const context = vm.createContext({ window, document, Math: math, performance: { now: () => now }, Date: Clock, navigator: {}, console });
+  const source = fs.readFileSync(require.resolve('../js/dinos.js'), 'utf8').replace(/\}\)\(\);\s*$/, 'globalThis.inspect = { habitats, arenaMotion, remapArenaRoamers, dropFood, getJourneys: () => journeys, inspectionSpot, inspectContent, endInspection, setJourneyPage: page => { journeyPage = page; } };})();');
   vm.runInContext(source, context);
   window.initializeDinoInteractions();
   function advance(ms) { const end = now + ms; while (now < end) { now += 16; const pending = [...frames.values()]; frames.clear(); pending.forEach(fn => fn(now)); } }
@@ -192,5 +195,94 @@ test('clicking and feeding show varied classic emoticons without consecutive rep
     else raptor.emit('click');
     const face = raptor.getAttribute('data-tooltip');
     assert.ok(faces.has(face)); assert.notEqual(face, previous); previous = face;
+  }
+});
+
+
+test('a traveling raptor is absent at home, returns for meat, and eats after entering', () => {
+  const { create } = require('../js/dino-journeys.js');
+  const storage = { value: null, getItem() { return this.value; }, setItem(_, value) { this.value = value; } };
+  const world = create(storage);
+  world.data.members.raptor.page = 'projects'; world.data.members.raptor.until = Date.now() + 90000; world.save(Date.now());
+  const a = arena(7, false, 900, storage), h = [...a.habitats.values()][0];
+  const raptor = [...a.arenaMotion.values()].find(s => s.kind === 'raptor');
+  assert.equal(raptor.roamer.hidden, true);
+  a.dropFood(h, 'leaf', { x: h.bounds.centerX, y: h.bounds.centerY });
+  a.advance(1000); assert.equal(raptor.roamer.hidden, true);
+  a.dropFood(h, 'meat', { x: h.bounds.centerX, y: h.bounds.centerY });
+  assert.ok(raptor.transit?.arriving); assert.equal(raptor.roamer.disabled, true);
+  a.advance(15000);
+  assert.equal(raptor.roamer.hidden, false); assert.equal(raptor.roamer.disabled, false);
+  assert.equal(h.foods.filter(f => f.type === 'meat').length, 0);
+  a.window.emit('pagehide');
+  const saved = create(storage, JSON.parse(storage.value).updated);
+  assert.equal(saved.data.members.raptor.page, 'home');
+  assert.equal(saved.data.members.raptor.position.page, 'home');
+});
+
+test('reduced-motion recall restores the absent diner immediately without walking', () => {
+  const { create } = require('../js/dino-journeys.js');
+  const storage = { value: null, getItem() { return this.value; }, setItem(_, value) { this.value = value; } };
+  const world = create(storage);
+  world.data.members.raptor.page = 'projects'; world.data.members.raptor.until = Date.now() + 90000; world.save(Date.now());
+  const a = arena(7, true, 350, storage), h = [...a.habitats.values()][0];
+  a.dropFood(h, 'meat', { x: h.bounds.centerX, y: h.bounds.centerY });
+  const raptor = [...a.arenaMotion.values()].find(s => s.kind === 'raptor');
+  assert.equal(raptor.roamer.hidden, false); assert.equal(raptor.transit, null);
+  assert.equal(h.foods.length, 0); assert.equal(a.frames.size, 0);
+});
+
+
+test('content inspection uses only clear space, persists without fading, and restores on resize', () => {
+  const storage = { getItem() { return null; }, setItem() {} };
+  const a = arena(7, false, 900, storage);
+  a.window.innerWidth = 1000; a.window.innerHeight = 800; a.window.scrollX = 0; a.window.scrollY = 900;
+  const target = { getBoundingClientRect: () => ({left:100,right:240,top:300,bottom:510,width:140,height:210}) };
+  assert.equal(a.inspectionSpot(target).x, 248);
+  const originalQuery = a.document.querySelectorAll;
+  const blocker = { closest: () => null, getBoundingClientRect: () => ({left:0,right:1000,top:100,bottom:800,width:1000,height:700}) };
+  a.document.querySelectorAll = selector => selector.startsWith('a, button') ? [blocker] : originalQuery(selector);
+  assert.equal(a.inspectionSpot(target), undefined, 'never covers occupied content');
+  a.document.querySelectorAll = originalQuery;
+  const state = [...a.arenaMotion.values()][0];
+  a.scene.getBoundingClientRect = () => ({left:0,right:900,top:-900,bottom:-500,width:900,height:400});
+  a.setJourneyPage('books');
+  a.getJourneys().data.members[state.kind].page = 'books';
+  a.inspectContent(state, target); assert.ok(state.inspection);
+  state.habitat.visible = false;
+  a.advance(1500); assert.equal(state.dino.classList.contains('is-idle'), true);
+  a.advance(10000); assert.ok(state.inspection, 'no timed disappearance');
+  a.window.emit('scroll'); assert.ok(state.inspection);
+  a.window.emit('resize'); assert.equal(state.inspection, null);
+  assert.equal(state.roamer.style.opacity, '1');
+});
+
+test('autonomous departures remain fully opaque and disappear only beyond the scene edge', () => {
+  const storage = { getItem() { return null; }, setItem() {} };
+  const a = arena(3, false, 900, storage);
+  a.getJourneys().data.nextTrip = 0;
+  a.advance(16);
+  const state = [...a.arenaMotion.values()].find(s => s.transit && !s.transit.arriving);
+  assert.ok(state);
+  for (let i = 0; i < 700 && !state.roamer.hidden; i++) {
+    a.advance(16);
+    assert.equal(state.roamer.style.opacity, '1');
+  }
+  assert.equal(state.roamer.hidden, true);
+  assert.ok(state.x < 0 || state.x > a.scene.clientWidth, 'walked completely off the scene');
+});
+
+
+test('delegated attention notices new headings, images and form controls without rebinding', () => {
+  const a = arena(7, false, 900, { getItem() { return null; }, setItem() {} });
+  const makeTarget = x => ({ isConnected: true,
+    closest(selector) { return ['.arena-scene, .arena-pantry', 'a[href]', '.book-cover, .album-trigger'].includes(selector) ? null : this; },
+    getBoundingClientRect: () => ({left:x, right:x+100, top:20, bottom:80, width:100, height:60}) });
+  for (const [event, x] of [['click', 40], ['input', 700], ['change', 120]]) {
+    a.document.emit(event, { target: makeTarget(x) });
+    const attentive = [...a.arenaMotion.values()].filter(s => s.attention?.until > a.now());
+    assert.ok(attentive.length, `${event} attracts attention`);
+    assert.ok(attentive.every(s => s.attention.u >= 0 && s.attention.u <= 1));
+    a.advance(5500);
   }
 });

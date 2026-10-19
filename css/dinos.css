@@ -56,6 +56,39 @@
   visibility: hidden;
 }
 
+.arena-roamer[hidden] { display: none; }
+.arena-roamer:disabled { cursor: default; }
+/* Visitors share the artwork's stacking context; never the content or dialogs. */
+.page-monument .dino-visit-scene {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  pointer-events: auto;
+}
+.dino-visit-scene .arena-roamer {
+  background: transparent;
+  border: 0;
+  padding: 2px;
+  color: var(--muted);
+}
+.dino-visit-scene .arena-roamer:focus-visible {
+  outline: 1px dashed var(--accent);
+  outline-offset: 3px;
+}
+.arena-scene.dino-inspection-scene {
+  --arena-dino-scale: .48;
+  position: absolute;
+  inset: auto;
+  width: 56px;
+  height: 64px;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 5;
+}
+.dino-inspection-scene .arena-roamer { background: transparent; border: 0; padding: 2px; }
+
 .dino--ambient {
   --dino-size: 22px;
   --dino-opacity: 1;
