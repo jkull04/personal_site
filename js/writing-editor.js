@@ -14,7 +14,7 @@ window.createWritingEditor = ({getState,save,isBusy,onChange}) => {
     const attrs=`id="${id}" data-writing-key="${key}"`;
     let input;
     if(type==='textarea')input=`<textarea ${attrs} rows="${key==='body'?18:3}" maxlength="${key==='body'?200000:2000}">${esc(entry[key])}</textarea>`;
-    else if(type==='category')input=`<select ${attrs}><option value="essay" ${entry.type==='essay'?'selected':''}>Essay</option><option value="blog" ${entry.type==='blog'?'selected':''}>Note</option></select>`;
+    else if(type==='category')input=`<select ${attrs}><option value="essay" ${entry.type==='essay'?'selected':''}>Essay</option><option value="blog" ${entry.type==='blog'?'selected':''}>Note</option><option value="project" ${entry.type==='project'?'selected':''}>Project</option></select>`;
     else input=`<input ${attrs} type="${type}" value="${esc(entry[key])}" maxlength="2000" />`;
     return `<label class="${wide?'wide':''}" for="${id}">${label}${input}</label>`;
   }
@@ -25,25 +25,31 @@ window.createWritingEditor = ({getState,save,isBusy,onChange}) => {
       const entry=entries.find(e=>e.id===card.dataset.writingId);if(!entry)continue;
       card.querySelector('[data-writing-title]').textContent=entry.title||'Untitled writing';
       card.querySelector('[data-writing-state]').textContent=stateLabel(entry)+(entry.substackUrl?' · Substack link saved':'');
+      card.querySelector('[data-project-fields]').hidden=entry.type!=='project';
+      card.querySelector('[data-project-crosspost]').hidden=entry.type!=='project';
+      card.querySelector('[data-writing-destination]').textContent=entry.type==='project'?'This project will appear on the Projects page. Add Problem, Approach, and Output below; the main writing field is optional for additional detail.':'This writing will appear on the Writings page.';
       const preview=card.querySelector('[data-writing-preview]');
       if(preview.open)renderPreview(card,entry);
     }
   }
   function renderPreview(card,entry) {
-    card.querySelector('[data-preview-content]').innerHTML=`<h2>${esc(entry.title||'Untitled writing')}</h2>${entry.subtitle?'<p class="writing-subtitle">'+esc(entry.subtitle)+'</p>':''}<div class="writing-prose">${WritingData.markdown(entry.body)}</div>`;
+    card.querySelector('[data-preview-content]').innerHTML=`<h2>${esc(entry.title||'Untitled writing')}</h2>${entry.subtitle?'<p class="writing-subtitle">'+esc(entry.subtitle)+'</p>':''}<div class="writing-prose">${WritingData.markdown(WritingData.articleBody(entry))}</div>`;
   }
   function render() {
     const open=new Set([...holder.querySelectorAll('[data-writing-id] > details[open]')].map(el=>el.parentElement.dataset.writingId));
     holder.innerHTML=getState().data.writings.map(entry=>`<article class="writing-edit-card" data-writing-id="${entry.id}"><details ${open.has(entry.id)?'open':''}><summary><strong data-writing-title>${esc(entry.title||'Untitled writing')}</strong><span class="book-badge" data-writing-state></span></summary><div class="edit-fields">
-      ${control(entry,'title','Title','text',true)}${control(entry,'subtitle','Subtitle (optional)','text',true)}${control(entry,'type','Category','category')}${control(entry,'date','Publication date','date')}${control(entry,'tags','Topics (comma separated)','text',true)}${control(entry,'abstract','Short description for the writings page','textarea',true)}${control(entry,'body','Writing','textarea',true)}
-      </div><p class="writing-format-help">Plain text works. For formatting use # Heading, **bold**, *italic*, - bullet, &gt; quotation, or [link text](https://…). Separate paragraphs with a blank line.</p>
+      ${control(entry,'title','Title','text',true)}${control(entry,'subtitle','Subtitle (optional)','text',true)}${control(entry,'type','Category','category')}${control(entry,'date','Publication date','date')}${control(entry,'tags','Topics (comma separated)','text',true)}${control(entry,'abstract','Short description for the website','textarea',true)}
+      </div><p class="writing-format-help" data-writing-destination></p>
+      <div class="edit-fields" data-project-fields ${entry.type==='project'?'':'hidden'}>${control(entry,'problem','Problem — what did you set out to solve?','textarea',true)}${control(entry,'approach','Approach — how did you tackle it?','textarea',true)}${control(entry,'output','Output — what did you make or learn?','textarea',true)}</div>
+      <div class="edit-fields">${control(entry,'body','Writing / additional project detail','textarea',true)}</div>
+      <p class="writing-format-help">Plain text works. For formatting use # Heading, **bold**, *italic*, - bullet, &gt; quotation, or [link text](https://…). Separate paragraphs with a blank line.</p>
       <details data-writing-preview class="writing-preview"><summary>Preview article</summary><div data-preview-content></div></details>
       <label class="checkbox writing-inclusion"><input type="checkbox" data-writing-key="published" ${entry.published!==false?'checked':''} />Include on public site</label>
       <p class="writing-format-help">Check this box, then use “Publish updates” above. Leaving it unchecked keeps a new writing in this browser only. Unchecking a published writing removes its page on the next publish.</p>
       <div class="studio-actions"><a href="${WritingData.href(entry)}" target="_blank" rel="noopener" ${getState().baseline.writings.some(e=>e.id===entry.id)?'':'hidden'}>View website article ↗</a><button type="button" data-writing-action="download">Download Markdown</button><button type="button" data-writing-action="remove">Remove writing</button></div>
-      <section class="writing-crosspost-panel" aria-label="Crosspost to Substack"><h3>Crosspost to Substack</h3><p>After publishing here, copy the title, subtitle, and formatted body into a new Substack post. Review it and publish there; nothing is sent to subscribers from Studio.</p><div class="studio-actions"><button type="button" data-writing-action="title">Copy title</button><button type="button" data-writing-action="subtitle">Copy subtitle</button><button type="button" data-writing-action="body">Copy for Substack</button><a href="https://jameskull.substack.com/publish" target="_blank" rel="noopener noreferrer">Open Substack ↗</a></div><p class="writing-format-help">The body includes a link to the original article on your website. After publishing on Substack, save the post URL below and publish updates again to link the two versions and avoid a duplicate listing.</p>${control(entry,'substackUrl','Published Substack post URL (optional)','url',true)}</section>
+      <section class="writing-crosspost-panel" aria-label="Crosspost to Substack"><h3>Crosspost to Substack</h3><p data-project-crosspost ${entry.type==='project'?'':'hidden'}>For projects, add the “Projects” tag in Substack. The copied body includes the Problem, Approach, and Output headings used by the site’s sync.</p><p>After publishing here, copy the title, subtitle, and formatted body into a new Substack post. Review it and publish there; nothing is sent to subscribers from Studio.</p><div class="studio-actions"><button type="button" data-writing-action="title">Copy title</button><button type="button" data-writing-action="subtitle">Copy subtitle</button><button type="button" data-writing-action="body">Copy for Substack</button><a href="https://jameskull.substack.com/publish" target="_blank" rel="noopener noreferrer">Open Substack ↗</a></div><p class="writing-format-help">The body includes a link to the original article on your website. After publishing on Substack, save the post URL below and publish updates again to link the two versions and avoid a duplicate listing.</p>${control(entry,'substackUrl','Published Substack post URL (optional)','url',true)}</section>
       <p data-writing-feedback role="status" aria-live="polite"></p>
-      </details></article>`).join('')||'<p class="studio-panel">Your essays and notes start here. Add a writing to open a draft.</p>';
+      </details></article>`).join('')||'<p class="studio-panel">Your essays, notes, and projects start here. Add a writing to open a draft.</p>';
     holder.querySelectorAll('[data-writing-preview]').forEach(details=>details.ontoggle=()=>{if(details.open){const card=details.closest('[data-writing-id]');renderPreview(card,entryFor(details));}});
     refresh();
   }
@@ -71,7 +77,7 @@ window.createWritingEditor = ({getState,save,isBusy,onChange}) => {
         onChange();getState().data.writings=getState().data.writings.filter(e=>e.id!==entry.id);render();await save();return;
       }
       if(action==='download') {
-        const content='# '+entry.title+'\n\n'+(entry.subtitle?entry.subtitle+'\n\n':'')+entry.body+'\n';
+        const content='# '+entry.title+'\n\n'+(entry.subtitle?entry.subtitle+'\n\n':'')+WritingData.articleBody(entry)+'\n';
         const url=URL.createObjectURL(new Blob([content],{type:'text/markdown;charset=utf-8'}));
         const a=document.createElement('a');a.href=url;a.download=(entry.title.replace(/[^a-z0-9]+/gi,'-').replace(/^-|-$/g,'').slice(0,80)||'writing')+'.md';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);return;
       }

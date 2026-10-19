@@ -65,3 +65,39 @@ test('crosspost deduplication uses the exact linked URL and keeps unrelated Subs
 test('Substack handoff contains formatted body and a link to the original',()=>{
  const content=Writing.bodyForSubstack(essay());assert.ok(content.html.includes('<h2>A heading</h2>'));assert.ok(content.html.includes('https://www.jameskull.com/writings/posts/test-essay/'));assert.ok(!content.html.includes('<h1>'));
 });
+
+test('projects require their sections and publish a complete page in the same commit',async()=>{
+ const project=essay({type:'project',body:'',problem:'A problem',approach:'An approach',output:'A result'});
+ assert.doesNotThrow(()=>validate(collections([project]),true));
+ assert.throws(()=>validate(collections([{...project,output:''}]),true),/Problem, Approach, and Output/);
+ const baseline=collections([]),{api,calls}=remote(baseline);
+ await publish({data:collections([project]),baseline,images:{},api});
+ const page=calls.find(c=>c.path==='/git/trees').body.tree.find(e=>e.path.endsWith('index.html')).content;
+ assert.ok(page.includes('← All projects'));assert.ok(page.includes('<h4>Problem</h4>'));
+ assert.ok(page.includes('<h4>Approach</h4>'));assert.ok(page.includes('<h4>Output</h4>'));
+ const crosspost=Writing.bodyForSubstack(project);
+ assert.ok(crosspost.html.includes('<h4>Problem</h4>'));assert.ok(crosspost.text.includes('### Output\n\nA result'));
+});
+test('projects route to Projects, retain existing posts, and deduplicate linked Substack copies',()=>{
+ const project=essay({type:'project',problem:'Why',approach:'How',output:'Result',substackUrl:'https://jameskull.substack.com/p/example'});
+ const posts=[{id:'copy',links:[{href:project.substackUrl}]},{id:'original',links:[{href:'https://jameskull.substack.com/p/other'}]}];
+ const result=Writing.projects([project,essay({id:'essay'}),{...project,id:'private',published:false}],posts);
+ assert.deepEqual(result.map(e=>e.id),['test-essay','original']);
+ assert.equal(result[0].links[0].href,Writing.href(project));
+ assert.equal(Writing.listing([project],[]).length,0);
+ assert.equal(Writing.listing([project],[{href:project.substackUrl}]).length,0);
+});
+test('the real Projects renderer loads existing Substack and Studio projects without errors',async()=>{
+ const vm=require('node:vm'),fs=require('node:fs');
+ const element=()=>({innerHTML:'',style:{setProperty(){}},classList:{remove(){},toggle(){}},querySelectorAll:()=>[],setAttribute(){},removeAttribute(){},addEventListener(){},scrollTop:0,scrollHeight:0,clientHeight:0});
+ const list=element();let hydrate;
+ const document={getElementById:id=>id==='works-list'?list:null,querySelector:()=>null,querySelectorAll:()=>[],createElement:element,body:{appendChild(){}},addEventListener:(name,fn)=>{if(name==='DOMContentLoaded')hydrate=fn;}};
+ const local=essay({type:'project',title:'Local project',problem:'Local problem',approach:'Local approach',output:'Local output'});
+ const existing={id:'old-project',title:'Existing Substack project',date:'2026-01-01',summary:'Summary',problem:'Why',approach:'How',output:'Result',tags:['Projects'],links:[{href:'https://jameskull.substack.com/p/existing'}]};
+ const window={addEventListener(){},requestAnimationFrame:()=>1,cancelAnimationFrame(){},innerHeight:800,scrollY:0};
+ vm.runInNewContext(fs.readFileSync(require.resolve('../js/content.js'),'utf8'),{document,window,WritingData:Writing,fetch:async path=>({ok:true,json:async()=>path.includes('works-substack')?[existing]:[local]})});
+ await hydrate();
+ assert.ok(list.innerHTML.includes('Existing Substack project'));assert.ok(list.innerHTML.includes('Local project'));
+ assert.ok(list.innerHTML.includes('Published here'));assert.ok(list.innerHTML.includes('Published on Substack'));
+ assert.ok(list.innerHTML.includes('Local problem'));
+});
