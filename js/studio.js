@@ -77,7 +77,11 @@
     return `<div class="catalog-cover">${url?`<img src="${esc(url)}" alt="Cover of ${esc(title)}" loading="lazy" referrerpolicy="no-referrer" />`:''}<span ${url?'hidden':''}>No cover available</span></div>`;
   }
   document.querySelector('main').addEventListener('error',event=>{
-    if(event.target.matches('.catalog-cover img')) {event.target.hidden=true;event.target.nextElementSibling.hidden=false;}
+    if(event.target.matches('.catalog-cover img')) {
+      const img=event.target;
+      if(img.src.includes('-M.jpg')) {img.src=img.src.replace('-M.jpg','-L.jpg');return;}
+      img.hidden=true;img.nextElementSibling.hidden=false;
+    }
   },true);
   let catalogMatches=[], catalogController, catalogTimer, catalogVersion=0, lastSearch=0, catalogTarget='';
   const catalogCache=new Map();
