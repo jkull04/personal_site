@@ -1,5 +1,18 @@
 [
   {
+    "title": "Golden Son",
+    "author": "Pierce Brown",
+    "catalogKey": "/works/OL19340986W",
+    "coverId": 15180063,
+    "year": "2015",
+    "id": "52fec9ab-b25b-4901-92c7-806dddb83999",
+    "status": "Read",
+    "finished": "2026-09-04",
+    "rating": "5",
+    "note": "",
+    "published": true
+  },
+  {
     "id": "68a67f0c-06d1-4f4d-ad05-e8775ae1292b",
     "title": "Red Rising",
     "author": "Pierce Brown",
