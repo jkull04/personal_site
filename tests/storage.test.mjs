@@ -11,7 +11,7 @@ const digest=s=>createHash('sha256').update(s).digest('hex');
 const credential='a'.repeat(64), origin='https://www.jameskull.com';
 const empty=()=>({books:[],photography:[],writings:[]});
 const image=Uint8Array.from([255,216,255,224,0,16,255,217]);
-const imageURL='https://images.jameskull.com/photos/'+digest(image)+'.jpg';
+const imageURL='https://jameskull-studio-storage.fitzykull.workers.dev/photos/'+digest(image)+'.jpg';
 const photo=(extra={})=>({id:'p',title:'Photo',alt:'A mountain',src:'/assets/photography/p.jpg',thumb:'/assets/photography/p-thumb.jpg',published:true,...extra});
 class MemoryStorage {
   data=new Map(); queue=Promise.resolve();
@@ -38,7 +38,7 @@ function setup() {
     else value={sha:'new'};
     return Response.json(value);
   });
-  const call=(path,body,token,method=body===undefined?'GET':'POST',requestOrigin=origin)=>handler(new Request('https://studio-api.jameskull.com'+path,{method,headers:{Origin:requestOrigin,...(token?{Authorization:'Bearer '+token}:{}),'Content-Type':body instanceof Uint8Array?'image/jpeg':'application/json'},body:body===undefined?undefined:body instanceof Uint8Array?body:JSON.stringify(body)}),env);
+  const call=(path,body,token,method=body===undefined?'GET':'POST',requestOrigin=origin)=>handler(new Request('https://jameskull-studio-storage.fitzykull.workers.dev'+path,{method,headers:{Origin:requestOrigin,...(token?{Authorization:'Bearer '+token}:{}),'Content-Type':body instanceof Uint8Array?'image/jpeg':'application/json'},body:body===undefined?undefined:body instanceof Uint8Array?body:JSON.stringify(body)}),env);
   const login=async()=>{const response=await call('/session',{credential});assert.equal(response.status,200);return (await response.json()).token;};
   return {call,login,env,objects,calls,storage,budget,handler};
 }
@@ -53,6 +53,17 @@ test('session signatures cannot be forged or extended',async()=>{
   assert.equal((await call('/usage',undefined,token)).status,200);
   const forged=btoa(JSON.stringify({exp:Date.now()+999999999})) +'.'+token.split('.')[1];
   assert.equal((await call('/usage',undefined,forged)).status,401);
+});
+test('shared media and API host exposes only canonical photo paths without authentication',async()=>{
+  const {handler,env}=setup();
+  const host=new URL(imageURL).origin;
+  for(const path of ['/session','/photos','/publish','/usage']){
+    assert.equal((await handler(new Request(host+path),env)).status,403);
+  }
+  for(const url of [imageURL+'?bypass=1',host+'/photos/not-a-hash.jpg']){
+    assert.equal((await handler(new Request(url),env)).status,404);
+  }
+  assert.equal((await handler(new Request(imageURL,{method:'POST',body:image}),env)).status,404);
 });
 test('login rate limits and incomplete setup fail closed',async()=>{
   const {call,env}=setup();env.LOGIN_LIMITER.limit=async()=>({success:false});
@@ -97,7 +108,7 @@ test('Studio sends only public metadata and required images; drafts stay unchang
   const calls=[];
   const service=browser(async(url,options={})=>{
     calls.push({url,...options});
-    if(url==='/data/studio-storage.json')return Response.json({enabled:true,apiOrigin:'https://studio-api.jameskull.com',mediaOrigin:'https://images.jameskull.com'});
+    if(url==='/data/studio-storage.json')return Response.json({enabled:true,apiOrigin:'https://jameskull-studio-storage.fitzykull.workers.dev',mediaOrigin:'https://jameskull-studio-storage.fitzykull.workers.dev'});
     if(url.endsWith('/session'))return Response.json({token:'session'});
     if(url.endsWith('/photos'))return Response.json({url:imageURL});
     if(url.endsWith('/publish'))return Response.json({published:JSON.parse(options.body).data,sha:'new'});
@@ -115,7 +126,7 @@ test('failed upload stops before publication and preserves local draft paths',as
   const calls=[];
   const service=browser(async(url)=>{
     calls.push(url);
-    if(url==='/data/studio-storage.json')return Response.json({enabled:true,apiOrigin:'https://studio-api.jameskull.com',mediaOrigin:'https://images.jameskull.com'});
+    if(url==='/data/studio-storage.json')return Response.json({enabled:true,apiOrigin:'https://jameskull-studio-storage.fitzykull.workers.dev',mediaOrigin:'https://jameskull-studio-storage.fitzykull.workers.dev'});
     if(url.endsWith('/session'))return Response.json({token:'session'});
     return Response.json({error:'Upload interrupted'},{status:503});
   });
@@ -154,7 +165,7 @@ test('migration uploads existing published images and preserves source paths unt
   const calls=[];
   const service=browser(async(url,options={})=>{
     calls.push(url);
-    if(url==='/data/studio-storage.json')return Response.json({enabled:true,apiOrigin:'https://studio-api.jameskull.com',mediaOrigin:'https://images.jameskull.com'});
+    if(url==='/data/studio-storage.json')return Response.json({enabled:true,apiOrigin:'https://jameskull-studio-storage.fitzykull.workers.dev',mediaOrigin:'https://jameskull-studio-storage.fitzykull.workers.dev'});
     if(url.startsWith('/assets/photography/'))return new Response(image,{headers:{'Content-Type':'image/jpeg'}});
     if(url.endsWith('/session'))return Response.json({token:'session'});
     if(url.endsWith('/photos'))return Response.json({url:imageURL});

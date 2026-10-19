@@ -4,7 +4,7 @@
   const writing = root.WritingData || (typeof require === 'function' ? require('./writing-data.js') : null);
   const paths = {writings:'data/writings-local.json',books:'data/books.json', photography:'data/photography.json'};
   const imagePath = /^assets\/photography\/[a-zA-Z0-9_-]+\.jpg$/;
-  const remoteImage = /^https:\/\/images\.jameskull\.com\/photos\/[a-f0-9]{64}\.jpg$/;
+  const remoteImage = /^https:\/\/jameskull-studio-storage\.fitzykull\.workers\.dev\/photos\/[a-f0-9]{64}\.jpg$/;
   const validPhoto = path => imagePath.test(String(path).replace(/^\//,'')) || remoteImage.test(path);
   async function readCollection(api,path) {
     const file=await api(path);

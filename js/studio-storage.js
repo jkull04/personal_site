@@ -6,7 +6,7 @@
   const ready = fetch('/data/studio-storage.json', {cache:'no-store'})
     .then(r => { if (!r.ok) throw Error('Cannot load photo storage settings. Reload Studio before publishing.'); return r.json(); })
     .then(value => {
-      if (value.apiOrigin !== 'https://studio-api.jameskull.com' || value.mediaOrigin !== 'https://images.jameskull.com') throw Error('Invalid photo storage settings.');
+      if (value.apiOrigin !== 'https://jameskull-studio-storage.fitzykull.workers.dev' || value.mediaOrigin !== 'https://jameskull-studio-storage.fitzykull.workers.dev') throw Error('Invalid photo storage settings.');
       config=value;
       try { token=sessionStorage.getItem(sessionKey); } catch {}
       return config;

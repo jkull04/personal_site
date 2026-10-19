@@ -3,7 +3,7 @@ import '../../js/studio-core.js';
 export {StorageBudget} from './quota.mjs';
 
 const encoder=new TextEncoder();
-const media='https://images.jameskull.com';
+const media='https://jameskull-studio-storage.fitzykull.workers.dev';
 const repo='https://api.github.com/repos/jkull04/personal_site';
 const keyPattern=/^photos\/[a-f0-9]{64}\.jpg$/;
 const hex=b=>Array.from(new Uint8Array(b),v=>v.toString(16).padStart(2,'0')).join('');
@@ -65,7 +65,8 @@ async function servePhoto(request,env,ctx) {
 }
 export function createHandler(fetcher=fetch) {
   return async(request,env,ctx)=>{
-    if(new URL(request.url).origin===media)return servePhoto(request,env,ctx);
+    const url=new URL(request.url);
+    if(url.origin===media && url.pathname.startsWith('/photos/'))return servePhoto(request,env,ctx);
     const origin=request.headers.get('Origin');
     const allowed=(env.ALLOWED_ORIGINS||'').split(',').includes(origin);
     const headers={'Content-Type':'application/json','Cache-Control':'no-store','Vary':'Origin','X-Content-Type-Options':'nosniff'};

@@ -13,8 +13,10 @@ Worker, which issues a signed 12-hour session. GitHub credentials stay in Worker
 secrets. The encrypted browser draft and its existing session behavior remain.
 
 The Worker uploads to a **private** Standard R2 bucket, using SHA-256 filenames
-for retry safety. It serves images at `images.jameskull.com`, with edge caching.
-Both that domain and `studio-api.jameskull.com` route to the Worker. Do NOT attach
+for retry safety. It serves API requests and images at
+`jameskull-studio-storage.fitzykull.workers.dev`, with edge caching for images.
+Only `/photos/<hash>.jpg` is public; upload and publish routes require a session.
+This avoids a DNS migration for the existing GitHub Pages site. Do NOT attach
 a public R2 domain or enable r2.dev: those would bypass the request budget.
 
 Publishing reuses StudioCore on the server. It checks the latest GitHub baseline,
@@ -58,20 +60,18 @@ browser/edge cached copies can persist, as with any public photo.
 
 ## One-time activation
 
-1. In Cloudflare, accept R2 subscription terms (currently $0 due now plus usage).
-   This requires the owner's approval. Confirm Workers is on Free.
-2. Add `jameskull.com` to Cloudflare DNS if needed, copying all existing records
-   and preserving GitHub Pages routing, email, and domain registration. Do not
-   change nameservers until the complete DNS record set is verified.
-3. On a machine with npm and Cloudflare access, run `npx wrangler@4 login` and
-   `npx wrangler@4 r2 bucket create jameskull-photos` from this directory.
+1. R2 is active with owner approval, the private bucket exists, Workers is on
+   Free, and $1/$5 account alerts are configured. Keep these settings.
+2. Use the existing `fitzykull.workers.dev` subdomain. No website DNS changes
+   are needed. The feature flag remains off until live verification completes.
+3. On a machine with npm and Cloudflare access, run `npx wrangler@4 login` from this directory. The `jameskull-photos` bucket already exists.
    Keep the bucket private; use Standard storage only. No paid plan is required.
 4. Run `python3 configure-secrets.py`. It prompts without echoing for the existing
    Studio password and a GitHub token scoped to `jkull04/personal_site` with
    Contents read/write. Secrets go to Wrangler via stdin, never files/arguments.
    Approve the requested service access before provisioning credentials.
 5. Run `npx wrangler@4 deploy --dry-run`, then `npx wrangler@4 deploy`.
-   Confirm both custom domains are active and the SQLite migration succeeded.
+   Confirm the workers.dev address is active and the SQLite migration succeeded.
 6. Add account-wide $1 and $5 budget alerts to the account's billing email.
 7. Test a small image upload, publish, reload, retry, and removal in a staging
    environment first. Confirm unauthenticated writes fail and public R2 access
