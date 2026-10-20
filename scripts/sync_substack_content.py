@@ -127,6 +127,7 @@ class SyncConfig:
     optional_sections: list[str]
     page_limit: int
     max_pages: int
+    writing_type_overrides: dict[str, str] = field(default_factory=dict)
 
 
 def load_config(path: Path) -> SyncConfig:
@@ -143,6 +144,7 @@ def load_config(path: Path) -> SyncConfig:
         optional_sections=[str(value).strip() for value in project_template.get("optional_sections", [])],
         page_limit=max(1, int(pagination.get("limit", 20))),
         max_pages=max(1, int(pagination.get("max_pages", 200))),
+        writing_type_overrides=data.get("writing_type_overrides", {}),
     )
 
 
@@ -982,6 +984,10 @@ def to_writings_entries(posts: list[dict[str, Any]], config: SyncConfig) -> list
         if not title or not slug or not date:
             continue
 
+        override = config.writing_type_overrides.get(normalize_slug(slug))
+        if override in {"essay", "blog"}:
+            entry_type = override
+
         writings.append(
             {
                 "id": normalize_slug(slug),
@@ -1348,3 +1354,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

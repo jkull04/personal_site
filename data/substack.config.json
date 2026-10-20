@@ -1,5 +1,8 @@
 {
   "publication_host": "jameskull.substack.com",
+  "writing_type_overrides": {
+    "ai-and-the-employee-firm-relationship": "blog"
+  },
   "tags": {
     "writings": "Essays",
     "blog": "Notes",
@@ -14,3 +17,4 @@
     "max_pages": 200
   }
 }
+

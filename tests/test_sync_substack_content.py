@@ -64,6 +64,18 @@ def make_preload_page(post: dict) -> str:
 
 
 class WritingsRoutingTests(unittest.TestCase):
+    def test_employee_firm_piece_remains_a_note_after_sync_or_bridge(self):
+        post = make_public_post("ai-and-the-employee-firm-relationship", tags=[])
+        config = sync.load_config(sync.CONFIG_PATH)
+        entries = sync.to_writings_entries([post, make_public_post("other")], config)
+        self.assertEqual({e["id"]: e["type"] for e in entries}, {
+            post["slug"]: "blog", "other": "essay"
+        })
+        with patch.object(sync, "load_existing_outputs", return_value=([], [])):
+            writings, projects = bridge.apply_post(post)
+        self.assertEqual(writings[0]["type"], "blog")
+        self.assertEqual(projects, [])
+
     def test_untagged_and_topic_only_public_posts_are_essays(self):
         posts = [
             make_public_post("untagged", tags=[]),
@@ -405,3 +417,4 @@ class SummaryTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
