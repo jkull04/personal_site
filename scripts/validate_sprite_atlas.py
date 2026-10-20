@@ -20,7 +20,7 @@ STYLE_MARBLE_COLORS = {
 DEFAULT_DISPLAY_CHECKS = {
     "marble-brach-walk-atlas.png": [(48, 63), (54, 72)],
     "longneck-walk-atlas.png": [(48, 63), (54, 72)],
-    "stegosaurus-walk-atlas.png": [(65, 40), (74, 46)],
+    "stegosaurus-walk-atlas.png": [(56, 35)],
     "raptor-walk-atlas.png": [(50, 26), (56, 30)],
 }
 

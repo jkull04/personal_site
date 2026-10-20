@@ -18,7 +18,8 @@
 .dino--sheet {
   --sheet-frame-w: 64px;
   --sheet-frame-h: 36px;
-  --walk-frame-ms: 3600ms;
+  --walk-frame-ms: 800ms;
+  --dino-sheet-image: var(--dino-walk-image);
   --dino-face: 1;
   --walk-face: var(--dino-face);
   width: var(--sheet-frame-w);
@@ -29,17 +30,20 @@
 }
 
 .dino--sheet.dino--stego {
-  --dino-sheet-image: url("../assets/sprites/stegosaurus-walk-atlas-2x.webp?v=20260519a");
+  --dino-walk-image: url("../assets/sprites/stegosaurus-walk-atlas-2x.webp?v=20261020-approved-dinos-v2");
+  --dino-idle-image: url("../assets/sprites/stegosaurus-standing-atlas.webp?v=20261020-approved-dinos-v2");
   background-image: var(--dino-sheet-image);
 }
 
 .dino--sheet.dino--raptor {
-  --dino-sheet-image: url("../assets/sprites/raptor-walk-atlas-2x.webp?v=20260519a");
+  --dino-walk-image: url("../assets/sprites/raptor-walk-atlas-2x.webp?v=20261020-approved-dinos-v2");
+  --dino-idle-image: url("../assets/sprites/raptor-standing-atlas.webp?v=20261020-approved-dinos-v2");
   background-image: var(--dino-sheet-image);
 }
 
 .dino--sheet.dino--longneck {
-  --dino-sheet-image: url("../assets/sprites/marble-brach-walk-atlas-2x.webp?v=20260519a");
+  --dino-walk-image: url("../assets/sprites/marble-brach-walk-atlas-2x.webp?v=20261020-approved-dinos-v2");
+  --dino-idle-image: url("../assets/sprites/marble-brach-standing-atlas.webp?v=20261020-approved-dinos-v2");
   background-image: var(--dino-sheet-image);
   background-size: calc(var(--sheet-frame-w) * 8) var(--sheet-frame-h);
 }
@@ -112,17 +116,17 @@
 }
 
 .dino--sheet.dino--stego.dino--lounge {
-  --sheet-frame-w: calc(74px * var(--arena-dino-scale, 1) * var(--arena-dino-size-mult, 1));
-  --sheet-frame-h: calc(46px * var(--arena-dino-scale, 1) * var(--arena-dino-size-mult, 1));
+  --sheet-frame-w: calc(56px * var(--arena-dino-scale, 1) * var(--arena-dino-size-mult, 1));
+  --sheet-frame-h: calc(35px * var(--arena-dino-scale, 1) * var(--arena-dino-size-mult, 1));
 }
 
 .dino--sheet.dino--stego.dino--route {
-  --sheet-frame-w: calc(74px * var(--arena-dino-size-mult, 1));
-  --sheet-frame-h: calc(46px * var(--arena-dino-size-mult, 1));
+  --sheet-frame-w: calc(56px * var(--arena-dino-size-mult, 1));
+  --sheet-frame-h: calc(35px * var(--arena-dino-size-mult, 1));
 }
 
 .dino--sheet.dino--raptor.dino--lounge {
-  --sheet-frame-w: calc(58px * var(--arena-dino-scale, 1) * var(--arena-dino-size-mult, 1));
+  --sheet-frame-w: calc(56px * var(--arena-dino-scale, 1) * var(--arena-dino-size-mult, 1));
   --sheet-frame-h: calc(30px * var(--arena-dino-scale, 1) * var(--arena-dino-size-mult, 1));
 }
 
@@ -132,7 +136,7 @@
 }
 
 .dino--sheet.dino--longneck.dino--lounge {
-  --sheet-frame-w: calc(55px * var(--arena-dino-scale, 1) * var(--arena-dino-size-mult, 1));
+  --sheet-frame-w: calc(54px * var(--arena-dino-scale, 1) * var(--arena-dino-size-mult, 1));
   --sheet-frame-h: calc(72px * var(--arena-dino-scale, 1) * var(--arena-dino-size-mult, 1));
 }
 
@@ -168,13 +172,21 @@
   background-position: 0 calc(var(--dino-row) * -1 * var(--dino-size));
 }
 
-.dino--sheet.is-idle {
+/* Standing atlas: planted pose, breathing pose, then a brief blink. */
+.dino--sheet.is-idle:not(.play-sent):not(.play-loop-walk) {
+  --dino-sheet-image: var(--dino-idle-image);
+  background-size: calc(var(--sheet-frame-w) * 3) var(--sheet-frame-h);
   background-position: 0 0;
 }
 
-/* Keep the home stego lounge in a planted idle stance instead of frame-0 stride. */
-.dino--sheet.dino--stego.dino--lounge.is-idle {
-  background-position: calc(var(--sheet-frame-w) * -7) 0;
+.dino--sheet.is-idle:not(.play-sent):not(.play-loop-walk):not(.is-eating) {
+  animation: dino-sheet-idle 4000ms steps(1) infinite;
+}
+
+@keyframes dino-sheet-idle {
+  0%, 92.5%, 100% { background-position: 0 0; }
+  37.5%, 70% { background-position: calc(var(--sheet-frame-w) * -1) 0; }
+  67.5% { background-position: calc(var(--sheet-frame-w) * -2) 0; }
 }
 
 .dino.play-sent {
@@ -214,31 +226,31 @@
     background-position: 0 0;
   }
 
-  14% {
+  12.5% {
     background-position: calc(var(--sheet-frame-w) * -1) 0;
   }
 
-  28% {
+  25% {
     background-position: calc(var(--sheet-frame-w) * -2) 0;
   }
 
-  42% {
+  37.5% {
     background-position: calc(var(--sheet-frame-w) * -3) 0;
   }
 
-  56% {
+  50% {
     background-position: calc(var(--sheet-frame-w) * -4) 0;
   }
 
-  70% {
+  62.5% {
     background-position: calc(var(--sheet-frame-w) * -5) 0;
   }
 
-  84% {
+  75% {
     background-position: calc(var(--sheet-frame-w) * -6) 0;
   }
 
-  100% {
+  87.5%, 100% {
     background-position: calc(var(--sheet-frame-w) * -7) 0;
   }
 }
@@ -249,6 +261,7 @@
     transform: none !important;
   }
 
+  .dino--sheet.is-idle,
   .dino.play-sent,
   .dino.play-loop-walk {
     animation: none !important;

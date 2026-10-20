@@ -14,9 +14,9 @@
     contact: { u: 0.7, v: 0.84 }
   };
   const DINO_BOTTOM_TRIM_RATIO = {
-    stego: 21 / 258,
-    raptor: 20 / 223,
-    longneck: 20 / 288
+    stego: 3 / 35,
+    raptor: 3 / 30,
+    longneck: 5 / 72
   };
   const DINO_SCALE_REFERENCE_WIDTH = 920;
   const DINO_SCALE_MIN = 0.38;
@@ -29,9 +29,12 @@
   const ROOT_ATLAS_LOADING_CLASS = "dino-atlases-loading";
   const ATLAS_PRELOAD_DELAY_MS = 120;
   const DINO_ATLAS_URLS = [
-    "/assets/sprites/stegosaurus-walk-atlas-2x.webp?v=20260519a",
-    "/assets/sprites/raptor-walk-atlas-2x.webp?v=20260519a",
-    "/assets/sprites/marble-brach-walk-atlas-2x.webp?v=20260519a"
+    "/assets/sprites/stegosaurus-walk-atlas-2x.webp?v=20261020-approved-dinos-v2",
+    "/assets/sprites/raptor-walk-atlas-2x.webp?v=20261020-approved-dinos-v2",
+    "/assets/sprites/marble-brach-walk-atlas-2x.webp?v=20261020-approved-dinos-v2",
+    "/assets/sprites/stegosaurus-standing-atlas.webp?v=20261020-approved-dinos-v2",
+    "/assets/sprites/raptor-standing-atlas.webp?v=20261020-approved-dinos-v2",
+    "/assets/sprites/marble-brach-standing-atlas.webp?v=20261020-approved-dinos-v2"
   ];
 
   const copyResetTimers = new WeakMap();
