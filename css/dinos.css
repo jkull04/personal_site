@@ -77,7 +77,8 @@
   outline: 1px dashed var(--accent);
   outline-offset: 3px;
 }
-.arena-scene.dino-inspection-scene {
+.arena-scene.dino-inspection-scene,
+.arena-scene.dino-transit-scene {
   --arena-dino-scale: .65;
   position: absolute;
   inset: auto;
@@ -87,7 +88,8 @@
   overflow: hidden;
   z-index: 5;
 }
-.dino-inspection-scene .arena-roamer { background: transparent; border: 0; padding: 2px; }
+.dino-inspection-scene .arena-roamer,
+.dino-transit-scene .arena-roamer { background: transparent; border: 0; padding: 2px; }
 
 .dino--ambient {
   --dino-size: 22px;

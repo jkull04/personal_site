@@ -462,7 +462,9 @@
     if (state.transit || state.food || state.activity === "eating") return;
     const rect = target.getBoundingClientRect(), sceneRect = state.scene.getBoundingClientRect();
     if (state.inspection) {
-      const perch = state.inspection.element.getBoundingClientRect();
+      const visit = state.inspection;
+      const perch = { left: visit.x - window.scrollX, top: visit.top - window.scrollY,
+        bottom: visit.top - window.scrollY + 80 };
       if (perch.bottom > 0 && perch.top < window.innerHeight) {
         state.inspection.face = perch.left > rect.left + rect.width / 2 ? -1 : 1;
         return;
@@ -481,12 +483,18 @@
     if (!spot) return;
     const element = document.createElement("div");
     element.className = "arena-scene dino-inspection-scene";
-    element.style.left = `${spot.x + window.scrollX}px`;
+    element.style.left = `${window.scrollX}px`;
     element.style.top = `${spot.y + window.scrollY}px`;
+    const width = document.documentElement.clientWidth || window.innerWidth;
+    element.style.width = `${width}px`;
     document.body.append(element);
     element.append(state.roamer);
-    state.inspection = { element, x: spot.x, started: performance.now(),
+    const to = spot.x + 36;
+    const from = to < width / 2 ? -state.roamer.offsetWidth : width + state.roamer.offsetWidth;
+    state.inspection = { element, x: spot.x + window.scrollX, top: spot.y + window.scrollY,
+      from, to, duration: clamp(Math.abs(to - from) / (state.personality.speed * 2) * 1000, 1400, 12000), started: performance.now(),
       face: spot.x > rect.left ? -1 : 1 };
+    setRoamerPosition(state.roamer, from, 77);
     state.roamer.style.opacity = "1";
     queueArenaTick();
   }
@@ -498,9 +506,9 @@
       endInspection(state);
       return false;
     }
-    const progress = clamp01((now - visit.started) / 1300);
-    setRoamerPosition(state.roamer, visit.face === 1 ? -32 + progress * 68 : 104 - progress * 68, 77);
-    setFacing(state.dino, visit.face);
+    const progress = clamp01((now - visit.started) / visit.duration);
+    setRoamerPosition(state.roamer, visit.from + (visit.to - visit.from) * progress, 77);
+    setFacing(state.dino, progress < 1 ? (visit.to > visit.from ? 1 : -1) : visit.face);
     state.dino.classList.toggle("play-loop-walk", progress < 1);
     state.dino.classList.toggle("is-idle", progress === 1);
     state.dino.style.setProperty("--walk-frame-ms", `${Math.round(16000 / state.personality.speed)}ms`);
@@ -644,20 +652,50 @@
     state.vx = state.vy = 0;
     state.pettedUntil = 0;
     setActivity(state, "resting");
+    if (reducedMotion.matches) {
+      endJourneyLayer(state);
+      state.transit = null;
+      state.u = clamp01(state.u);
+      Object.assign(state, normalizedToBounds(state.bounds, state.u, state.v));
+      setRoamerPosition(state.roamer, state.x, state.y);
+      return;
+    }
     const left = arriving ? Math.random() < .5 : state.u < .5;
     const b = state.bounds, span = Math.max(1, b.maxX - b.minX);
-    const edge = left ? (-state.roamer.offsetWidth - b.minX) / span
-      : (state.scene.clientWidth + state.roamer.offsetWidth - b.minX) / span;
+    // Travel outside the artwork's clipped box, all the way to the viewport edge.
+    endJourneyLayer(state);
+    const rect = state.scene.getBoundingClientRect();
+    const width = document.documentElement.clientWidth || window.innerWidth || state.scene.clientWidth;
+    const layer = document.createElement("div");
+    layer.className = "arena-scene dino-transit-scene";
+    Object.assign(layer.style, { left: `${window.scrollX || 0}px`, top: `${rect.top + (window.scrollY || 0)}px`,
+      width: `${width}px`, height: `${rect.height}px` });
+    layer.style.setProperty("--arena-dino-scale", state.scene.style.getPropertyValue("--arena-dino-scale") || "1");
+    document.body.append(layer);
+    layer.append(state.roamer);
+    state.journeyLayer = layer;
+    const edge = left ? (-rect.left - state.roamer.offsetWidth - b.minX) / span
+      : (width - rect.left + state.roamer.offsetWidth - b.minX) / span;
     const target = arriving ? (left ? .18 : .82) : edge;
     const start = arriving ? edge : state.u;
     const distance = Math.abs(target - start) * (state.bounds.maxX - state.bounds.minX);
-    state.transit = { arriving, from: start, to: target, start: now + (arriving ? randomBetween(700, 1800) : 0),
+    state.transit = { arriving, left, from: start, to: target, start: now + (arriving ? randomBetween(700, 1800) : 0),
       duration: clamp(distance / state.personality.speed * 1000, 1400, 10000) };
     state.v = clamp(state.v, .25, .75);
     state.roamer.hidden = false;
     state.roamer.disabled = true;
     state.roamer.style.opacity = "1";
-    if (arriving) setRoamerPosition(state.roamer, b.minX + start * span, state.y);
+    state.u = start;
+    state.x = b.minX + start * span;
+    setRoamerPosition(state.roamer, rect.left + state.x, state.y);
+  }
+
+  function endJourneyLayer(state) {
+    if (!state.journeyLayer) return;
+    state.scene.append(state.roamer);
+    state.journeyLayer.remove();
+    state.journeyLayer = null;
+    setRoamerPosition(state.roamer, state.x, state.y);
   }
 
   function syncJourneyState(state, now) {
@@ -668,6 +706,7 @@
       startJourneyTransition(state, present, now);
     }
     if (reducedMotion.matches) {
+      endJourneyLayer(state);
       state.transit = null;
       state.roamer.hidden = !present;
       state.roamer.disabled = !present;
@@ -676,9 +715,14 @@
     }
     if (state.transit) {
       const t = state.transit;
+      const rect = state.scene.getBoundingClientRect();
+      const width = document.documentElement.clientWidth || window.innerWidth || state.scene.clientWidth;
+      const b = state.bounds, span = Math.max(1, b.maxX - b.minX);
+      const edge = ((t.left ? -state.roamer.offsetWidth : width + state.roamer.offsetWidth) - rect.left - b.minX) / span;
+      if (t.arriving) t.from = edge;
+      else t.to = edge;
       const progress = clamp01((now - t.start) / t.duration);
       const u = t.from + (t.to - t.from) * progress;
-      const b = state.bounds;
       state.x = b.minX + u * (b.maxX - b.minX);
       state.y = b.minY + state.v * (b.maxY - b.minY);
       state.u = u;
@@ -686,8 +730,14 @@
       state.dino.classList.toggle("is-idle", now < t.start);
       state.dino.style.setProperty("--walk-frame-ms", `${Math.round(16000 / state.personality.speed)}ms`);
       setFacing(state.dino, t.to > t.from ? 1 : -1);
-      setRoamerPosition(state.roamer, state.x, state.y);
+      if (state.journeyLayer) {
+        Object.assign(state.journeyLayer.style, { width: `${width}px`, height: `${rect.height}px`,
+          top: `${rect.top + (window.scrollY || 0)}px` });
+        state.journeyLayer.style.setProperty("--arena-dino-scale", state.scene.style.getPropertyValue("--arena-dino-scale") || "1");
+      }
+      setRoamerPosition(state.roamer, state.x + (state.journeyLayer ? rect.left : 0), state.y);
       if (progress === 1) {
+        endJourneyLayer(state);
         state.transit = null;
         state.roamer.hidden = !present;
         state.roamer.disabled = !present;
@@ -744,6 +794,13 @@
       habitat.foods.forEach(food => renderFood(habitat, food));
     });
     document.querySelectorAll(".arena-roamer").forEach(roamer => {
+      const traveling = arenaMotion.get(roamer);
+      if (traveling?.inspection) return;
+      if (traveling?.transit) {
+        traveling.bounds = habitats.get(traveling.scene).bounds;
+        syncJourneyState(traveling, performance.now());
+        return;
+      }
       const scene = roamer.closest(".arena-scene");
       if (!scene) return;
       const bounds = habitats.get(scene)?.bounds || roamerBoundsForScene(scene);
@@ -987,6 +1044,7 @@
     arenaRaf = 0; arenaLastTick = 0;
     arenaMotion.forEach(state => {
       endInspection(state);
+      endJourneyLayer(state);
       state.dino.classList.remove("play-loop-walk", "is-eating");
       state.dino.classList.add("is-idle");
       markArenaState(state.dino, "lounge");

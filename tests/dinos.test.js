@@ -54,7 +54,7 @@ function arena(seed = 7, reduced = false, width = 900, journeyStorage = null) {
   class Clock extends Date { static now() { return epoch + now; } }
   if (journeyStorage) Object.assign(window, { DinoJourneys: require('../js/dino-journeys.js'), location: { pathname: '/' }, sessionStorage: journeyStorage });
   const context = vm.createContext({ window, document, Math: math, performance: { now: () => now }, Date: Clock, navigator: {}, console });
-  const source = fs.readFileSync(require.resolve('../js/dinos.js'), 'utf8').replace(/\}\)\(\);\s*$/, 'globalThis.inspect = { habitats, arenaMotion, remapArenaRoamers, dropFood, getJourneys: () => journeys, inspectionSpot, inspectContent, endInspection, setJourneyPage: page => { journeyPage = page; } };})();');
+  const source = fs.readFileSync(require.resolve('../js/dinos.js'), 'utf8').replace(/\}\)\(\);\s*$/, 'globalThis.inspect = { habitats, arenaMotion, remapArenaRoamers, dropFood, getJourneys: () => journeys, inspectionSpot, inspectContent, endInspection, startJourneyTransition, setJourneyPage: page => { journeyPage = page; } };})();');
   vm.runInContext(source, context);
   window.initializeDinoInteractions();
   function advance(ms) { const end = now + ms; while (now < end) { now += 16; const pending = [...frames.values()]; frames.clear(); pending.forEach(fn => fn(now)); } }
@@ -229,6 +229,7 @@ test('reduced-motion recall restores the absent diner immediately without walkin
   a.dropFood(h, 'meat', { x: h.bounds.centerX, y: h.bounds.centerY });
   const raptor = [...a.arenaMotion.values()].find(s => s.kind === 'raptor');
   assert.equal(raptor.roamer.hidden, false); assert.equal(raptor.transit, null);
+  assert.ok(raptor.x >= h.bounds.minX && raptor.x <= h.bounds.maxX, 'recalled diner remains visible with reduced motion');
   assert.equal(h.foods.length, 0); assert.equal(a.frames.size, 0);
 });
 
@@ -250,7 +251,12 @@ test('content inspection uses only clear space, persists without fading, and res
   a.getJourneys().data.members[state.kind].page = 'books';
   a.inspectContent(state, target); assert.ok(state.inspection);
   state.habitat.visible = false;
-  a.advance(1500); assert.equal(state.dino.classList.contains('is-idle'), true);
+  const visit = state.inspection;
+  assert.equal(visit.element.style.left, '0px');
+  assert.ok(visit.from < -30 || visit.from > a.window.innerWidth + 30, 'starts completely beyond the browser edge');
+  a.advance(visit.duration / 2);
+  assert.equal(state.dino.classList.contains('play-loop-walk'), true);
+  a.advance(visit.duration / 2 + 16); assert.equal(state.dino.classList.contains('is-idle'), true);
   a.advance(10000); assert.ok(state.inspection, 'no timed disappearance');
   a.window.emit('scroll'); assert.ok(state.inspection);
   a.window.emit('resize'); assert.equal(state.inspection, null);
@@ -285,4 +291,40 @@ test('delegated attention notices new headings, images and form controls without
     assert.ok(attentive.every(s => s.attention.u >= 0 && s.attention.u <= 1));
     a.advance(5500);
   }
+});
+
+
+test('arrivals cross the viewport edge outside an inset artwork, including after layout refresh', () => {
+  const sides = new Set();
+  for (const width of [390, 1280]) for (const seed of [3, 7, 17, 93]) {
+    const a = arena(seed, false, width * .6, { getItem() { return null; }, setItem() {} });
+    a.window.innerWidth = width;
+    a.window.innerHeight = 900;
+    a.window.scrollX = a.window.scrollY = 0;
+    const left = width * .2;
+    a.scene.getBoundingClientRect = () => ({left, top:200, width:width*.6, height:300});
+    const state = [...a.arenaMotion.values()][0];
+    a.startJourneyTransition(state, true, a.now());
+    sides.add(state.transit.left);
+    const offscreen = () => state.x + left < -state.roamer.offsetWidth / 2 || state.x + left > width + state.roamer.offsetWidth / 2;
+    assert.ok(offscreen(), 'initial position is beyond the page, not merely outside the artwork');
+    assert.equal(state.journeyLayer.style.width, `${width}px`);
+    a.remapArenaRoamers();
+    assert.ok(offscreen(), 'a layout refresh cannot reset an arriving dinosaur to its idle position');
+    const transit = state.transit;
+    a.advance(transit.start + transit.duration / 2);
+    assert.ok(state.journeyLayer, 'still on the page-wide walking layer');
+    assert.equal(state.roamer.style.opacity, '1');
+    a.advance(transit.duration / 2 + 50);
+    assert.equal(state.transit, null);
+    assert.equal(state.journeyLayer, null, 'rejoins its artwork after the walk');
+    assert.ok(state.x >= state.bounds.minX && state.x <= state.bounds.maxX);
+    a.getJourneys().data.members[state.kind].page = 'books';
+    a.getJourneys().data.members[state.kind].until = Date.now() + 120000;
+    a.advance(16);
+    a.advance(state.transit.duration + 16);
+    assert.equal(state.roamer.hidden, true);
+    assert.ok(offscreen(), 'departures also finish beyond the browser edge');
+  }
+  assert.equal(sides.size, 2, 'covers both left and right entrances');
 });
