@@ -37,6 +37,42 @@
       }
     }
   }
+  // Reconcile at field level without changing any input or discarding browser images.
+  // A genuine edit to the same field on both sides stops the whole operation.
+  function mergePublished(data,baseline,remote) {
+    const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+    const result={};
+    const conflict=(entry,field)=>{throw Error(`“${entry?.title || entry?.id || 'Entry'}” changed ${field} both here and on the site. Your draft and uploaded images are safe. Download a backup before resolving this conflict; do not reload published content.`);};
+    for(const kind of Object.keys(paths).filter(k=>data[k]!==undefined)) {
+      const local=data[kind],base=baseline[kind] || [],latest=remote[kind] || [];
+      const bmap=new Map(base.map(e=>[e.id,e])),lmap=new Map(local.map(e=>[e.id,e])),rmap=new Map(latest.map(e=>[e.id,e]));
+      const merged=new Map();
+      for(const id of new Set([...lmap.keys(),...rmap.keys()])) {
+        const b=bmap.get(id),l=lmap.get(id),r=rmap.get(id);
+        if(!l){if(b && !same(b,r))conflict(r,'after you removed it');if(!b)merged.set(id,structuredClone(r));continue;}
+        if(!r){if(b && !same(b,l))conflict(l,'after it was removed on the site');if(!b)merged.set(id,structuredClone(l));continue;}
+        const entry={};
+        for(const key of new Set([...Object.keys(b || {}),...Object.keys(l),...Object.keys(r)])) {
+          let value;
+          if(same(l[key],r[key]) || same(r[key],b?.[key]))value=l[key];
+          else if(same(l[key],b?.[key]))value=r[key];
+          else conflict(l,key);
+          if(value!==undefined)entry[key]=structuredClone(value);
+        }
+        merged.set(id,entry);
+      }
+      const common=base.filter(e=>lmap.has(e.id)&&rmap.has(e.id)).map(e=>e.id),commonSet=new Set(common);
+      const order=entries=>entries.map(e=>e.id).filter(id=>commonSet.has(id));
+      const localOrder=order(local),remoteOrder=order(latest);
+      const localMoved=!same(localOrder,common),remoteMoved=!same(remoteOrder,common);
+      if(localMoved && remoteMoved && !same(localOrder,remoteOrder))conflict({title:kind},'order');
+      const primary=remoteMoved&&!localMoved?latest:local,secondary=primary===local?latest:local;
+      const ids=[...new Set([...primary,...secondary].map(e=>e.id))];
+      result[kind]=ids.filter(id=>merged.has(id)).map(id=>merged.get(id));
+    }
+    validate(result);
+    return result;
+  }
   async function publish({data, baseline, images, api}) {
     validate(data, true);
     const kinds = Object.keys(paths).filter(k=>data[k]!==undefined);
@@ -47,7 +83,7 @@
     // Read at one immutable commit. Never overwrite another device's content changes.
     for (const kind of kinds) {
       const remote = await readCollection(api,'/contents/'+paths[kind]+'?ref='+head);
-      if (canonical(remote) !== canonical(baseline[kind])) throw Error('Published content changed on another device. Download your backup, then reload published content before applying your edits. Nothing was overwritten.');
+      if (canonical(remote) !== canonical(baseline[kind])) throw Error('Published content changed on another device while publishing. Your draft and images are safe. Click Publish updates again to merge the latest changes safely.');
     }
     const changed = kinds.filter(k=>canonical(published[k]) !== canonical(baseline[k]));
     if (!changed.length) return {unchanged:true, published};
@@ -75,7 +111,7 @@
     await api('/git/refs/heads/main','PATCH',{sha:createdCommit.sha,force:false});
     return {sha:createdCommit.sha,published};
   }
-  const core = {validate,publish,imagePath,validPhoto,readCollection};
+  const core = {validate,mergePublished,publish,imagePath,validPhoto,readCollection};
   root.StudioCore = core;
   if (typeof module !== 'undefined') module.exports = core;
 })(globalThis);

@@ -184,3 +184,16 @@ test('exhausted or unavailable budget never falls back to unrestricted R2 access
   env.BUDGET.get=()=>({fetch:async()=>{throw Error('Budget offline');}});
   assert.equal((await handler(new Request(imageURL),env)).status,503);assert.equal(reads,0);
 });
+test('retry after network failure reuses successful uploads and reports draft safety',async()=>{
+ let uploads=0,publishes=0;
+ const service=browser(async(url,options={})=>{
+  if(url==='/data/studio-storage.json')return Response.json({enabled:true,apiOrigin:new URL(imageURL).origin,mediaOrigin:new URL(imageURL).origin});
+  if(url.endsWith('/session'))return Response.json({token:'session'});
+  if(url.endsWith('/photos')){uploads++;return Response.json({url:imageURL});}
+  if(url.endsWith('/publish')){publishes++;if(publishes===1)throw new TypeError('Load failed');return Response.json({published:JSON.parse(options.body).data});}
+ });
+ await service.ready;
+ const args={data:{...empty(),photography:[photo()]},baseline:empty(),images:{'assets/photography/p.jpg':Buffer.from(image).toString('base64'),'assets/photography/p-thumb.jpg':Buffer.from(image).toString('base64')}};
+ await assert.rejects(()=>service.publish(args),/draft and uploaded photos are safe/);assert.equal(uploads,2);
+ await service.publish(args);assert.equal(uploads,2);assert.equal(Object.keys(args.images).length,2);assert.equal(args.data.photography[0].src,'/assets/photography/p.jpg');
+});

@@ -2,6 +2,7 @@
 (() => {
   'use strict';
   let config, token;
+  const uploadedImages=new Map();
   const sessionKey = 'jameskull-storage-session-v1';
   const ready = fetch('/data/studio-storage.json', {cache:'no-store'})
     .then(r => { if (!r.ok) throw Error('Cannot load photo storage settings. Reload Studio before publishing.'); return r.json(); })
@@ -11,20 +12,24 @@
       try { token=sessionStorage.getItem(sessionKey); } catch {}
       return config;
     });
+  async function networkFetch(url,options,label) {
+    try {return await fetch(url,options);}
+    catch {throw Error(label+' could not connect. Your draft and uploaded photos are safe. Check your connection and click Publish updates again; do not reload published content.');}
+  }
   async function request(path, options={}, retry=true) {
     await ready;
     if (!config.enabled) throw Error('Cloud photo storage is not connected yet.');
     if (!token) await login();
-    const response=await fetch(config.apiOrigin+path,{...options,headers:{...options.headers,Authorization:'Bearer '+token},credentials:'omit',cache:'no-store'});
+    const response=await networkFetch(config.apiOrigin+path,{...options,headers:{...options.headers,Authorization:'Bearer '+token},credentials:'omit',cache:'no-store'},path==='/publish'?'Publishing':path==='/photos'?'Photo upload':'Cloud storage');
     if (response.status===401 && retry) { clear(); return request(path,options,false); }
-    const result=await response.json();
+    let result;try {result=await response.json();}catch {throw Error('Cloud storage returned an incomplete response. Your draft and photos are safe. Retry publishing.');}
     if (!response.ok) throw Error(result.error || 'Photo storage request failed. Your browser draft is safe.');
     return result;
   }
   async function login() {
     const credential=await StudioAccess.serviceCredential();
-    const response=await fetch(config.apiOrigin+'/session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({credential}),credentials:'omit',cache:'no-store'});
-    const result=await response.json();
+    const response=await networkFetch(config.apiOrigin+'/session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({credential}),credentials:'omit',cache:'no-store'},'Cloud storage sign-in');
+    let result;try {result=await response.json();}catch {throw Error('Cloud storage returned an incomplete response. Your draft and photos are safe. Retry publishing.');}
     if(!response.ok) throw Error(result.error || 'Storage sign-in failed.');
     token=result.token;
     try {sessionStorage.setItem(sessionKey,token);} catch {}
@@ -44,6 +49,8 @@
         const path=photo[field];
         if(uploaded.has(path)) {photo[field]=uploaded.get(path);continue;}
         const pending=images[path.slice(1)];
+        const cached=uploadedImages.get(path);
+        if(pending && cached?.content===pending){photo[field]=cached.url;continue;}
         if(!pending && !(migrate && path.startsWith('/assets/photography/'))) continue;
         progress(`Uploading image ${i+1} of ${media.length}…`);
         let blob;
@@ -54,10 +61,12 @@
           blob=await response.blob();
         }
         const url=await upload(blob);uploaded.set(path,url);photo[field]=url;
+        if(pending)uploadedImages.set(path,{content:pending,url});
       }
     }
     progress('Publishing your collections…');
-    return request('/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:publicData,baseline})});
+    const result=await request('/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:publicData,baseline})});
+    uploadedImages.clear();return result;
   }
   const usage=()=>request('/usage');
   // Install a rejection handler immediately; callers still receive configuration errors.

@@ -483,6 +483,12 @@
     if(!StudioStorage.enabled && !$('github-token').value.trim()) { $('connection').open=true; $('github-token').focus(); status('Connect GitHub below to publish.'); return; }
     setBusy(true); $('publish-result').textContent='Publishing your included entries…';
     try {
+      await saveQueue;
+      $('publish-result').textContent='Checking the latest site while keeping your draft and images…';
+      const latest=await fetchPublished();
+      const merged=StudioCore.mergePublished(state.data,state.baseline,latest.data);
+      state={...state,data:merged,baseline:latest.baseline};
+      await save();
       const previousPhotos=structuredClone(state.data.photography);
       const previousBooks=structuredClone(state.data.books);
       const result=StudioStorage.enabled
@@ -513,7 +519,7 @@
       await save().catch(()=>{});
       if(StudioStorage.enabled) refreshStorage();
       $('publish-result').innerHTML=result.unchanged?'No public changes to publish.':`Saved to GitHub. The website will update after deployment finishes. <a href="https://github.com/jkull04/personal_site/actions" target="_blank" rel="noopener">Check deployment ↗</a>`;
-    } catch(error) { $('publish-result').textContent=error.message; } finally {setBusy(false);}
+    } catch(error) { $('publish-result').textContent=error instanceof TypeError?'The connection was interrupted. Your draft and uploaded photos are saved. Check your connection and click Publish updates again; do not reload published content.':error.message; } finally {setBusy(false);}
   };
   $('publish').onclick=()=>publishUpdates();
   $('storage-migrate').onclick=()=>{
