@@ -31,7 +31,7 @@
 
 .dino--sheet.dino--stego {
   --dino-walk-image: url("../assets/sprites/stegosaurus-walk-atlas-2x.webp?v=20261020-stego-shading-v3");
-  --dino-idle-image: url("../assets/sprites/stegosaurus-standing-atlas.webp?v=20261020-stego-stance-v5");
+  --dino-idle-image: url("../assets/sprites/stegosaurus-standing-atlas.webp?v=20261020-stego-grounded-v6");
   background-image: var(--dino-sheet-image);
 }
 
@@ -412,3 +412,4 @@ body.is-dragging-arena-food * { cursor: grabbing !important; }
   .arena-roamer .dino.is-eating { animation: none; }
   .arena-scene .arena-floor { transition: none; }
 }
+

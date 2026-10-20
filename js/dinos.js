@@ -32,7 +32,7 @@
     "/assets/sprites/stegosaurus-walk-atlas-2x.webp?v=20261020-stego-shading-v3",
     "/assets/sprites/raptor-walk-atlas-2x.webp?v=20261020-approved-dinos-v2",
     "/assets/sprites/marble-brach-walk-atlas-2x.webp?v=20261020-approved-dinos-v2",
-    "/assets/sprites/stegosaurus-standing-atlas.webp?v=20261020-stego-stance-v5",
+    "/assets/sprites/stegosaurus-standing-atlas.webp?v=20261020-stego-grounded-v6",
     "/assets/sprites/raptor-standing-atlas.webp?v=20261020-approved-dinos-v2",
     "/assets/sprites/marble-brach-standing-atlas.webp?v=20261020-approved-dinos-v2"
   ];
@@ -1373,4 +1373,5 @@
     scheduleAtlasPreload();
   });
 })();
+
 
