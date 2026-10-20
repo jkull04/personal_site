@@ -1,27 +1,15 @@
 window.createShowcaseEditor = ({getState,save,isBusy,onChange,uploadImage}) => {
   const $=id=>document.getElementById(id),esc=WritingData.esc;
-  let remoteProjects=[],remoteWritings=[],loaded=false;
+  let remoteProjects=[],loaded=false;
   const settings=()=>getState().data.showcase ||= [];
-  function home() {let entry=settings().find(e=>e.id==='home');if(!entry){entry={id:'home',projectId:'',writingId:'',album:''};settings().unshift(entry);}return entry;}
   const projects=()=>WritingData.projects(getState().data.writings,remoteProjects);
   function display(id) {let entry=settings().find(e=>e.id==='project-'+id);if(!entry){entry={id:'project-'+id,projectId:id,imageSrc:'',imageAlt:'',demoUrl:''};settings().push(entry);}return entry;}
-  function options(select,items,current,automatic) {
-    select.replaceChildren(new Option(automatic,''));
-    items.forEach(([value,label])=>select.add(new Option(label,value)));
-    if(current && !items.some(([value])=>value===current))select.add(new Option('Unavailable selection — automatic fallback',current));
-    select.value=current||'';
-  }
   function refreshPreview() {
-    const selected=ShowcaseData.selections(settings(),projects(),WritingData.listing(getState().data.writings,remoteWritings),getState().data.photography);
-    $('homepage-selection-preview').textContent=[selected.project?'Project: '+selected.project.title:'No published project yet',selected.writing?'Writing: '+selected.writing.title:'No published writing yet',selected.photos.length?'Photos: '+(selected.album||'Ungrouped'):'No published photo collection yet'].join(' · ');
+    const selected=ShowcaseData.latest(getState().data.books,projects(),getState().data.photography);
+    $('homepage-selection-preview').textContent=[selected.book?'Book: '+selected.book.title:'No finished book yet',selected.photos.length?'Photos: '+selected.album:'No photo collection yet',selected.project?'Project: '+selected.project.title:'No project yet'].join(' · ');
   }
   function render() {
     if(!getState())return;
-    const values=settings().find(e=>e.id==='home')||{};
-    options($('homepage-project'),projects().map(p=>[p.id,p.title]),values.projectId,'Latest project');
-    options($('homepage-writing'),WritingData.listing(getState().data.writings,remoteWritings).map(w=>[w.id,w.title]),values.writingId,'Latest writing');
-    const groups=[...new Set(getState().data.photography.filter(p=>p.published!==false).map(PhotoData.group))];
-    options($('homepage-album'),groups.filter(Boolean).map(g=>[g,g]),values.album,'First photo collection');
     const opened=new Set([...$('project-presentations').querySelectorAll('details[open]')].map(el=>el.dataset.project));
     $('project-presentations').innerHTML=projects().map(project=>{
       const entry=settings().find(e=>e.id==='project-'+project.id)||{},pending=getState().images[entry.imageSrc?.slice(1)];
@@ -30,7 +18,6 @@ window.createShowcaseEditor = ({getState,save,isBusy,onChange,uploadImage}) => {
     }).join('')||'<p>Publish a project from Writings to add its image here.</p>';
     refreshPreview();
   }
-  for(const [id,key] of [['homepage-project','projectId'],['homepage-writing','writingId'],['homepage-album','album']])$(id).addEventListener('change',()=>{if(isBusy())return;onChange();home()[key]=$(id).value;refreshPreview();save().catch(()=>{});});
   $('project-presentations').addEventListener('input',event=>{
     const key=event.target.dataset.presentationKey;if(!key||isBusy())return;
     onChange();display(event.target.closest('[data-project]').dataset.project)[key]=event.target.value;save().catch(()=>{});
@@ -48,8 +35,8 @@ window.createShowcaseEditor = ({getState,save,isBusy,onChange,uploadImage}) => {
   });
   async function load() {
     if(loaded){render();return;}
-    const read=path=>fetch(path,{cache:'no-store'}).then(r=>{if(!r.ok)throw Error('Could not load existing projects and writings.');return r.json();});
-    try {const results=await Promise.all([read('/data/works-substack.json'),read('/data/writings.json')]);[remoteProjects,remoteWritings]=results;loaded=true;$('showcase-status').textContent='';render();}
+    const read=path=>fetch(path,{cache:'no-store'}).then(r=>{if(!r.ok)throw Error('Could not load existing projects.');return r.json();});
+    try {remoteProjects=await read('/data/works-substack.json');loaded=true;$('showcase-status').textContent='';render();}
     catch(error){$('showcase-status').textContent=error.message+' Reopen this tab to retry.';render();}
   }
   return {render,load};

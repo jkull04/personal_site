@@ -30,10 +30,17 @@
   dialog?.addEventListener('close',()=>{document.body.classList.remove('book-modal-open');origin?.focus({preventScroll:true});});
   dialog?.addEventListener('click',event=>{if(event.target!==dialog)return;const r=dialog.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)dialog.close();});
   list.addEventListener('click',event=>{const button=event.target.closest('[data-book]');if(!button||!dialog)return;const book=books.find(b=>b.id===button.dataset.book);if(book)openBook(book,button,event.detail===0);});
+  function openLinkedBook() {
+    const book=books.find(b=>window.location.hash==='#book-'+encodeURIComponent(b.id));
+    if(!book||!dialog||dialog.open)return;
+    const button=[...list.querySelectorAll('[data-book]')].find(node=>node.dataset.book===book.id);
+    openBook(book,button,true);
+  }
+  window.addEventListener('hashchange',openLinkedBook);
   fetch('/data/books.json',{cache:'no-store'}).then(r=>{if(!r.ok)throw Error();return r.json();}).then(data=>{
     if(!Array.isArray(data))throw Error();
     const groups=BookData.finishedByYear(data);books=groups.flatMap(([,entries])=>entries);
     list.innerHTML=groups.length?groups.map(([year,entries])=>`<section class="book-year" aria-labelledby="year-${year}"><h2 id="year-${year}">${esc(year)}</h2><div class="book-cover-grid">${entries.map(book=>`<button type="button" class="book-cover" data-book="${esc(book.id)}" aria-haspopup="dialog" aria-label="Read about ${esc(book.title)} by ${esc(book.author)}">${cover(book)}<span class="book-caption">${esc(book.title)}${stars(book)}</span>${book.recommended===true?'<span class="book-recommendation">Especially recommend</span>':''}</button>`).join('')}</div></section>`).join(''):'<p class="books-empty">Finished books will appear here.</p>';
-    wireCovers(list);
+    wireCovers(list);openLinkedBook();
   }).catch(()=>{list.innerHTML='<p>Could not load the bookshelf. Please refresh to try again.</p>';});
 })();

@@ -33,6 +33,14 @@
     const album=groups.includes(home.album)?home.album:groups[0];
     return {project:works.find(e=>e.id===home.projectId)||works[0],writing:texts.find(e=>e.id===home.writingId)||texts[0],album,photos:pictures.filter(p=>(p.collection||'').trim()===album)};
   }
-  const api={imageURL,linkURL,validate,project,selections};root.ShowcaseData=api;
+  function latest(books=[],projects=[],photos=[]) {
+    const newest=(items,date)=>items.filter(e=>e.published!==false).slice().sort((a,b)=>String(date(b)||'').localeCompare(String(date(a)||'')));
+    const book=newest(books.filter(b=>b.status==='Read'),b=>b.finished||(/^\d{4}$/.test(String(b.finishedYear||''))?b.finishedYear+'-01-01':''))[0];
+    const work=newest(projects,p=>p.date)[0];
+    const pictures=photos.filter(p=>p.published!==false && String(p.collection||'').trim());
+    const album=String(newest(pictures,p=>p.date)[0]?.collection||'').trim();
+    return {book,project:work,album,photos:pictures.filter(p=>p.collection.trim()===album)};
+  }
+  const api={imageURL,linkURL,validate,project,selections,latest};root.ShowcaseData=api;
   if(typeof module!=='undefined')module.exports=api;
 })(globalThis);

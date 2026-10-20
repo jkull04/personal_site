@@ -27,8 +27,8 @@
     <link rel="stylesheet" href="/css/writing.css?v=r2-1" />
     <script defer src="/js/writing-data.js?v=r2-1"></script>
     <script defer src="/js/writing-editor.js?v=r2-1"></script>
-    <script defer src="/js/showcase-data.js?v=discovery-1"></script>
-    <script defer src="/js/showcase-editor.js?v=discovery-1"></script>
+    <script defer src="/js/showcase-data.js?v=latest-selections-1"></script>
+    <script defer src="/js/showcase-editor.js?v=latest-selections-1"></script>
     <script defer src="/js/studio-core.js?v=discovery-1"></script>
     <script defer src="/js/book-data.js?v=book-editions-1"></script>
     <script defer src="/js/photo-data.js?v=gallery-balanced-1"></script>
@@ -78,8 +78,8 @@
       </section>
       <div class="studio-tabs" role="group" aria-label="Edit collection"><button type="button" data-tab="books" aria-pressed="true">Books</button><button type="button" data-tab="photography" aria-pressed="false">Photos</button><button type="button" data-tab="writings" aria-pressed="false">Writings</button><button type="button" data-tab="showcase" aria-pressed="false">Homepage &amp; projects</button></div>
       <section id="showcase-editor" aria-labelledby="showcase-heading" hidden>
-        <div class="studio-section-head"><div><h2 id="showcase-heading">Selected things</h2><p>Choose a project, a writing, and a photo collection for the homepage.</p></div><a href="/" target="_blank" rel="noopener">View homepage ↗</a></div>
-        <div class="studio-panel"><div class="edit-fields"><label>Project<select id="homepage-project"></select></label><label>Writing<select id="homepage-writing"></select></label><label class="wide">Photo collection<select id="homepage-album"></select></label></div><p id="homepage-selection-preview"></p><p>If a selection is removed or made private, the homepage uses another published entry.</p></div>
+        <div class="studio-section-head"><div><h2 id="showcase-heading">Selected things</h2><p>The homepage automatically shows your latest book, photo collection, and project.</p></div><a href="/" target="_blank" rel="noopener">View homepage ↗</a></div>
+        <div class="studio-panel"><p id="homepage-selection-preview"></p><p>Selections use the book’s finish date, the collection’s newest photo date, and the project’s date. Only finished books and public entries appear. Publish your changes to update the homepage.</p></div>
         <h3>Project images and links</h3><p>Add a screenshot and an optional link to try each project. Existing project write-ups stay connected.</p><p id="showcase-status" role="status"></p><div id="project-presentations"></div>
       </section>
       <section id="books-editor" aria-labelledby="books-heading"><div class="studio-section-head"><div><h2 id="books-heading">Reading shelf</h2><p>Finished books appear as covers, grouped by the year you read them.</p></div><button id="add-book" type="button" disabled>Add manually</button></div><section class="shelf-panel" aria-labelledby="shelf-count"><h3 id="shelf-count">Your added books</h3><p>Click a cover to edit. “Not published” books are saved in this browser until you publish.</p><div id="shelf-overview" class="shelf-overview"></div></section><div class="catalog-search">

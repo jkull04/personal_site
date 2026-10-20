@@ -10,6 +10,7 @@
 .selection-image { aspect-ratio:8/5; background:var(--surface); overflow:hidden; border:1px solid var(--border-soft); }
 .selection-image img { width:100%; height:100%; object-fit:cover; }
 .selection-art img { object-fit:contain; image-rendering:pixelated; padding:14px; }
+.selection-book img { object-fit:contain; padding:14px; }
 .selection-copy { display:flex; flex:1; flex-direction:column; align-items:start; padding-top:20px; }
 .selection-copy .eyebrow { color:var(--text); font-size:.72rem; margin:0 0 10px; letter-spacing:.12em; }
 .selection-copy h3 { font-size:1.15rem; line-height:1.4; overflow-wrap:anywhere; }

@@ -4,6 +4,15 @@ const vm=require('node:vm'),fs=require('node:fs');
 const Showcase=require('../js/showcase-data.js'),Core=require('../js/studio-core.js');
 const empty=()=>({books:[],photography:[],writings:[],showcase:[]});
 const display=(extra={})=>({id:'project-demo',projectId:'demo',imageSrc:'/assets/photography/project-demo.jpg',imageAlt:'Project dashboard',demoUrl:'https://example.com/',...extra});
+test('latest homepage selections use reading and content dates, exclude private entries, and preserve source order',()=>{
+ const books=[{id:'old',status:'Read',finished:'2024-12-31'},{id:'year',status:'Read',finishedYear:'2025'},{id:'latest',status:'Read',finished:'2026-10-17',year:'1592'},{id:'reading',status:'Reading',finished:'2027-01-01'},{id:'private',status:'Read',finished:'2027-01-01',published:false}];
+ const projects=[{id:'old',date:'2025-01-01'},{id:'new',date:'2026-01-01'},{id:'draft',date:'2027-01-01',published:false}];
+ const photos=[{id:'old',collection:'Old',date:'2025-01-01'},{id:'first',collection:' New ',date:'2024-01-01'},{id:'latest',collection:'New',date:'2026-01-01'},{id:'draft',collection:'Private',date:'2027-01-01',published:false},{id:'loose',date:'2028-01-01'}];
+ const before=JSON.stringify({books,projects,photos}),result=Showcase.latest(books,projects,photos);
+ assert.equal(result.book.id,'latest');assert.equal(result.project.id,'new');assert.equal(result.album,'New');assert.deepEqual(result.photos.map(p=>p.id),['first','latest']);
+ assert.equal(Showcase.latest(books.slice(0,2)).book.id,'year');assert.equal(JSON.stringify({books,projects,photos}),before);
+ assert.deepEqual(Showcase.latest(),{book:undefined,project:undefined,album:'',photos:[]});
+});
 test('homepage resolves choices and replaces removed/private selections without changing data',()=>{
  const projects=[{id:'old',date:'2025-01-01'},{id:'latest',date:'2026-01-01'},{id:'private',published:false,date:'2027-01-01'}];
  const photos=[{id:'secret',collection:'Private',published:false},{id:'a',collection:'Italy'}];
