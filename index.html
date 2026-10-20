@@ -28,7 +28,8 @@
       media="(min-resolution: 2dppx)"
     />
     <link rel="stylesheet" href="./css/base.css" />
-    <link rel="stylesheet" href="./css/components.css?v=20261020-intro-layout-1" />
+    <link rel="stylesheet" href="./css/components.css?v=20261020-mobile-home-1" />
+    <script defer src="/js/home-nav.js?v=20261020-mobile-home-1"></script>
     <link rel="stylesheet" href="./css/dinos.css?v=20261020-stego-grounded-v6" />
     <script defer src="./js/dino-journeys.js?v=20261020-journeys-3"></script>
     <script defer src="./js/dinos.js?v=20261020-stego-grounded-v6"></script>
@@ -48,7 +49,8 @@
           <img class="icon-endcap" src="./assets/icons/favicon-32.png" width="16" height="16" alt="" />
           <span>JFK</span>
         </a>
-        <ul class="nav-links">
+        <button class="home-menu-toggle" type="button" aria-expanded="false" aria-controls="home-navigation" hidden>Menu<span aria-hidden="true"></span></button>
+        <ul class="nav-links" id="home-navigation">
           <li><a class="is-active" href="/">Home</a></li>
           <li><a href="/projects/">Projects</a></li>
           <li><a href="/writings/">Writings</a></li>
@@ -137,13 +139,13 @@
               <a class="arena-route" href="/writings/">
                 <span class="arena-route-label">Writings</span>
               </a>
-              <a class="arena-route" href="/contact/">
+              <a class="arena-route arena-route--secondary" href="/contact/">
                 <span class="arena-route-label">Contact</span>
               </a>
-              <a class="arena-route" href="/photography/">
+              <a class="arena-route arena-route--secondary" href="/photography/">
                 <span class="arena-route-label">Photos</span>
               </a>
-              <a class="arena-route" href="/books/">
+              <a class="arena-route arena-route--secondary" href="/books/">
                 <span class="arena-route-label">Books</span>
               </a>
             </nav>

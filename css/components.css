@@ -1297,10 +1297,37 @@
 }
 
 
-/* A compact introduction leaves room for the artwork on phones. */
+/* Simplify the homepage navigation and let each section breathe on phones. */
+.home-menu-toggle[hidden],
+.home-page .nav-links[hidden] { display: none; }
 @media (max-width: 600px) {
-  .home-page .hero--arena { padding-top: 24px; gap: 20px; }
+  .home-page .site-shell { width: calc(100% - 40px); }
+  .home-page .page-header { padding-top: 20px; }
+  .home-page .top-nav { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 0 20px; padding-bottom: 12px; }
+  .home-menu-toggle {
+    display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+    min-height: 44px; padding: 8px 0 8px 12px; border: 0;
+    color: var(--text); background: transparent; cursor: pointer;
+    font-family: var(--font-display); font-size: .85rem; letter-spacing: .05em;
+  }
+  .home-menu-toggle span { width: 7px; height: 7px; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; transform: translateY(-2px) rotate(45deg); }
+  .home-menu-toggle[aria-expanded="true"] span { transform: translateY(2px) rotate(225deg); }
+  .home-page .nav-links { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 0 24px; padding: 12px 0 0; }
+  .home-page .nav-links a { display: flex; align-items: center; min-height: 44px; padding: 8px 0; border: 0; }
+  .home-page .nav-links a:hover,
+  .home-page .nav-links a:focus-visible,
+  .home-page .nav-links a.is-active { text-decoration: underline; text-underline-offset: 5px; }
+  .home-page .hero--arena { padding-top: 36px; gap: 40px; }
+  .home-page .home-identity { gap: 18px; }
   .home-page #home-title { font-size: clamp(2rem, 8.5vw, 2.125rem); }
-  .home-page .home-intro { font-size: 1rem; gap: 10px; }
+  .home-page .home-intro { font-size: 1rem; gap: 16px; line-height: 1.55; }
   .home-page .home-interests { font-size: 1rem; }
+  .home-page .arena-stage { gap: 32px; }
+  .home-page .arena-routes--home { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); gap: 12px; }
+  .home-page .arena-routes--home > .arena-route { grid-column: span 3; }
+  .home-page .arena-routes--home > .arena-route--secondary { grid-column: span 2; padding: 0; border: 0; background: transparent; }
+  .home-page .arena-route--secondary .arena-route-label { display: flex; justify-content: center; align-items: center; min-height: 44px; padding: 8px 2px; border: 0; background: transparent; font-weight: 500; }
+  .home-page .arena-route--secondary:hover .arena-route-label,
+  .home-page .arena-route--secondary:focus-visible .arena-route-label { background: transparent; box-shadow: none; text-decoration: underline; text-underline-offset: 5px; }
+  .home-page .home-selections { margin-top: 48px; padding-top: 32px; }
 }
