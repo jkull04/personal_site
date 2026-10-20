@@ -38,20 +38,24 @@
   async function upload(blob) {
     return (await request('/photos',{method:'POST',headers:{'Content-Type':'image/jpeg'},body:blob})).url;
   }
-  async function publish({data,baseline,images,migrate=false,progress=()=>{}}) {
+  async function publish({data,baseline,images,migrate=false,progress=()=>{},onPhoto=()=>{}}) {
     StudioCore.validate(data,true);
     // Never send private drafts or unrelated pending images to the service.
     const publicData=Object.fromEntries(Object.entries(data).map(([kind,entries])=>[kind,entries.filter(e=>e.published!==false).map(e=>({...e}))]));
     const uploaded=new Map();
     const media=[...publicData.photography.map(entry=>({entry,fields:['src','thumb']})),...publicData.books.filter(b=>b.coverSrc).map(entry=>({entry,fields:['coverSrc']}))];
     for(const [i,{entry:photo,fields}] of media.entries()) {
+      const isPhoto=fields.includes('src');
+      let touched=false;
+      try {
       for(const field of fields) {
         const path=photo[field];
         if(uploaded.has(path)) {photo[field]=uploaded.get(path);continue;}
         const pending=images[path.slice(1)];
         const cached=uploadedImages.get(path);
-        if(pending && cached?.content===pending){photo[field]=cached.url;continue;}
+        if(pending && cached?.content===pending){photo[field]=cached.url;touched=true;continue;}
         if(!pending && !(migrate && path.startsWith('/assets/photography/'))) continue;
+        touched=true;if(isPhoto)onPhoto({id:photo.id,phase:'uploading'});
         progress(`Uploading image ${i+1} of ${media.length}…`);
         let blob;
         if(pending) blob=new Blob([Uint8Array.from(atob(pending),c=>c.charCodeAt(0))],{type:'image/jpeg'});
@@ -63,7 +67,10 @@
         const url=await upload(blob);uploaded.set(path,url);photo[field]=url;
         if(pending)uploadedImages.set(path,{content:pending,url});
       }
+      if(isPhoto && touched)onPhoto({id:photo.id,phase:'uploaded'});
+      } catch(error) {if(isPhoto)onPhoto({id:photo.id,phase:'failed',error:error.message});throw error;}
     }
+    publicData.photography.forEach(photo=>onPhoto({id:photo.id,phase:'publishing'}));
     progress('Publishing your collections…');
     const result=await request('/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:publicData,baseline})});
     uploadedImages.clear();return result;

@@ -73,7 +73,7 @@
     validate(result);
     return result;
   }
-  async function publish({data, baseline, images, api}) {
+  async function publish({data, baseline, images, api, onPhoto=()=>{}}) {
     validate(data, true);
     const kinds = Object.keys(paths).filter(k=>data[k]!==undefined);
     const published = Object.fromEntries(kinds.map(k=>[k,data[k].filter(e=>e.published !== false)]));
@@ -102,9 +102,14 @@
     for (const [path, content] of Object.entries(images)) {
       if (!needed.has(path)) continue;
       if (!imagePath.test(path) || !/^[A-Za-z0-9+/=]+$/.test(content)) throw Error('Invalid image upload.');
-      const blob = await api('/git/blobs','POST',{content,encoding:'base64'});
+      const owners=published.photography.filter(p=>[p.src.slice(1),p.thumb.slice(1)].includes(path));
+      owners.forEach(p=>onPhoto({id:p.id,phase:'uploading'}));
+      let blob;
+      try {blob=await api('/git/blobs','POST',{content,encoding:'base64'});}
+      catch(error){owners.forEach(p=>onPhoto({id:p.id,phase:'failed',error:error.message}));throw error;}
       tree.push({path,mode:'100644',type:'blob',sha:blob.sha});
     }
+    published.photography.forEach(p=>onPhoto({id:p.id,phase:'publishing'}));
     const createdTree = await api('/git/trees','POST',{base_tree:commit.tree.sha,tree});
     const createdCommit = await api('/git/commits','POST',{message:'Update writings, books and photography from Studio',tree:createdTree.sha,parents:[head]});
     // Non-forced update is atomic; a concurrent commit rejects this operation.

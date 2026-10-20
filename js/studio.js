@@ -6,11 +6,14 @@
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   let state, db, busy = false, saveQueue = Promise.resolve();
   const previews = {};
+  let duplicateUploads=[], deploymentTimer, deploymentChecks=0;
+  const activePhotoPublish=new Set();
   const status = message => { $('studio-status').textContent = message; };
   function save() {
     StudioAccess.requireUnlocked();
     refreshBookOverview();
     refreshManagementSummary();
+    refreshPhotoStatuses();
     const snapshot = structuredClone(state);
     saveQueue = saveQueue.catch(()=>{}).then(async()=>{
       const encrypted=await StudioAccess.seal(snapshot);
@@ -27,7 +30,7 @@
     busy = value;
     document.querySelectorAll('#studio-editor button, #studio-editor input, #studio-editor textarea, #studio-editor select').forEach(el=>el.disabled=value);
     renderBatch();
-    if(state) { refreshManagerOptions(); managedKinds.forEach(updateSelectionControls); }
+    if(state) { refreshManagerOptions(); managedKinds.forEach(updateSelectionControls); refreshPhotoStatuses(); }
   }
   async function api(path, method='GET', body) {
     StudioAccess.requireUnlocked();
@@ -83,7 +86,7 @@
         const fields = kind==='books' ? field(kind,e,'title','Title')+field(kind,e,'author','Author')+field(kind,e,'status','Shelf','status')+field(kind,e,'rating','Rating (optional)','rating')+field(kind,e,'finished','Date finished (optional)','date')+field(kind,e,'finishedYear','Finish year (if date unknown)','number')+field(kind,e,'note','Your reading note','textarea',true) : field(kind,e,'title','Title')+field(kind,e,'collection','Group')+field(kind,e,'subgroup','Subgroup (optional)')+field(kind,e,'location','Place (optional)')+field(kind,e,'date','Date taken (optional)','date')+field(kind,e,'alt','Image description (required when publishing)','text',true)+field(kind,e,'caption','Caption (optional)','textarea',true);
         const thumb = kind==='photography' ? ((state.images[e.thumb.slice(1)] || previews[e.thumb.slice(1)]) ? 'data:image/jpeg;base64,'+(state.images[e.thumb.slice(1)] || previews[e.thumb.slice(1)]) : e.thumb) : studioBookCover(e);
         const cover = kind==='books' ? `<div>${bookCover(thumb,e.title,e)}<button type="button" data-book-covers="${e.id}">Choose cover</button><button type="button" data-lookup-book="${e.id}">Find book &amp; author</button></div>` : (thumb?`<img src="${esc(thumb)}" alt="${esc(e.alt || 'Uploaded photograph preview')}" />`:'');
-        return `<article class="edit-card" data-kind="${kind}" data-id="${e.id}"><label class="entry-select"><input type="checkbox" data-select-entry aria-label="Select ${esc(e.title || 'untitled entry')}" ${selection[kind].has(e.id)?'checked':''} /></label><details ${openIds.has(e.id)?'open':''}><summary class="entry-summary">${kind==='books'?bookCover(thumb,e.title,e):`<img class="entry-thumb" src="${esc(thumb)}" alt="" loading="lazy" />`}<span><strong class="entry-title">${esc(e.title || 'Untitled')}</strong><span class="entry-meta">${esc(entryLabel(kind,e))}</span><span class="entry-state book-badge">${esc(publication(kind,e))}</span></span><span class="entry-edit-hint">Edit</span></summary><div class="${kind==='photography'?'edit-photo':'edit-book'}">${cover}<div><div class="edit-fields">${fields}</div>${actions(kind,e,i)}</div></div></details></article>`;
+        return `<article class="edit-card" data-kind="${kind}" data-id="${e.id}"><label class="entry-select"><input type="checkbox" data-select-entry aria-label="Select ${esc(e.title || 'untitled entry')}" ${selection[kind].has(e.id)?'checked':''} /></label><details ${openIds.has(e.id)?'open':''}><summary class="entry-summary">${kind==='books'?bookCover(thumb,e.title,e):`<img class="entry-thumb" src="${esc(thumb)}" alt="" loading="lazy" />`}<span><strong class="entry-title">${esc(e.title || 'Untitled')}</strong><span class="entry-meta">${esc(entryLabel(kind,e))}</span><span class="entry-state book-badge">${esc(publication(kind,e))}</span></span><span class="entry-edit-hint">Edit</span></summary><div class="${kind==='photography'?'edit-photo':'edit-book'}">${cover}<div><div class="edit-fields">${fields}</div>${actions(kind,e,i)}${kind==='photography'?photoTransferMarkup(e):''}</div></div></details></article>`;
       }).join('') || `<p>No ${kind==='books'?'books':'photographs'} yet. Add your first one above.</p>`;
     }
     writingEditor.render();
@@ -93,6 +96,7 @@
     refreshManagerOptions();
     managedKinds.forEach(applyManagerView);
     refreshManagementSummary();
+    refreshPhotoStatuses();
   }
   function studioBookCover(book) {
     const path=book.coverSrc?.slice(1), pending=path && (state.images[path] || previews[path]);
@@ -384,6 +388,7 @@
     const entry = state.data[card.dataset.kind].find(e=>e.id===card.dataset.id);
     undoDraft=null;managedKinds.forEach(updateSelectionControls);
     entry[event.target.dataset.key] = event.target.type==='checkbox' ? event.target.checked : event.target.value;
+    if(card.dataset.kind==='photography')delete state.photoTransfers?.[entry.id];
     if(card.dataset.kind==='photography' && event.target.dataset.key==='collection' && !entry.collection.trim()) {entry.subgroup='';$(entry.id+'-subgroup').value='';}
     save().catch(()=>{});
   });
@@ -422,26 +427,61 @@
     }
     try { return {full:encode(2400),thumb:encode(640)}; } finally { bitmap.close(); }
   }
-  async function upload(files) {
-    if (busy || !state) return;
-    if($('upload-subgroup').value.trim() && !$('upload-group').value.trim()) { $('upload-status').textContent='Choose a group before adding a subgroup.'; return; }
-    if (files.length>20) { $('upload-status').textContent='Choose up to 20 photos at a time.'; return; }
-    undoDraft=null;setBusy(true); let added=0; const errors=[];
-    for (const file of files) {
-      $('upload-status').textContent='Preparing '+file.name+'…';
-      try {
-        const photo=await resizePhoto(file); const id=crypto.randomUUID();
-        const path='assets/photography/'+id;
-        const total=Object.values(state.images).reduce((n,v)=>n+v.length,0)+photo.full.content.length+photo.thumb.content.length;
-        if(total>45*1024*1024) throw Error('Publish this batch or remove photos before adding more.');
-        state.images[path+'.jpg']=photo.full.content; state.images[path+'-thumb.jpg']=photo.thumb.content;
-        state.data.photography.push({id,title:file.name.replace(/\.[^.]+$/,'').replace(/[_-]+/g,' '),collection:$('upload-group').value.trim(),subgroup:$('upload-subgroup').value.trim(),location:'',date:'',caption:'',alt:'',src:'/'+path+'.jpg',thumb:'/'+path+'-thumb.jpg',width:photo.full.width,height:photo.full.height,published:false});
-        added++;
-      } catch(error) { errors.push(file.name+': '+error.message); }
-    }
-    render(); await save().catch(()=>{}); setBusy(false);
-    $('photo-upload').value=''; $('upload-status').textContent=`${added} photo${added===1?'':'s'} added. Add descriptions and check “Include on public site” when ready.`+(errors.length?'\n'+errors.join('\n'):'');
+  function renderDuplicates() {
+    $('duplicate-uploads').innerHTML=duplicateUploads.length?`<h3>Already in your collection</h3><p>These photos were skipped. You can keep a separate copy if you intended to add them again.</p>${duplicateUploads.map((item,i)=>`<div class="duplicate-upload"><span><strong>${esc(item.file.name)}</strong><small>Matches ${esc(item.title)} · ${esc(item.group || 'Ungrouped')}</small></span><button type="button" data-existing-photo="${esc(item.id)}">Show existing</button><button type="button" data-duplicate-copy="${i}">Add a copy</button><button type="button" data-duplicate-dismiss="${i}">Dismiss</button></div>`).join('')}`:'';
   }
+  async function upload(files,allowDuplicate=false,destination=null) {
+    if (busy || !state) return;
+    const group=destination?.group ?? $('upload-group').value.trim(), subgroup=destination?.subgroup ?? $('upload-subgroup').value.trim();
+    if(subgroup && !group) { $('upload-status').textContent='Choose a group before adding a subgroup.'; return; }
+    if (files.length>20) { $('upload-status').textContent='Choose up to 20 photos at a time.'; return; }
+    undoDraft=null;setBusy(true); let added=0,skipped=0; const errors=[];
+    try {
+      state.photoFingerprints ||= {};
+      const index=await StudioPhotos.duplicateIndex(state.data.photography,state.images,state.photoFingerprints);
+      for (const file of files) {
+        $('upload-status').textContent='Checking and preparing '+file.name+'…';
+        try {
+          if(file.size>35*1024*1024)throw Error('Image exceeds 35 MB. Export a smaller JPEG.');
+          const sourceHash=await StudioPhotos.digest(await file.arrayBuffer());
+          let existing=index.get('source:'+sourceHash),photo,imageHash;
+          if(!existing || allowDuplicate) {
+            photo=await resizePhoto(file);imageHash=await StudioPhotos.digest(StudioPhotos.fromBase64(photo.full.content));
+            existing ||= index.get('image:'+imageHash);
+          }
+          if(existing && !allowDuplicate) {
+            duplicateUploads.push({file,id:existing.id,title:existing.title,group:PhotoData.group(existing),destination:{group,subgroup}});skipped++;continue;
+          }
+          const id=crypto.randomUUID(),path='assets/photography/'+id;
+          const total=Object.values(state.images).reduce((n,v)=>n+v.length,0)+photo.full.content.length+photo.thumb.content.length;
+          if(total>45*1024*1024) throw Error('Publish this batch or remove photos before adding more.');
+          state.images[path+'.jpg']=photo.full.content; state.images[path+'-thumb.jpg']=photo.thumb.content;
+          const entry={id,title:file.name.replace(/\.[^.]+$/,'').replace(/[_-]+/g,' '),collection:group,subgroup,location:'',date:'',caption:'',alt:'',src:'/'+path+'.jpg',thumb:'/'+path+'-thumb.jpg',width:photo.full.width,height:photo.full.height,published:false};
+          state.data.photography.push(entry);state.photoFingerprints[id]=sourceHash;
+          index.set('source:'+sourceHash,entry);index.set('image:'+imageHash,entry);added++;
+        } catch(error) { errors.push(file.name+': '+error.message); }
+      }
+      render(); await save().catch(()=>{});
+    } catch(error) {errors.push(error.message);}
+    finally {setBusy(false);renderDuplicates();}
+    $('photo-upload').value=''; $('upload-status').textContent=`${added} photo${added===1?'':'s'} added. ${skipped?skipped+' duplicate'+(skipped===1?'':'s')+' skipped. ':''}Add descriptions and check “Include on public site” when ready.`+(errors.length?'\n'+errors.join('\n'):'');
+    return added;
+  }
+  $('duplicate-uploads').addEventListener('click',async event=>{
+    const button=event.target.closest('button');if(!button || busy)return;
+    if(button.hasAttribute('data-existing-photo')) {
+      $('photography-search').value='';$('photography-visibility').value='';$('photography-group').value='';$('photography-subgroup').value='';applyManagerView('photography');
+      const card=$('photo-edit-list').querySelector(`[data-id="${button.dataset.existingPhoto}"]`);
+      if(card){card.querySelector('details').open=true;card.scrollIntoView({behavior:'smooth',block:'center'});card.querySelector('input[data-key="title"]').focus({preventScroll:true});}
+      return;
+    }
+    const index=Number(button.dataset.duplicateCopy ?? button.dataset.duplicateDismiss),item=duplicateUploads[index];
+    if(!item)return;
+    if(button.hasAttribute('data-duplicate-copy')) {
+      const added=await upload([item.file],true,item.destination);if(!added)return;
+    }
+    duplicateUploads.splice(duplicateUploads.indexOf(item),1);renderDuplicates();
+  });
   $('photo-upload').onchange=event=>upload([...event.target.files]);
   const drop=$('drop-zone');
   drop.ondragover=event=>{event.preventDefault();drop.classList.add('dragging');};
@@ -468,7 +508,7 @@
       StudioCore.validate(imported.data); StudioCore.validate(imported.baseline);
       for(const [path,content] of Object.entries(imported.images)) if(!StudioCore.imagePath.test(path) || typeof content!=='string' || !/^[A-Za-z0-9+/=]+$/.test(content)) throw Error('Invalid image in backup.');
       if(!confirm('Replace this browser’s draft with the backup? Download the current draft first if you want to keep it.')) return;
-      state={version:1,data:imported.data,baseline:imported.baseline,images:imported.images}; undoDraft=null;managedKinds.forEach(k=>selection[k].clear());render(); await save(); setBusy(false);
+      state={version:1,data:imported.data,baseline:imported.baseline,images:imported.images,photoFingerprints:imported.photoFingerprints || {}}; undoDraft=null;managedKinds.forEach(k=>selection[k].clear());render(); await save(); setBusy(false);
     } catch(error) { status('Could not restore: '+error.message); }
     event.target.value='';
   };
@@ -481,6 +521,11 @@
     if(busy)return;
     try {await StudioStorage.ready;} catch(error) {status(error.message);return;}
     if(!StudioStorage.enabled && !$('github-token').value.trim()) { $('connection').open=true; $('github-token').focus(); status('Connect GitHub below to publish.'); return; }
+    activePhotoPublish.clear();
+    state.photoTransfers ||= {};
+    state.data.photography.filter(p=>p.published!==false && (migrate || StudioPhotos.baseStatus(p,state.data.photography,state.baseline.photography).phase==='pending')).forEach(p=>{
+      activePhotoPublish.add(p.id);state.photoTransfers[p.id]={phase:'queued',signature:JSON.stringify(p)};
+    });
     setBusy(true); $('publish-result').textContent='Publishing your included entries…';
     try {
       await saveQueue;
@@ -492,8 +537,8 @@
       const previousPhotos=structuredClone(state.data.photography);
       const previousBooks=structuredClone(state.data.books);
       const result=StudioStorage.enabled
-        ? await StudioStorage.publish({data:state.data,baseline:state.baseline,images:state.images,migrate,progress:text=>$('publish-result').textContent=text})
-        : await StudioCore.publish({data:state.data,baseline:state.baseline,images:state.images,api});
+        ? await StudioStorage.publish({data:state.data,baseline:state.baseline,images:state.images,migrate,progress:text=>$('publish-result').textContent=text,onPhoto:updatePhotoTransfer})
+        : await StudioCore.publish({data:state.data,baseline:state.baseline,images:state.images,api,onPhoto:updatePhotoTransfer});
       state.baseline=structuredClone(result.published);
       writingEditor.render();
       undoDraft=null;
@@ -513,13 +558,26 @@
         const local=state.data.photography.find(p=>p.id===photo.id);
         if(local) {local.src=photo.src;local.thumb=photo.thumb;}
       }
+      for(const id of activePhotoPublish) {
+        const photo=state.data.photography.find(p=>p.id===id);
+        if(photo)state.photoTransfers[id]={phase:'deploying',signature:JSON.stringify(photo)};
+      }
       render();
       const retained=new Set([...state.data.photography.flatMap(p=>[p.src.slice(1),p.thumb.slice(1)]),...state.data.books.filter(b=>b.coverSrc).map(b=>b.coverSrc.slice(1))]);
       for(const path of Object.keys(state.images)) if(!retained.has(path)) delete state.images[path];
       await save().catch(()=>{});
       if(StudioStorage.enabled) refreshStorage();
       $('publish-result').innerHTML=result.unchanged?'No public changes to publish.':`Saved to GitHub. The website will update after deployment finishes. <a href="https://github.com/jkull04/personal_site/actions" target="_blank" rel="noopener">Check deployment ↗</a>`;
-    } catch(error) { $('publish-result').textContent=error instanceof TypeError?'The connection was interrupted. Your draft and uploaded photos are saved. Check your connection and click Publish updates again; do not reload published content.':error.message; } finally {setBusy(false);}
+    } catch(error) {
+      const message=error instanceof TypeError?'The connection was interrupted. Your draft and uploaded photos are saved. Retry publishing when connected.':error.message;
+      $('publish-result').textContent=message;
+      for(const id of activePhotoPublish) {
+        const photo=state.data.photography.find(p=>p.id===id),previous=state.photoTransfers[id];
+        if(photo)state.photoTransfers[id]={phase:previous?.phase==='queued'?'waiting':'failed',error:previous?.error || message,signature:JSON.stringify(photo)};
+      }
+      await save().catch(()=>{});
+    } finally {setBusy(false);activePhotoPublish.clear();scheduleDeploymentCheck(true);}
+
   };
   $('publish').onclick=()=>publishUpdates();
   $('storage-migrate').onclick=()=>{
@@ -546,6 +604,7 @@
   }
   function publication(kind, entry) {
     if(kind === 'books') return bookStatus(entry);
+    if(kind === 'photography')return StudioPhotos.status(entry,state.data.photography,state.baseline.photography,state.photoTransfers).label;
     const saved=state.baseline[kind].find(e=>e.id===entry.id);
     if(entry.published===false) return saved ? 'Removal pending' : 'Private draft';
     if(!saved) return 'Not published';
@@ -634,7 +693,7 @@
     for(const kind of managedKinds) {
       for(const entry of state.data[kind]) {
         if(entry.published!==false) included++;
-        if(['Removal pending','Not published','Changes to publish'].includes(publication(kind,entry))) pending++;
+        if(kind==='photography'?StudioPhotos.baseStatus(entry,state.data.photography,state.baseline.photography).phase==='pending':['Removal pending','Not published','Changes to publish'].includes(publication(kind,entry))) pending++;
         const card=document.querySelector(`.edit-card[data-id="${entry.id}"]`);
         if(card) {
           card.querySelector('.entry-title').textContent=entry.title || 'Untitled';
@@ -707,6 +766,91 @@
       $(kind+'-feedback').textContent=action==='undo'?'Restored the draft from before the last bulk action.':'Draft updated. Review your entries, then publish when ready.';
     } catch(error) {$(kind+'-feedback').textContent=error.message;}
   });
+  const photoPreview=$('photo-preview-dialog');
+  document.body.append(photoPreview);
+  let previewPage=0;
+  function previewSubgroups() {
+    const parent=selectedGroup($('preview-group').value), photos=state.data.photography.filter(p=>p.published!==false && PhotoData.group(p)===parent);
+    const names=[...new Set(photos.map(PhotoData.subgroup))];
+    $('preview-subgroup').replaceChildren(new Option('All photos',''));
+    names.forEach(name=>$('preview-subgroup').add(new Option(name || 'No subgroup',JSON.stringify(name))));
+    previewPage=0;renderGalleryPreview();
+  }
+  function renderGalleryPreview() {
+    const parent=selectedGroup($('preview-group').value), child=selectedGroup($('preview-subgroup').value), phone=$('preview-size').value==='phone',batch=phone?4:8;
+    const photos=state.data.photography.filter(p=>p.published!==false && PhotoData.matches(p,parent,child));
+    previewPage=Math.min(previewPage,Math.max(0,Math.ceil(photos.length/batch)-1));
+    const shown=photos.slice(previewPage*batch,(previewPage+1)*batch),groupPhotos=state.data.photography.filter(p=>p.published!==false && PhotoData.group(p)===parent),mosaic=PhotoData.preview(groupPhotos);
+    photoPreview.classList.toggle('phone-preview',phone);
+    $('preview-category-title').textContent=parent || 'Other photos';
+    $('preview-mosaic').className='studio-preview-mosaic mosaic-'+mosaic.length;
+    $('preview-mosaic').innerHTML=mosaic.map(p=>`<img src="${esc(photoThumb(p))}" alt="" />`).join('');
+    $('preview-spread').innerHTML=photos.length?PhotoData.rows(shown,phone).map(row=>`<div class="studio-preview-row">${row.map(p=>`<figure data-preview-photo="${p.id}"><img src="${esc(photoThumb(p))}" alt="${esc(p.alt || p.title)}" /></figure>`).join('')}</div>`).join(''):'<p>No included photos in this category. Check “Include on public site” on the photos you want to show.</p>';
+    shown.forEach(p=>photoPreview.querySelector(`[data-preview-photo="${p.id}"]`)?.style.setProperty('--photo-ratio',PhotoData.ratio(p)));
+    $('preview-page-status').textContent=photos.length?`${previewPage*batch+1}–${Math.min((previewPage+1)*batch,photos.length)} of ${photos.length}`:'No included photos';
+    $('preview-previous').disabled=previewPage===0;$('preview-next').disabled=(previewPage+1)*batch>=photos.length;
+  }
+  document.querySelector('main').addEventListener('click',event=>{
+    if(!event.target.closest('[data-preview-gallery]') || busy)return;
+    const groups=PhotoData.grouped(state.data.photography.filter(p=>p.published!==false));
+    $('preview-group').replaceChildren(...groups.map(g=>new Option(g.name || 'Other photos',JSON.stringify(g.name))));
+    const current=managerValue('photography','group');if([...$('preview-group').options].some(o=>o.value===current))$('preview-group').value=current;
+    $('preview-size').value=matchMedia('(max-width:700px), (max-height:540px)').matches?'phone':'desktop';
+    previewSubgroups();photoPreview.showModal();
+  });
+  $('preview-group').onchange=previewSubgroups;
+  $('preview-subgroup').onchange=()=>{previewPage=0;renderGalleryPreview();};
+  $('preview-size').onchange=()=>{previewPage=0;renderGalleryPreview();};
+  $('preview-previous').onclick=()=>{previewPage--;renderGalleryPreview();};
+  $('preview-next').onclick=()=>{previewPage++;renderGalleryPreview();};
+  $('preview-close').onclick=()=>photoPreview.close();
+  function photoTransferMarkup(photo) {
+    return `<div class="photo-transfer"><small data-photo-error></small><button type="button" data-retry-photo="${photo.id}" hidden>Retry publish</button></div>`;
+  }
+  function refreshPhotoStatuses() {
+    if(!state)return;
+    for(const [id,transfer] of Object.entries(state.photoTransfers || {})) {
+      const photo=state.data.photography.find(p=>p.id===id);
+      if(!photo || transfer.signature!==JSON.stringify(photo) || transfer.phase==='deploying' && StudioPhotos.baseStatus(photo,state.data.photography,state.baseline.photography).phase!=='published')delete state.photoTransfers[id];
+    }
+    document.querySelectorAll('[data-kind="photography"][data-id]').forEach(card=>{
+      const photo=state.data.photography.find(p=>p.id===card.dataset.id);if(!photo)return;
+      const info=StudioPhotos.status(photo,state.data.photography,state.baseline.photography,state.photoTransfers);
+      const badge=card.querySelector('[data-photo-status],.entry-state');
+      if(badge){badge.textContent=info.label;badge.dataset.phase=info.phase;}
+      const error=card.querySelector('[data-photo-error]');if(error)error.textContent=info.error || '';
+      const retry=card.querySelector('[data-retry-photo]');if(retry){retry.hidden=!['failed','waiting'].includes(info.phase);retry.disabled=busy;}
+    });
+    $('check-photo-publish').hidden=!Object.values(state.photoTransfers || {}).some(p=>p.phase==='deploying');
+    $('check-photo-publish').disabled=busy;
+  }
+  function updatePhotoTransfer(event) {
+    if(!activePhotoPublish.has(event.id))return;
+    const photo=state.data.photography.find(p=>p.id===event.id);if(!photo)return;
+    state.photoTransfers[event.id]={...event,signature:JSON.stringify(photo)};refreshPhotoStatuses();
+  }
+  document.querySelector('main').addEventListener('click',event=>{
+    if(event.target.closest('[data-retry-photo]') && !busy)publishUpdates();
+  });
+  async function verifyPhotoDeployment() {
+    if(busy){scheduleDeploymentCheck();return;}
+    try {
+      const response=await fetch('/data/photography.json?verify='+Date.now(),{cache:'no-store'});
+      if(!response.ok)throw Error();const live=await response.json();if(!Array.isArray(live))throw Error();
+      let changed=false;
+      for(const photo of state.data.photography)if(state.photoTransfers?.[photo.id]?.phase==='deploying' && StudioPhotos.isLive(photo,state.data.photography,live)) {delete state.photoTransfers[photo.id];changed=true;}
+      if(changed)await save();
+      if(!Object.values(state.photoTransfers || {}).some(p=>p.phase==='deploying'))$('publish-result').textContent='Your photos are published and verified on the live site.';
+    } catch { /* Keep the honest deployment-pending status until a later successful check. */ }
+    refreshPhotoStatuses();scheduleDeploymentCheck();
+  }
+  function scheduleDeploymentCheck(reset=false) {
+    clearTimeout(deploymentTimer);if(reset)deploymentChecks=0;
+    if(deploymentChecks<8 && Object.values(state?.photoTransfers || {}).some(p=>p.phase==='deploying')) {
+      deploymentChecks++;deploymentTimer=setTimeout(verifyPhotoDeployment,15000);
+    }
+  }
+  $('check-photo-publish').onclick=()=>{deploymentChecks=0;verifyPhotoDeployment();};
   function photoThumb(photo) {
     const path=photo.thumb.slice(1), data=state.images[path] || previews[path];
     return data?'data:image/jpeg;base64,'+data:photo.thumb;
@@ -714,8 +858,9 @@
   function renderPhotoOrganizer(entries) {
     const holder=$('photo-organizer');
     const ordered=managerValue('photography','sort')==='order';
-    holder.innerHTML=`<div class="organizer-heading"><h3>Arrange &amp; preview</h3><p>${ordered?'Drag a handle to reorder the photos shown below. Use the arrow buttons on a phone or keyboard.':'Choose “Your order” above to rearrange photos.'} Select 1–4 included photos from one group to set its square preview.</p></div><div class="studio-actions"><button type="button" data-photo-organize="preview">Use selected as category preview</button><button type="button" data-photo-organize="automatic">Use automatic preview for this group</button></div>
-    <div class="photo-organizer-grid">${entries.map((e,i)=>`<article class="organizer-photo" data-kind="photography" data-id="${e.id}" data-photo-order="${e.id}"><div class="organizer-image"><img src="${esc(photoThumb(e))}" alt="${esc(e.alt || e.title)}" loading="lazy" /><label><input type="checkbox" data-select-entry aria-label="Select ${esc(e.title)}" ${selection.photography.has(e.id)?'checked':''} />Select</label>${e.preview?'<span class="preview-marker">Preview</span>':''}</div><p>${esc(e.title)}</p><small>${esc(PhotoData.group(e)||'Ungrouped')}${e.published===false?' · Private':''}</small><div class="organizer-order"><button type="button" draggable="${ordered&&!busy}" data-drag-photo="${e.id}" aria-label="Drag to reorder ${esc(e.title)}" ${!ordered||busy?'disabled':''}>⠿</button><button type="button" data-photo-organize="earlier" aria-label="Move ${esc(e.title)} earlier" ${!ordered||busy||i===0?'disabled':''}>←</button><button type="button" data-photo-organize="later" aria-label="Move ${esc(e.title)} later" ${!ordered||busy||i===entries.length-1?'disabled':''}>→</button></div></article>`).join('')}</div><p id="photo-organize-status" role="status"></p>`;
+    holder.innerHTML=`<div class="organizer-heading"><h3>Arrange &amp; preview</h3><p>${ordered?'Drag a handle to reorder the photos shown below. Use the arrow buttons on a phone or keyboard.':'Choose “Your order” above to rearrange photos.'} Select 1–4 included photos from one group to set its square preview.</p></div><div class="studio-actions"><button type="button" data-preview-gallery>Preview gallery</button><button type="button" data-photo-organize="preview">Use selected as category preview</button><button type="button" data-photo-organize="automatic">Use automatic preview for this group</button></div>
+    <div class="photo-organizer-grid">${entries.map((e,i)=>`<article class="organizer-photo" data-kind="photography" data-id="${e.id}" data-photo-order="${e.id}"><div class="organizer-image"><img src="${esc(photoThumb(e))}" alt="${esc(e.alt || e.title)}" loading="lazy" /><label><input type="checkbox" data-select-entry aria-label="Select ${esc(e.title)}" ${selection.photography.has(e.id)?'checked':''} />Select</label>${e.preview?'<span class="preview-marker">Preview</span>':''}</div><p>${esc(e.title)}</p><small>${esc(PhotoData.group(e)||'Ungrouped')}${e.published===false?' · Private':''}</small><span class="photo-position">${i+1}</span><span data-photo-status class="photo-status"></span>${photoTransferMarkup(e)}<div class="organizer-order"><button type="button" draggable="${ordered&&!busy}" data-drag-photo="${e.id}" aria-label="Drag to reorder ${esc(e.title)}" ${!ordered||busy?'disabled':''}>⠿</button><button type="button" data-photo-organize="earlier" aria-label="Move ${esc(e.title)} earlier" ${!ordered||busy||i===0?'disabled':''}>←</button><button type="button" data-photo-organize="later" aria-label="Move ${esc(e.title)} later" ${!ordered||busy||i===entries.length-1?'disabled':''}>→</button></div></article>`).join('')}</div><p id="photo-organize-status" role="status"></p>`;
+    refreshPhotoStatuses();
   }
   function reorderPhoto(from,to) {
     if(busy || managerValue('photography','sort')!=='order')return;
@@ -735,13 +880,15 @@
   $('photo-organizer').addEventListener('dragover',event=>{
     const target=event.target.closest('[data-photo-order]');if(!draggedPhoto || !target)return;
     event.preventDefault();event.dataTransfer.dropEffect='move';
-    $('photo-organizer').querySelectorAll('.drop-before').forEach(el=>el.classList.remove('drop-before'));target.classList.add('drop-before');
+    const cards=[...$('photo-organizer').querySelectorAll('[data-photo-order]')];
+    cards.forEach(el=>el.classList.remove('drop-before','drop-after'));
+    target.classList.add(cards.findIndex(el=>el.dataset.photoOrder===draggedPhoto)<cards.indexOf(target)?'drop-after':'drop-before');
   });
   $('photo-organizer').addEventListener('drop',event=>{
     event.preventDefault();const target=event.target.closest('[data-photo-order]');
     if(draggedPhoto && target)reorderPhoto(draggedPhoto,target.dataset.photoOrder);draggedPhoto='';
   });
-  $('photo-organizer').addEventListener('dragend',()=>{draggedPhoto='';$('photo-organizer').querySelectorAll('.is-dragging,.drop-before').forEach(el=>el.classList.remove('is-dragging','drop-before'));});
+  $('photo-organizer').addEventListener('dragend',()=>{draggedPhoto='';$('photo-organizer').querySelectorAll('.is-dragging,.drop-before,.drop-after').forEach(el=>el.classList.remove('is-dragging','drop-before','drop-after'));});
   $('photo-organizer').addEventListener('click',event=>{
     const button=event.target.closest('[data-photo-organize]');if(!button || busy)return;
     const action=button.dataset.photoOrganize;
@@ -758,7 +905,7 @@
         next=state.data.photography.map(p=>PhotoData.group(p)===parent?{...p,preview:false}:p);
       }
       rememberBulk();state.data.photography=next;render();save().catch(()=>{});
-      $('photo-organize-status').textContent=action==='preview'?'Category preview saved. Publish to update the site.':'This group will use its first four included photos.';
+      $('photo-organize-status').textContent=action==='preview'?'Category preview saved. Publish to update the site.':'This group will use a varied selection of included photos from its subgroups.';
     }catch(error){$('photo-organize-status').textContent=error.message;}
   });
   const writingEditor=createWritingEditor({getState:()=>state,save,isBusy:()=>busy,onChange:()=>{undoDraft=null;managedKinds.forEach(updateSelectionControls);}});
@@ -771,9 +918,11 @@
       state=await StudioAccess.open(state);
       if(!state) state=await fetchPublished();
       await upgradeWritings(state);
+      state.photoTransfers ||= {};
+      for(const transfer of Object.values(state.photoTransfers))if(['queued','uploading','uploaded','publishing'].includes(transfer.phase)){transfer.phase='waiting';transfer.error='Publishing was interrupted. Your draft is saved; retry when ready.';}
       StudioCore.validate(state.data);
       await save();
-      StudioCore.validate(state.data); render(); setBusy(false); status('Your draft is ready. Changes save automatically in this browser.');
+      StudioCore.validate(state.data); render(); setBusy(false); status('Your draft is ready. Changes save automatically in this browser.');scheduleDeploymentCheck(true);
     } catch(error) { status('Could not open Studio: '+error.message+' Refresh to try again.'); }
   }
   setBusy(true);
