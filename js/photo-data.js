@@ -32,7 +32,27 @@
   function preview(photos) {
     const included=photos.filter(p=>p.published!==false);
     const chosen=included.filter(p=>p.preview===true);
-    return (chosen.length ? chosen : included).slice(0,4);
+    if(chosen.length) return chosen.slice(0,4);
+    const destinations=new Set(), varied=[];
+    for(const photo of included) {
+      const destination=subgroup(photo);
+      if(!destinations.has(destination)) { destinations.add(destination); varied.push(photo); }
+    }
+    return [...varied,...included.filter(photo=>!varied.includes(photo))].slice(0,4);
+  }
+  // Keep reading order while balancing the combined aspect ratios of two rows.
+  const ratio = photo => Math.max(.4,Math.min(2.5,(Number(photo.width)||1600)/(Number(photo.height)||1200)));
+  function rows(photos, compact=false) {
+    if(photos.length <= (compact?2:3)) return [photos];
+    const total=photos.reduce((sum,photo)=>sum+ratio(photo),0);
+    let split=1, best=Infinity, sum=0;
+    for(let i=1;i<photos.length;i++) {
+      sum+=ratio(photos[i-1]);
+      if(compact && (i>2 || photos.length-i>2)) continue;
+      const difference=Math.abs(total-2*sum);
+      if(difference<best) {best=difference;split=i;}
+    }
+    return [photos.slice(0,split),photos.slice(split)];
   }
   function setPreview(photos, ids) {
     const selected=new Set(ids), chosen=photos.filter(p=>selected.has(p.id));
@@ -71,6 +91,6 @@
     const page=Number(params.get('page'));
     return {parent,child,photoId:photo?.id || '',page:Number.isSafeInteger(page)&&page>0?page:0};
   }
-  root.PhotoData = {group, subgroup, matches, grouped, move, rename, preview, setPreview, reorder, link, resolveLink};
+  root.PhotoData = {group, subgroup, matches, grouped, move, rename, preview, ratio, rows, setPreview, reorder, link, resolveLink};
   if (typeof module !== 'undefined') module.exports = root.PhotoData;
 })(globalThis);

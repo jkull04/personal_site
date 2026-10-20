@@ -67,3 +67,19 @@ test('photo links survive group renames and moves; encoded subgroup and empty gr
  assert.equal(resolveLink(source,'#photo=unknown'),null);
  assert.equal(resolveLink(source,'#group=New+Zealand&page=Infinity').page,0);
 });
+test('automatic preview samples destinations, fills spare slots, and keeps manual choices',()=>{
+ const {preview,setPreview}=require('../js/photo-data.js');
+ const source=[photo('a','Trip','Peru'),photo('b','Trip','Peru'),photo('c','Trip','Greece'),photo('d','Trip','Prague'),photo('e','Trip','London')];
+ assert.deepEqual(preview(source).map(p=>p.id),['a','c','d','e']);
+ assert.deepEqual(preview(source.slice(0,3)).map(p=>p.id),['a','c','b']);
+ assert.deepEqual(preview(setPreview(source,['a','b'])).map(p=>p.id),['a','b']);
+ assert.deepEqual(preview(source.map(p=>({...p,published:p.id!=='c'}))).map(p=>p.id),['a','d','e','b']);
+});
+test('balanced rows preserve reading order and compact pages stay two photos wide',()=>{
+ const {rows}=require('../js/photo-data.js');
+ const source=Array.from({length:8},(_,i)=>({...photo(String(i),'Trip'),width:i<3?1600:900,height:1200}));
+ assert.deepEqual(rows(source).map(r=>r.length),[3,5]);
+ assert.deepEqual(rows(source).flat(),source);
+ assert.deepEqual(rows(source.slice(0,4),true).map(r=>r.length),[2,2]);
+ assert.deepEqual(rows(source.slice(0,1)),[source.slice(0,1)]);
+});

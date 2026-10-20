@@ -113,7 +113,7 @@
       await Promise.race([Promise.all(images.map(image=>image.decode().catch(()=>{}))),new Promise(resolve=>setTimeout(resolve,180))]);
       if (panel !== activePanel || closing) return;
     }
-    const centerRect = activePanel.querySelector('.album-center').getBoundingClientRect();
+    const centerRect = activePanel.querySelector('.album-spread').getBoundingClientRect();
     const center = {x:centerRect.x+centerRect.width/2,y:centerRect.y+centerRect.height/2};
     await Promise.all([...activePanel.querySelectorAll('.photo-card')].map((card,i) => {
       const r = card.getBoundingClientRect();
@@ -142,7 +142,7 @@
     if(sync)updateLink();
   }
   function photoCard(photo, index) {
-    return `<figure class="photo-card"><button type="button" data-photo="${index}" aria-label="View ${esc(photo.title)}"><img src="${esc(safeImage(photo.thumb || photo.src))}" alt="${esc(photo.alt || photo.title)}" width="${Number(photo.width)||1600}" height="${Number(photo.height)||1200}" loading="eager" decoding="async" /></button></figure>`;
+    return `<figure class="photo-card" style="--photo-ratio:${PhotoData.ratio(photo)}"><button type="button" data-photo="${index}" aria-label="View ${esc(photo.title)}"><img src="${esc(safeImage(photo.thumb || photo.src))}" alt="${esc(photo.alt || photo.title)}" width="${Number(photo.width)||1600}" height="${Number(photo.height)||1200}" loading="eager" decoding="async" /></button></figure>`;
   }
   function renderDetails(animate = true) {
     if (!panel || activeIndex < 0) return;
@@ -150,11 +150,14 @@
     const child = activeSubgroup ? JSON.parse(activeSubgroup) : undefined;
     visible = entries.filter(photo=>PhotoData.matches(photo,album.name,child));
     const start = page*batchSize, photos = visible.slice(start,start+batchSize), total = visible.length;
+    let offset=start;
+    const rows=PhotoData.rows(photos,compact.matches).map(row=>`<div class="photo-row">${row.map(photo=>photoCard(photo,offset++)).join('')}</div>`).join('');
     panel.innerHTML = `<div class="album-spread-shell">
+      <div class="album-heading"><h2 id="album-detail-title">${esc(album.name || 'Other photos')}</h2><p>${total} ${photoWord(total)}</p></div>
       <button type="button" class="album-share" data-share-album aria-label="Copy category link">Copy link</button>
       <button type="button" class="album-dismiss" data-close-album aria-label="Close ${esc(album.name || 'Other photos')}"><span aria-hidden="true">×</span></button>
       ${album.subgroups.some(s=>s.name) ? `<div class="album-subfilters" role="group" aria-label="Filter subgroups"><button type="button" data-subgroup="" aria-pressed="${!activeSubgroup}">All</button>${album.subgroups.map(s=>`<button type="button" data-subgroup="${esc(JSON.stringify(s.name))}" aria-pressed="${child===s.name}">${esc(s.name || 'Other photos')} <span>${s.photos.length}</span></button>`).join('')}</div>` : ''}
-      <div class="album-spread" data-count="${photos.length}" style="--spread-rows:${Math.ceil(photos.length/2)}"><div class="album-center"><h2 id="album-detail-title">${esc(album.name || 'Other photos')}</h2><p>${child ? esc(child)+' · ' : ''}${total} ${photoWord(total)}</p><span class="album-center-rule" aria-hidden="true"></span></div>${photos.map((p,i)=>photoCard(p,start+i)).join('')}</div>
+      <div class="album-spread" data-count="${photos.length}">${rows}</div>
       ${total > batchSize ? `<nav class="album-pagination" aria-label="Album pages"><button type="button" data-page="-1" ${page===0?'disabled':''}>← Previous</button><p role="status">${start+1}–${Math.min(start+batchSize,total)} of ${total}</p><button type="button" data-page="1" ${start+batchSize>=total?'disabled':''}>Next →</button></nav>` : ''}
     </div>`;
     if (animate) { panel.classList.add('is-entering'); animateSpread(); }
