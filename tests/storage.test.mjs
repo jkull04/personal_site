@@ -203,6 +203,16 @@ test('retry after network failure reuses successful uploads and reports draft sa
 });
 
 
+test('project screenshots must exist in budgeted storage and publish with homepage settings',async()=>{
+ const {call,login,calls}=setup();const token=await login();
+ const display={id:'project-example',projectId:'example',imageSrc:imageURL,imageAlt:'A project screenshot',demoUrl:'https://example.com/'};
+ const body={data:{...empty(),showcase:[display,{id:'home',projectId:'example',writingId:'',album:''}]},baseline:{...empty(),showcase:[]}};
+ assert.equal((await call('/publish',body,token)).status,400);assert.equal(calls.length,0);
+ await call('/photos',image,token);
+ const result=await call('/publish',body,token);assert.equal(result.status,200);
+ const tree=JSON.parse(calls.find(c=>c.path==='/git/trees').body).tree;
+ assert.equal(tree[0].path,'data/showcase.json');assert.equal(JSON.parse(tree[0].content)[0].imageSrc,imageURL);
+});
 test('security: nonexistent photos cannot exhaust the gallery allowance',async()=>{
  const {call,login,env,storage,handler}=setup();await call('/photos',image,await login());
  await storage.put('daily',{day:new Date().toISOString().slice(0,10),reads:LIMITS.readsPerDay-1,writes:1});

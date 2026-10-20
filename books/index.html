@@ -18,9 +18,9 @@
     <script defer src="/js/dino-journeys.js?v=20261020-journeys-3"></script>
     <script defer src="/js/dinos.js?v=20261020-approved-dinos-v2"></script>
     <link rel="stylesheet" href="/css/collections.css" />
-    <link rel="stylesheet" href="/css/books.css?v=books-size-2" />
+    <link rel="stylesheet" href="/css/books.css?v=discovery-1" />
     <script defer src="/js/book-data.js?v=book-editions-1"></script>
-    <script defer src="/js/books.js?v=book-editions-1"></script>
+    <script defer src="/js/books.js?v=discovery-1"></script>
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
@@ -55,6 +55,10 @@
       </section>
       <section id="collection-list" class="book-years" aria-label="Finished books by year"><p>Loading books…</p></section>
       <noscript><p>Enable JavaScript to view this collection.</p></noscript>
+      <dialog id="book-detail" tabindex="-1" class="book-detail" aria-labelledby="book-detail-title">
+        <button type="button" class="book-detail-close" data-close-book aria-label="Close book notes">×</button>
+        <div data-book-content></div>
+      </dialog>
     </main>
     <footer class="footer site-shell">
       <p>James Kull | Classics and Economics, Washington and Lee University.</p>

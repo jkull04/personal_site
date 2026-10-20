@@ -8,6 +8,7 @@ on:
       - 'backend/storage/**'
       - 'tests/security*.test.*'
       - 'js/studio-core.js'
+      - 'js/showcase-data.js'
       - 'js/writing-data.js'
       - 'tests/storage.test.mjs'
       - '.github/workflows/deploy-studio-storage.yml'

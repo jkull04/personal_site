@@ -20,18 +20,20 @@
     <link rel="stylesheet" href="/css/collections.css" />
     <meta name="robots" content="noindex,nofollow" />
     <meta name="referrer" content="no-referrer" />
-    <link rel="stylesheet" href="/css/studio.css?v=photo-workflow-1" />
-    <script defer src="/js/studio-storage.js?v=security-20261020"></script>
+    <link rel="stylesheet" href="/css/studio.css?v=discovery-1" />
+    <script defer src="/js/studio-storage.js?v=discovery-1"></script>
     <script defer src="/js/studio-backup.js?v=security-20261020"></script>
     <script defer src="/js/studio-access.js?v=security-20261020"></script>
     <link rel="stylesheet" href="/css/writing.css?v=r2-1" />
     <script defer src="/js/writing-data.js?v=r2-1"></script>
     <script defer src="/js/writing-editor.js?v=r2-1"></script>
-    <script defer src="/js/studio-core.js?v=security-20261020"></script>
+    <script defer src="/js/showcase-data.js?v=discovery-1"></script>
+    <script defer src="/js/showcase-editor.js?v=discovery-1"></script>
+    <script defer src="/js/studio-core.js?v=discovery-1"></script>
     <script defer src="/js/book-data.js?v=book-editions-1"></script>
     <script defer src="/js/photo-data.js?v=gallery-balanced-1"></script>
     <script defer src="/js/studio-photos.js?v=photo-workflow-1"></script>
-    <script defer src="/js/studio.js?v=security-20261020"></script>
+    <script defer src="/js/studio.js?v=discovery-1"></script>
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
@@ -74,7 +76,12 @@
         <aside id="cloud-storage" class="studio-panel" hidden><p>Your password protects local drafts. Connect your GitHub account below to authorize uploads and publishing for this tab. Lock Studio to revoke that connection.</p><p id="storage-status" role="status">Cloud photo storage connected.</p><div class="studio-actions"><button id="storage-refresh" type="button">Refresh storage usage</button><button id="storage-migrate" type="button">Move existing photos to cloud storage</button></div></aside>
         <details id="connection"><summary>GitHub connection</summary><p>One-time setup: <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">create a fine-grained token</a> for <strong>jkull04 / personal_site only</strong>, with <strong>Contents: Read and write</strong>. Choose an expiration. Connect once per tab session. The token is cleared from this page after connecting and held encrypted by the service for this session. Disconnect removes it. It is never saved in drafts or backups.</p><label for="github-token">GitHub token</label><div class="studio-actions"><input id="github-token" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your repository token" /><button id="connect-github" type="button">Connect GitHub</button><button id="disconnect" type="button">Disconnect</button></div></details>
       </section>
-      <div class="studio-tabs" role="group" aria-label="Edit collection"><button type="button" data-tab="books" aria-pressed="true">Books</button><button type="button" data-tab="photography" aria-pressed="false">Photos</button><button type="button" data-tab="writings" aria-pressed="false">Writings</button></div>
+      <div class="studio-tabs" role="group" aria-label="Edit collection"><button type="button" data-tab="books" aria-pressed="true">Books</button><button type="button" data-tab="photography" aria-pressed="false">Photos</button><button type="button" data-tab="writings" aria-pressed="false">Writings</button><button type="button" data-tab="showcase" aria-pressed="false">Homepage &amp; projects</button></div>
+      <section id="showcase-editor" aria-labelledby="showcase-heading" hidden>
+        <div class="studio-section-head"><div><h2 id="showcase-heading">Selected things</h2><p>Choose a project, a writing, and a photo collection for the homepage.</p></div><a href="/" target="_blank" rel="noopener">View homepage ↗</a></div>
+        <div class="studio-panel"><div class="edit-fields"><label>Project<select id="homepage-project"></select></label><label>Writing<select id="homepage-writing"></select></label><label class="wide">Photo collection<select id="homepage-album"></select></label></div><p id="homepage-selection-preview"></p><p>If a selection is removed or made private, the homepage uses another published entry.</p></div>
+        <h3>Project images and links</h3><p>Add a screenshot and an optional link to try each project. Existing project write-ups stay connected.</p><p id="showcase-status" role="status"></p><div id="project-presentations"></div>
+      </section>
       <section id="books-editor" aria-labelledby="books-heading"><div class="studio-section-head"><div><h2 id="books-heading">Reading shelf</h2><p>Finished books appear as covers, grouped by the year you read them.</p></div><button id="add-book" type="button" disabled>Add manually</button></div><section class="shelf-panel" aria-labelledby="shelf-count"><h3 id="shelf-count">Your added books</h3><p>Click a cover to edit. “Not published” books are saved in this browser until you publish.</p><div id="shelf-overview" class="shelf-overview"></div></section><div class="catalog-search">
         <label for="book-search">Find a book</label>
         <div class="studio-actions"><input id="book-search" type="search" placeholder="Type a title or ISBN…" autocomplete="off" maxlength="200" disabled /><button id="search-books" type="button" disabled>Search</button></div>

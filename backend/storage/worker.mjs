@@ -1,5 +1,6 @@
 import {github} from './github.mjs';
 import '../../js/writing-data.js';
+import '../../js/showcase-data.js';
 import '../../js/studio-core.js';
 export {StorageBudget} from './quota.mjs';
 
@@ -120,8 +121,9 @@ export function createHandler(fetcher=fetch) {
         globalThis.StudioCore.validate(body.data,true);
         globalThis.StudioCore.validate(body.baseline);
         // Verify new remote references exist before exposing them in the site's metadata.
-        const previous=new Set(body.baseline.photography.flatMap(p=>[p.src,p.thumb]));
-        const needed=new Set(body.data.photography.filter(p=>p.published!==false).flatMap(p=>[p.src,p.thumb]));
+        const imageReferences=data=>[...data.photography.filter(p=>p.published!==false).flatMap(p=>[p.src,p.thumb]),...data.books.filter(b=>b.published!==false&&b.coverSrc).map(b=>b.coverSrc),...(data.showcase||[]).filter(s=>s.imageSrc).map(s=>s.imageSrc)];
+        const previous=new Set(imageReferences(body.baseline));
+        const needed=new Set(imageReferences(body.data));
         const fresh=[...needed].filter(url=>url.startsWith(media+'/')&&!previous.has(url));
         if(fresh.length>900) throw failure('Publish at most 450 new photos in one batch.');
         if(fresh.length)await budget(env,{action:'known',keys:fresh.map(url=>url.slice(media.length+1))});

@@ -95,7 +95,7 @@ test('the real Projects renderer loads existing Substack and Studio projects wit
  const local=essay({type:'project',title:'Local project',problem:'Local problem',approach:'Local approach',output:'Local output'});
  const existing={id:'old-project',title:'Existing Substack project',date:'2026-01-01',summary:'Summary',problem:'Why',approach:'How',output:'Result',tags:['Projects'],links:[{href:'https://jameskull.substack.com/p/existing'}]};
  const window={addEventListener(){},requestAnimationFrame:()=>1,cancelAnimationFrame(){},innerHeight:800,scrollY:0};
- vm.runInNewContext(fs.readFileSync(require.resolve('../js/content.js'),'utf8'),{document,window,WritingData:Writing,fetch:async path=>({ok:true,json:async()=>path.includes('works-substack')?[existing]:[local]})});
+ vm.runInNewContext(fs.readFileSync(require.resolve('../js/content.js'),'utf8'),{document,window,WritingData:Writing,ShowcaseData:require('../js/showcase-data.js'),fetch:async path=>({ok:true,json:async()=>path.includes('showcase')?[]:path.includes('works-substack')?[existing]:[local]})});
  await hydrate();
  assert.ok(list.innerHTML.includes('Existing Substack project'));assert.ok(list.innerHTML.includes('Local project'));
  assert.ok(list.innerHTML.includes('Published here'));assert.ok(list.innerHTML.includes('Published on Substack'));

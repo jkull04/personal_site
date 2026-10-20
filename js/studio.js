@@ -50,8 +50,9 @@
     if (!response.ok) throw Error('Cannot load the latest site from GitHub. Try again shortly.');
     const ref = await response.json();
     const data = {};
-    for (const kind of ['books','photography','writings']) {
+    for (const kind of ['books','photography','writings','showcase']) {
       const r = await fetch('https://api.github.com/repos/jkull04/personal_site/contents/data/'+(kind==='writings'?'writings-local':kind)+'.json?ref='+ref.object.sha,{cache:'no-store',headers:{Accept:'application/vnd.github.raw+json'}});
+      if(r.status===404 && kind==='showcase'){data[kind]=[];continue;}
       if (!r.ok) throw Error('Cannot load '+kind+' from GitHub. Try again after deployment.');
       data[kind] = await r.json();
     }
@@ -59,10 +60,13 @@
     return {version:1,data,baseline:structuredClone(data),images:{}};
   }
   async function upgradeWritings(value,current) {
-    if(value.data.writings===undefined || value.baseline.writings===undefined) {
+    const missing=['writings','showcase'].filter(kind=>value.data[kind]===undefined || value.baseline[kind]===undefined);
+    if(missing.length){
       const source=current || await fetchPublished();
-      value.data.writings=structuredClone(source.data.writings);
-      value.baseline.writings=structuredClone(source.baseline.writings);
+      for(const kind of missing){
+        if(value.data[kind]===undefined)value.data[kind]=structuredClone(source.data[kind]||[]);
+        if(value.baseline[kind]===undefined)value.baseline[kind]=structuredClone(source.baseline[kind]||[]);
+      }
     }
     return value;
   }
@@ -70,8 +74,9 @@
     const id = e.id+'-'+key;
     let control;
     if (type==='textarea') control = `<textarea id="${id}" data-key="${key}" maxlength="10000">${esc(e[key])}</textarea>`;
+    else if(type==='checkbox') control = `<input id="${id}" type="checkbox" data-key="${key}" ${e[key]===true?'checked':''} />`;
     else if (type==='status') control = `<select id="${id}" data-key="${key}">${['Reading','Read','Want to read'].map(v=>`<option ${e[key]===v?'selected':''}>${v}</option>`).join('')}</select>`;
-    else if (type==='rating') control = `<select id="${id}" data-key="${key}"><option value="">No rating</option>${[1,2,3,4,5].map(v=>`<option value="${v}" ${String(e[key])===String(v)?'selected':''}>${v} / 5</option>`).join('')}</select>`;
+    else if (type==='rating') control = `<select id="${id}" data-key="${key}"><option value="">No rating</option>${[0.5,1,1.5,2,2.5,3,3.5,4,4.5,5].map(v=>`<option value="${v}" ${String(e[key])===String(v)?'selected':''}>${v} / 5</option>`).join('')}</select>`;
     else control = `<input id="${id}" type="${type}" data-key="${key}" value="${esc(e[key])}" maxlength="${['collection','subgroup'].includes(key)?100:500}" ${key==='collection'?'list="photo-groups"':key==='subgroup'?'list="photo-subgroups"':''} />`;
     return `<label class="${wide?'wide':''}" for="${id}">${label}${control}</label>`;
   }
@@ -83,13 +88,14 @@
     for (const kind of ['books','photography']) {
       const holder = $(kind==='books'?'book-edit-list':'photo-edit-list');
       holder.innerHTML = state.data[kind].map((e,i)=>{
-        const fields = kind==='books' ? field(kind,e,'title','Title')+field(kind,e,'author','Author')+field(kind,e,'status','Shelf','status')+field(kind,e,'rating','Rating (optional)','rating')+field(kind,e,'finished','Date finished (optional)','date')+field(kind,e,'finishedYear','Finish year (if date unknown)','number')+field(kind,e,'note','Your reading note','textarea',true) : field(kind,e,'title','Title')+field(kind,e,'collection','Group')+field(kind,e,'subgroup','Subgroup (optional)')+field(kind,e,'location','Place (optional)')+field(kind,e,'date','Date taken (optional)','date')+field(kind,e,'alt','Image description (required when publishing)','text',true)+field(kind,e,'caption','Caption (optional)','textarea',true);
+        const fields = kind==='books' ? field(kind,e,'title','Title')+field(kind,e,'author','Author')+field(kind,e,'status','Shelf','status')+field(kind,e,'rating','Rating (optional)','rating')+field(kind,e,'finished','Date finished (optional)','date')+field(kind,e,'finishedYear','Finish year (if date unknown)','number')+field(kind,e,'note','Reading notes (visible on the public shelf)','textarea',true)+field(kind,e,'recommended','Especially recommend','checkbox',true) : field(kind,e,'title','Title')+field(kind,e,'collection','Group')+field(kind,e,'subgroup','Subgroup (optional)')+field(kind,e,'location','Place (optional)')+field(kind,e,'date','Date taken (optional)','date')+field(kind,e,'alt','Image description (required when publishing)','text',true)+field(kind,e,'caption','Caption (optional)','textarea',true);
         const thumb = kind==='photography' ? ((state.images[e.thumb.slice(1)] || previews[e.thumb.slice(1)]) ? 'data:image/jpeg;base64,'+(state.images[e.thumb.slice(1)] || previews[e.thumb.slice(1)]) : e.thumb) : studioBookCover(e);
         const cover = kind==='books' ? `<div>${bookCover(thumb,e.title,e)}<button type="button" data-book-covers="${e.id}">Choose cover</button><button type="button" data-lookup-book="${e.id}">Find book &amp; author</button></div>` : (thumb?`<img src="${esc(thumb)}" alt="${esc(e.alt || 'Uploaded photograph preview')}" />`:'');
         return `<article class="edit-card" data-kind="${kind}" data-id="${e.id}"><label class="entry-select"><input type="checkbox" data-select-entry aria-label="Select ${esc(e.title || 'untitled entry')}" ${selection[kind].has(e.id)?'checked':''} /></label><details ${openIds.has(e.id)?'open':''}><summary class="entry-summary">${kind==='books'?bookCover(thumb,e.title,e):`<img class="entry-thumb" src="${esc(thumb)}" alt="" loading="lazy" />`}<span><strong class="entry-title">${esc(e.title || 'Untitled')}</strong><span class="entry-meta">${esc(entryLabel(kind,e))}</span><span class="entry-state book-badge">${esc(publication(kind,e))}</span></span><span class="entry-edit-hint">Edit</span></summary><div class="${kind==='photography'?'edit-photo':'edit-book'}">${cover}<div><div class="edit-fields">${fields}</div>${actions(kind,e,i)}${kind==='photography'?photoTransferMarkup(e):''}</div></div></details></article>`;
       }).join('') || `<p>No ${kind==='books'?'books':'photographs'} yet. Add your first one above.</p>`;
     }
     writingEditor.render();
+    showcaseEditor.render();
     refreshBookOverview();
     if(catalogMatches.length) showCatalog(catalogMatches,false);
     renderBatch();
@@ -228,7 +234,7 @@
       if(book)selected.push(book);
       const blocked=busy || !!existing || !!duplicate;
       return `<div class="batch-row ${existing?'is-added':''}"><div>${bookCover(book?studioBookCover(book):'',book?.title || row.title,book || {})}</div><div><label for="batch-match-${i}">${esc(row.title)}</label><select id="batch-match-${i}" data-batch-row="${i}" ${busy?'disabled':''}><option value="">${row.error?'Search unavailable — retry below':'Choose a match or leave out'}</option>${row.matches.map((match,j)=>`<option value="${j}" ${row.selected===j?'selected':''}>${existingBook(match)?'✓ Already added · ':''}${esc(match.title)} — ${esc(match.author || 'Unknown author')}${match.year?' ('+esc(match.year)+')':''}</option>`).join('')}</select>
-      ${book?`<div class="batch-review"><strong>${esc(book.title)}</strong><button type="button" data-batch-covers="${i}" ${blocked?'disabled':''}>Choose cover</button><p>${esc(book.author || 'Author unavailable — choose another match or add manually')}</p><div class="batch-details"><label>Completed<input type="date" data-batch-date="${i}" value="${esc(row.finished || '')}" ${blocked?'disabled':''} /></label><label>Rating<select data-batch-rating="${i}" ${blocked?'disabled':''}><option value="">No rating</option>${[1,2,3,4,5].map(n=>`<option value="${n}" ${String(row.rating)===String(n)?'selected':''}>${'★'.repeat(n)} · ${n}/5</option>`).join('')}</select></label></div><p class="batch-year-hint">${row.finished?'Completed '+esc(row.finished):'Year only: '+esc($('batch-year').value)+'. Exact date optional.'}</p></div>`:''}
+      ${book?`<div class="batch-review"><strong>${esc(book.title)}</strong><button type="button" data-batch-covers="${i}" ${blocked?'disabled':''}>Choose cover</button><p>${esc(book.author || 'Author unavailable — choose another match or add manually')}</p><div class="batch-details"><label>Completed<input type="date" data-batch-date="${i}" value="${esc(row.finished || '')}" ${blocked?'disabled':''} /></label><label>Rating<select data-batch-rating="${i}" ${blocked?'disabled':''}><option value="">No rating</option>${[0.5,1,1.5,2,2.5,3,3.5,4,4.5,5].map(n=>`<option value="${n}" ${String(row.rating)===String(n)?'selected':''}>${'★'.repeat(n)} · ${n}/5</option>`).join('')}</select></label></div><p class="batch-year-hint">${row.finished?'Completed '+esc(row.finished):'Year only: '+esc($('batch-year').value)+'. Exact date optional.'}</p></div>`:''}
       <p class="book-badge">${existing?'✓ Already added · '+esc(bookStatus(existing)):duplicate?'Duplicate in this batch · added only once':book?'Ready for review · not added yet':'Not added · choose a match'}</p></div></div>`;
     }).join('');
     updateBatchButton();
@@ -381,7 +387,8 @@
   document.querySelectorAll('[data-tab]').forEach(button=>button.onclick=()=>{
     if (busy) return;
     document.querySelectorAll('[data-tab]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));
-    $('books-editor').hidden=button.dataset.tab!=='books'; $('photography-editor').hidden=button.dataset.tab!=='photography'; $('writings-editor').hidden=button.dataset.tab!=='writings';
+    $('books-editor').hidden=button.dataset.tab!=='books'; $('photography-editor').hidden=button.dataset.tab!=='photography'; $('writings-editor').hidden=button.dataset.tab!=='writings'; $('showcase-editor').hidden=button.dataset.tab!=='showcase';
+    if(button.dataset.tab==='showcase')showcaseEditor.load();
   });
   document.querySelector('main').addEventListener('input',event=>{
     if (busy || !event.target.dataset.key) return;
@@ -548,7 +555,12 @@
       const result=StudioStorage.enabled
         ? await StudioStorage.publish({data:state.data,baseline:state.baseline,images:state.images,migrate,progress:text=>$('publish-result').textContent=text,onPhoto:updatePhotoTransfer})
         : await StudioCore.publish({data:state.data,baseline:state.baseline,images:state.images,api,onPhoto:updatePhotoTransfer});
+      if(state.data.showcase && !result.published.showcase)throw Error('The publishing service is still updating. Your draft is saved. Retry publishing in a minute.');
       state.baseline=structuredClone(result.published);
+      for(const display of result.published.showcase||[]){
+        const local=state.data.showcase.find(s=>s.id===display.id);
+        if(local && display.imageSrc!==undefined){const path=local.imageSrc?.slice(1);if(path&&state.images[path]){previews[path]=state.images[path];delete state.images[path];}local.imageSrc=display.imageSrc;}
+      }
       writingEditor.render();
       undoDraft=null;
       // Uploaded images no longer count against the pending upload budget.
@@ -572,7 +584,7 @@
         if(photo)state.photoTransfers[id]={phase:'deploying',signature:JSON.stringify(photo)};
       }
       render();
-      const retained=new Set([...state.data.photography.flatMap(p=>[p.src.slice(1),p.thumb.slice(1)]),...state.data.books.filter(b=>b.coverSrc).map(b=>b.coverSrc.slice(1))]);
+      const retained=new Set([...state.data.photography.flatMap(p=>[p.src.slice(1),p.thumb.slice(1)]),...state.data.books.filter(b=>b.coverSrc).map(b=>b.coverSrc.slice(1)),...(state.data.showcase||[]).filter(e=>e.imageSrc).map(e=>e.imageSrc.slice(1))]);
       for(const path of Object.keys(state.images)) if(!retained.has(path)) delete state.images[path];
       await save().catch(()=>{});
       if(StudioStorage.enabled) refreshStorage();
@@ -634,7 +646,7 @@
         ${select('sort','Sort',option('order','Your order')+option('title','Title A–Z')+option('date','Newest '+(photo?'photo':'finish')+' first'))}
       </div><p id="${kind}-count" role="status"></p><div class="studio-actions"><button type="button" data-manage="select" data-kind="${kind}">Select shown</button><button type="button" data-manage="clear" data-kind="${kind}">Clear selection</button><button type="button" data-manage="undo" data-kind="${kind}" disabled>Undo last organization change</button></div>
       <details class="bulk-panel"><summary>Update selected <span id="${kind}-selected">(0)</span></summary><p>Changes affect every selected entry. Publish when ready.</p><div class="manager-filters">
-      ${photo?field('move-group','Move to group','<input CONTROL list="photo-groups" maxlength="100" placeholder="Blank = ungrouped" />')+field('move-subgroup','Move to subgroup','<input CONTROL list="photo-subgroups" maxlength="100" placeholder="Optional" />'):select('bulk-shelf','Reading status',option('','Keep current')+['Read','Reading','Want to read'].map(v=>option(v,v)).join(''))+field('bulk-year','Finish year (replaces exact date)','<input CONTROL type="number" min="1000" max="9999" placeholder="Keep current" />')+select('bulk-rating','Rating',option('','Keep current')+option('none','No rating')+[1,2,3,4,5].map(v=>option(v,v+' / 5')).join(''))}
+      ${photo?field('move-group','Move to group','<input CONTROL list="photo-groups" maxlength="100" placeholder="Blank = ungrouped" />')+field('move-subgroup','Move to subgroup','<input CONTROL list="photo-subgroups" maxlength="100" placeholder="Optional" />'):select('bulk-shelf','Reading status',option('','Keep current')+['Read','Reading','Want to read'].map(v=>option(v,v)).join(''))+field('bulk-year','Finish year (replaces exact date)','<input CONTROL type="number" min="1000" max="9999" placeholder="Keep current" />')+select('bulk-rating','Rating',option('','Keep current')+option('none','No rating')+[0.5,1,1.5,2,2.5,3,3.5,4,4.5,5].map(v=>option(v,v+' / 5')).join(''))}
       </div><div class="studio-actions"><button type="button" data-manage="apply" data-kind="${kind}">${photo?'Move selected':'Apply to selected'}</button><button type="button" data-manage="include" data-kind="${kind}">Include on site</button><button type="button" data-manage="private" data-kind="${kind}">Make private</button><button type="button" data-manage="remove" data-kind="${kind}">Remove selected</button></div></details>
       ${photo?'<details class="group-tools"><summary>Rename a group or subgroup</summary><p>Choose a group in the filters above. Select a subgroup too to rename only that subgroup. Matching photos move together; an existing name combines the groups.</p><label for="rename-group">New name<input id="rename-group" maxlength="100" /></label><button type="button" data-manage="rename" data-kind="photography">Rename filtered group</button></details>':''}<p id="${kind}-feedback" role="status"></p></section>`;
       for(const key of ['search','visibility','sort',...(photo?['group','subgroup']:['shelf','year'])]) {
@@ -718,6 +730,7 @@
       if(['Removal pending','Not published','Changes to publish'].includes(publication('writings',entry))) pending++;
     }
     pending+=(state.baseline.writings || []).filter(e=>!state.data.writings.some(d=>d.id===e.id)).length;
+    pending+=(state.data.showcase||[]).filter(e=>JSON.stringify(e)!==JSON.stringify((state.baseline.showcase||[]).find(b=>b.id===e.id))).length;
     writingEditor.refresh();
     $('draft-summary').textContent=`${pending} pending ${pending===1?'change':'changes'} · ${included} entries included in the next publish`;
   }
@@ -919,6 +932,13 @@
     }catch(error){$('photo-organize-status').textContent=error.message;}
   });
   const writingEditor=createWritingEditor({getState:()=>state,save,isBusy:()=>busy,onChange:()=>{undoDraft=null;managedKinds.forEach(updateSelectionControls);}});
+  const showcaseEditor=createShowcaseEditor({getState:()=>state,save,isBusy:()=>busy,onChange:()=>{undoDraft=null;},uploadImage:async file=>{
+    StudioAccess.requireUnlocked();setBusy(true);
+    try {const image=await resizePhoto(file);const path='assets/photography/project-'+crypto.randomUUID()+'.jpg';
+      if(Object.values(state.images).reduce((n,v)=>n+v.length,0)+image.full.content.length>45*1024*1024)throw Error('Publish your pending images before adding more.');
+      state.images[path]=image.full.content;return '/'+path;
+    } finally {setBusy(false);}
+  }});
   setupManagers();
 
   async function init() {

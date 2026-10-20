@@ -80,7 +80,7 @@
       if(findExisting(books,book)) {skipped++;continue;}
       const finished=String(book.finished || ''), rating=String(book.rating || '');
       if(finished && (!/^\d{4}-\d{2}-\d{2}$/.test(finished) || Number.isNaN(Date.parse(finished)) || new Date(finished).toISOString().slice(0,10)!==finished)) throw Error('Choose a valid completion date for '+book.title+'.');
-      if(rating && !['1','2','3','4','5'].includes(rating)) throw Error('Choose a rating from 1 to 5.');
+      if(rating && !['0.5','1','1.5','2','2.5','3','3.5','4','4.5','5'].includes(rating)) throw Error('Choose a rating from 0.5 to 5 in half-star steps.');
       books.push({...book,id:makeId(),status:'Read',finished,finishedYear:finished?finished.slice(0,4):String(year),rating,note:'',published:true}); added++;
     }
     return {books,added,skipped};

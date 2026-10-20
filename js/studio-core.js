@@ -2,7 +2,8 @@
 ((root) => {
   'use strict';
   const writing = root.WritingData || (typeof require === 'function' ? require('./writing-data.js') : null);
-  const paths = {writings:'data/writings-local.json',books:'data/books.json', photography:'data/photography.json'};
+  const showcase = root.ShowcaseData || (typeof require === 'function' ? require('./showcase-data.js') : null);
+  const paths = {writings:'data/writings-local.json',books:'data/books.json', photography:'data/photography.json',showcase:'data/showcase.json'};
   const imagePath = /^assets\/photography\/[a-zA-Z0-9_-]+\.jpg$/;
   const remoteImage = /^https:\/\/jameskull-studio-storage\.fitzykull\.workers\.dev\/photos\/[a-f0-9]{64}\.jpg$/;
   const validPhoto = path => imagePath.test(String(path).replace(/^\//,'')) || remoteImage.test(path);
@@ -14,20 +15,22 @@
   const canonical = value => JSON.stringify(value);
   function validate(data, publishing = false) {
     for (const kind of Object.keys(paths)) {
-      if (kind==='writings' && data[kind]===undefined) continue; // Older browser drafts and backups.
+      if (['writings','showcase'].includes(kind) && data[kind]===undefined) continue; // Older browser drafts and backups.
       if (!Array.isArray(data[kind]) || data[kind].length > (kind==='writings'?1000:50000)) throw Error('Invalid '+kind+' collection.');
       const ids = new Set();
       for (const entry of data[kind]) {
         if (!entry || typeof entry !== 'object' || !/^[a-zA-Z0-9_-]+$/.test(entry.id) || ids.has(entry.id)) throw Error('Every entry needs a unique ID.');
         ids.add(entry.id);
         if(kind==='writings') {writing.validate(entry,publishing);continue;}
+        if(kind==='showcase') {showcase.validate(entry);continue;}
         for (const [key, value] of Object.entries(entry)) {
           if (!['string','boolean','number'].includes(typeof value) || String(value).length > 20000) throw Error('Invalid entry field: '+key);
         }
         if (publishing && entry.published !== false && (!entry.title?.trim() || (kind === 'books' ? !entry.author?.trim() : !entry.alt?.trim()))) throw Error(kind === 'books' ? 'Add a title and author to every included book.' : 'Add a title and image description to every included photo.');
         if (kind === 'books' && entry.coverSrc && !validPhoto(entry.coverSrc)) throw Error('Invalid book cover path.');
         if (kind === 'books' && !['Reading','Read','Want to read'].includes(entry.status)) throw Error('Choose a valid reading status.');
-        if (kind === 'books' && entry.rating && !['1','2','3','4','5'].includes(String(entry.rating))) throw Error('Ratings must be from 1 to 5.');
+        if (kind === 'books' && entry.rating !== undefined && entry.rating !== '' && !['0.5','1','1.5','2','2.5','3','3.5','4','4.5','5'].includes(String(entry.rating))) throw Error('Ratings must be from 0.5 to 5 in half-star steps.');
+        if (kind === 'books' && entry.recommended !== undefined && typeof entry.recommended !== 'boolean') throw Error('Book recommendations must be true or false.');
         if (kind === 'books' && entry.finishedYear && !/^\d{4}$/.test(String(entry.finishedYear))) throw Error('Use four digits for the finish year.');
         if (kind === 'photography') {
           if (['collection','subgroup'].some(key=>entry[key] !== undefined && (typeof entry[key] !== 'string' || entry[key].length > 100))) throw Error('Group names must be 100 characters or fewer.');
@@ -73,10 +76,14 @@
     validate(result);
     return result;
   }
+  function publicData(data) {
+    const privateProjects=new Set((data.writings||[]).filter(w=>w.type==='project'&&w.published===false).map(w=>w.id));
+    return Object.fromEntries(Object.keys(paths).filter(k=>data[k]!==undefined).map(k=>[k,data[k].filter(e=>e.published!==false && (k!=='showcase'||e.id==='home'||!privateProjects.has(e.projectId)))]));
+  }
   async function publish({data, baseline, images, api, onPhoto=()=>{}}) {
     validate(data, true);
     const kinds = Object.keys(paths).filter(k=>data[k]!==undefined);
-    const published = Object.fromEntries(kinds.map(k=>[k,data[k].filter(e=>e.published !== false)]));
+    const published = publicData(data);
     if(published.writings && new TextEncoder().encode(JSON.stringify(published.writings,null,2)).length>900000) throw Error('The published writing collection is too large (900 KB maximum). Shorten the articles or keep some as private drafts before publishing.');
     const ref = await api('/git/ref/heads/main');
     const head = ref.object.sha;
@@ -98,7 +105,7 @@
         }
       }
     }
-    const needed = new Set([...published.photography.flatMap(p=>[p.src.slice(1),p.thumb.slice(1)]),...published.books.filter(b=>b.coverSrc).map(b=>b.coverSrc.slice(1))]);
+    const needed = new Set([...published.photography.flatMap(p=>[p.src.slice(1),p.thumb.slice(1)]),...published.books.filter(b=>b.coverSrc).map(b=>b.coverSrc.slice(1)),...(published.showcase||[]).filter(s=>s.imageSrc).map(s=>s.imageSrc.slice(1))]);
     for (const [path, content] of Object.entries(images)) {
       if (!needed.has(path)) continue;
       if (!imagePath.test(path) || !/^[A-Za-z0-9+/=]+$/.test(content)) throw Error('Invalid image upload.');
@@ -117,7 +124,7 @@
     await api('/git/refs/heads/main','PATCH',{sha:createdCommit.sha,force:false});
     return {sha:createdCommit.sha,published};
   }
-  const core = {validate,mergePublished,publish,imagePath,validPhoto,readCollection};
+  const core = {validate,mergePublished,publish,publicData,imagePath,validPhoto,readCollection};
   root.StudioCore = core;
   if (typeof module !== 'undefined') module.exports = core;
 })(globalThis);

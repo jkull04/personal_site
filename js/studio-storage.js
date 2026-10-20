@@ -50,9 +50,9 @@
   async function publish({data,baseline,images,migrate=false,progress=()=>{},onPhoto=()=>{}}) {
     StudioCore.validate(data,true);
     // Never send private drafts or unrelated pending images to the service.
-    const publicData=Object.fromEntries(Object.entries(data).map(([kind,entries])=>[kind,entries.filter(e=>e.published!==false).map(e=>({...e}))]));
+    const publicData=Object.fromEntries(Object.entries(StudioCore.publicData(data)).map(([kind,entries])=>[kind,entries.map(e=>({...e}))]));
     const uploaded=new Map();
-    const media=[...publicData.photography.map(entry=>({entry,fields:['src','thumb']})),...publicData.books.filter(b=>b.coverSrc).map(entry=>({entry,fields:['coverSrc']}))];
+    const media=[...publicData.photography.map(entry=>({entry,fields:['src','thumb']})),...publicData.books.filter(b=>b.coverSrc).map(entry=>({entry,fields:['coverSrc']})),...(publicData.showcase||[]).filter(s=>s.imageSrc?.startsWith('/assets/photography/')||s.imageSrc?.startsWith('https://')).map(entry=>({entry,fields:['imageSrc']}))];
     for(const [i,{entry:photo,fields}] of media.entries()) {
       const isPhoto=fields.includes('src');
       let touched=false;
