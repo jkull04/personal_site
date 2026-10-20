@@ -15,7 +15,29 @@
     document.documentElement.style.setProperty('--gallery-top',Math.ceil(height+12)+'px');
   }
   fitViewport(); window.addEventListener('resize',fitViewport,{passive:true});
+  const placeKey='jameskull-photo-places';
+  let savedPlaces={};
+  try { const saved=JSON.parse(sessionStorage.getItem(placeKey)); if(saved && typeof saved==='object' && !Array.isArray(saved)) savedPlaces=saved; } catch {}
+  function rememberPlace() {
+    if(!panel || activeIndex<0) return;
+    const name=albums[activeIndex].name;
+    savedPlaces={...savedPlaces,[name]:{subgroup:activeSubgroup,anchor:visible[page*batchSize]?.id}};
+    try { sessionStorage.setItem(placeKey,JSON.stringify(savedPlaces)); } catch {}
+  }
+  function updateFilterOverflow(reveal=false) {
+    const strip=panel?.querySelector('.album-subfilters');
+    if(!strip) return;
+    if(reveal) {
+      const selected=strip.querySelector('[aria-pressed="true"]'), bounds=strip.getBoundingClientRect(), item=selected?.getBoundingClientRect();
+      if(item && item.right>bounds.right-20) strip.scrollLeft+=item.right-bounds.right+20;
+      else if(item && item.left<bounds.left+20) strip.scrollLeft-=bounds.left-item.left+20;
+    }
+    strip.parentElement.classList.toggle('can-scroll-left',strip.scrollLeft>2);
+    strip.parentElement.classList.toggle('can-scroll-right',strip.scrollWidth-strip.clientWidth-strip.scrollLeft>2);
+  }
+  window.addEventListener('resize',()=>updateFilterOverflow(),{passive:true});
   function updateLink(push=false) {
+    rememberPlace();
     const hash=panel ? PhotoData.link(entries,albums[activeIndex].name,activeSubgroup?JSON.parse(activeSubgroup):undefined,dialog.open?visible[current]?.id:'',page) : '';
     if(location.hash!==hash) history[push?'pushState':'replaceState'](null,'',location.pathname+location.search+hash);
   }
@@ -130,6 +152,7 @@
   }
   async function closePanel(sync=true, animate=true) {
     if (!panel || closing) return;
+    rememberPlace();
     closing = true;
     const old = panel, button = list.querySelector(`[data-album="${activeIndex}"]`);
     old.classList.add('is-closing');
@@ -150,21 +173,35 @@
     const child = activeSubgroup ? JSON.parse(activeSubgroup) : undefined;
     visible = entries.filter(photo=>PhotoData.matches(photo,album.name,child));
     const start = page*batchSize, photos = visible.slice(start,start+batchSize), total = visible.length;
+    const previousScroll=panel.querySelector('.album-subfilters')?.scrollLeft || 0;
     let offset=start;
     const rows=PhotoData.rows(photos,compact.matches).map(row=>`<div class="photo-row">${row.map(photo=>photoCard(photo,offset++)).join('')}</div>`).join('');
     panel.innerHTML = `<div class="album-spread-shell">
       <div class="album-heading"><h2 id="album-detail-title">${esc(album.name || 'Other photos')}</h2><p>${total} ${photoWord(total)}</p></div>
       <button type="button" class="album-share" data-share-album aria-label="Copy category link">Copy link</button>
       <button type="button" class="album-dismiss" data-close-album aria-label="Close ${esc(album.name || 'Other photos')}"><span aria-hidden="true">×</span></button>
-      ${album.subgroups.some(s=>s.name) ? `<div class="album-subfilters" role="group" aria-label="Filter subgroups"><button type="button" data-subgroup="" aria-pressed="${!activeSubgroup}">All</button>${album.subgroups.map(s=>`<button type="button" data-subgroup="${esc(JSON.stringify(s.name))}" aria-pressed="${child===s.name}">${esc(s.name || 'Other photos')} <span>${s.photos.length}</span></button>`).join('')}</div>` : ''}
+      ${album.subgroups.some(s=>s.name) ? `<div class="album-subfilters-wrap"><div class="album-subfilters" role="group" aria-label="Filter subgroups"><button type="button" data-subgroup="" aria-pressed="${!activeSubgroup}">All</button>${album.subgroups.map(s=>`<button type="button" data-subgroup="${esc(JSON.stringify(s.name))}" aria-pressed="${child===s.name}">${esc(s.name || 'Other photos')} <span>${s.photos.length}</span></button>`).join('')}</div></div>` : ''}
       <div class="album-spread" data-count="${photos.length}">${rows}</div>
       ${total > batchSize ? `<nav class="album-pagination" aria-label="Album pages"><button type="button" data-page="-1" ${page===0?'disabled':''}>← Previous</button><p role="status">${start+1}–${Math.min(start+batchSize,total)} of ${total}</p><button type="button" data-page="1" ${start+batchSize>=total?'disabled':''}>Next →</button></nav>` : ''}
     </div>`;
+    const strip=panel.querySelector('.album-subfilters');
+    if(strip) {
+      strip.scrollLeft=previousScroll;
+      strip.addEventListener('scroll',()=>updateFilterOverflow(),{passive:true});
+      requestAnimationFrame(()=>updateFilterOverflow(true));
+    }
     if (animate) { panel.classList.add('is-entering'); animateSpread(); }
   }
   function openAlbum(index, sync=true) {
     if (panel || !albums[index]) return;
     activeIndex = index; activeSubgroup = ''; page = 0;
+    const saved=sync && Object.hasOwn(savedPlaces,albums[index].name) ? savedPlaces[albums[index].name] : null;
+    if(saved && typeof saved==='object') {
+      const subgroup=albums[index].subgroups.find(s=>JSON.stringify(s.name)===saved.subgroup);
+      activeSubgroup=subgroup?JSON.stringify(subgroup.name):'';
+      const photos=entries.filter(photo=>PhotoData.matches(photo,albums[index].name,subgroup?.name));
+      page=Math.floor(Math.max(0,photos.findIndex(photo=>photo.id===saved.anchor))/batchSize);
+    }
     const button = list.querySelector(`[data-album="${index}"]`), r = button.getBoundingClientRect();
     origin = {x:r.x+r.width/2,y:r.y+r.height/2};
     panel = document.createElement('dialog'); panel.className = 'album-explorer is-entering'; panel.dataset.input=keyboardInput?'keyboard':'pointer'; panel.id = 'album-expansion';

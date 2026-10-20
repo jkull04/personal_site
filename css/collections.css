@@ -207,3 +207,11 @@ html:has([data-collection="photography"]) { scrollbar-gutter:stable; }
  .album-share { font-size:.68rem; padding-inline:5px; }
 }
 @media(prefers-reduced-motion:reduce) { .album-subfilters button { transition:none; } }
+
+/* Edge cues appear only while more country filters are out of view. */
+.album-subfilters-wrap { position:relative; flex-shrink:0; min-width:0; }
+@media(max-width:700px), (max-height:540px) {
+ .album-subfilters-wrap::before,.album-subfilters-wrap::after { position:absolute; z-index:1; top:0; bottom:8px; width:26px; display:flex; align-items:center; pointer-events:none; color:var(--muted); font-size:20px; }
+ .album-subfilters-wrap.can-scroll-left::before { content:'‹'; left:0; justify-content:flex-start; background:linear-gradient(to right,var(--bg) 30%,transparent); }
+ .album-subfilters-wrap.can-scroll-right::after { content:'›'; right:0; justify-content:flex-end; background:linear-gradient(to left,var(--bg) 30%,transparent); }
+}
