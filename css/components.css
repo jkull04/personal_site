@@ -120,9 +120,22 @@
   font-size: clamp(2.45rem, 5.2vw, 3.55rem);
 }
 
+.home-page .home-intro {
+  display: grid;
+  gap: 10px;
+  max-width: 64ch;
+  font-size: clamp(1rem, 1.5vw, 1.125rem);
+  line-height: 1.5;
+}
+
 .home-page .hero-lead {
-  max-width: 52ch;
-  font-size: clamp(1.05rem, 2vw, 1.22rem);
+  max-width: none;
+  font-size: inherit;
+}
+
+.home-page .home-interests {
+  color: #756D60;
+  font-size: max(1rem, 0.944444em);
 }
 
 .hero-kicker {
@@ -1194,6 +1207,7 @@
 .home-page .hero--arena {
   min-height: 0;
   gap: 24px;
+  padding-top: 36px;
 }
 
 .home-page .home-identity {
@@ -1280,4 +1294,13 @@
   .arena-routes--home > .arena-route {
     flex-basis: 100%;
   }
+}
+
+
+/* A compact introduction leaves room for the artwork on phones. */
+@media (max-width: 600px) {
+  .home-page .hero--arena { padding-top: 24px; gap: 20px; }
+  .home-page #home-title { font-size: clamp(2rem, 8.5vw, 2.125rem); }
+  .home-page .home-intro { font-size: 1rem; gap: 10px; }
+  .home-page .home-interests { font-size: 1rem; }
 }

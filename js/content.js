@@ -58,6 +58,12 @@
     document.querySelectorAll("[data-site-tagline]").forEach((node) => {
       node.textContent = site.tagline || node.textContent;
     });
+
+    for (const field of ["intro", "interests"]) {
+      document.querySelectorAll(`[data-site-${field}]`).forEach((node) => {
+        node.textContent = site[field] || node.textContent;
+      });
+    }
   }
 
   function domId(value) {
