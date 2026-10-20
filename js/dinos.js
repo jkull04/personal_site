@@ -29,10 +29,10 @@
   const ROOT_ATLAS_LOADING_CLASS = "dino-atlases-loading";
   const ATLAS_PRELOAD_DELAY_MS = 120;
   const DINO_ATLAS_URLS = [
-    "/assets/sprites/stegosaurus-walk-atlas-2x.webp?v=20261020-approved-dinos-v2",
+    "/assets/sprites/stegosaurus-walk-atlas-2x.webp?v=20261020-stego-shading-v3",
     "/assets/sprites/raptor-walk-atlas-2x.webp?v=20261020-approved-dinos-v2",
     "/assets/sprites/marble-brach-walk-atlas-2x.webp?v=20261020-approved-dinos-v2",
-    "/assets/sprites/stegosaurus-standing-atlas.webp?v=20261020-approved-dinos-v2",
+    "/assets/sprites/stegosaurus-standing-atlas.webp?v=20261020-stego-shading-v3",
     "/assets/sprites/raptor-standing-atlas.webp?v=20261020-approved-dinos-v2",
     "/assets/sprites/marble-brach-standing-atlas.webp?v=20261020-approved-dinos-v2"
   ];
@@ -421,9 +421,9 @@
 
   // Independent decisions plus continuous steering: no animation paths or shared schedule.
   const personalities = {
-    raptor: { speed: 29, curiosity: 0.85, rest: [700, 1800], walk: [1200, 2600], reaction: [180, 700], food: "meat" },
-    stego: { speed: 15, curiosity: 0.3, rest: [1800, 4200], walk: [2000, 3800], reaction: [550, 1400], food: "leaf" },
-    longneck: { speed: 10, curiosity: 0.5, rest: [2600, 5600], walk: [2400, 4400], reaction: [1000, 2200], food: "leaf" }
+    raptor: { speed: 29, curiosity: 0.85, rest: [1400, 2800], walk: [1100, 2300], reaction: [180, 700], food: "meat" },
+    stego: { speed: 15, curiosity: 0.3, rest: [2600, 5600], walk: [1800, 3400], reaction: [550, 1400], food: "leaf" },
+    longneck: { speed: 10, curiosity: 0.5, rest: [3600, 7200], walk: [2200, 4000], reaction: [1000, 2200], food: "leaf" }
   };
   const habitats = new Map();
   let activeDrag = null;

@@ -30,8 +30,8 @@
 }
 
 .dino--sheet.dino--stego {
-  --dino-walk-image: url("../assets/sprites/stegosaurus-walk-atlas-2x.webp?v=20261020-approved-dinos-v2");
-  --dino-idle-image: url("../assets/sprites/stegosaurus-standing-atlas.webp?v=20261020-approved-dinos-v2");
+  --dino-walk-image: url("../assets/sprites/stegosaurus-walk-atlas-2x.webp?v=20261020-stego-shading-v3");
+  --dino-idle-image: url("../assets/sprites/stegosaurus-standing-atlas.webp?v=20261020-stego-shading-v3");
   background-image: var(--dino-sheet-image);
 }
 
