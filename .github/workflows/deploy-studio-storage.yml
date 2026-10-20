@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - 'backend/storage/**'
+      - 'tests/security*.test.*'
       - 'js/studio-core.js'
       - 'js/writing-data.js'
       - 'tests/storage.test.mjs'
@@ -30,7 +31,10 @@ jobs:
         with:
           node-version: '22'
       - name: Verify storage guards
-        run: node --test tests/*.test.js tests/storage.test.mjs
+        run: node --test tests/*.test.js tests/*.test.mjs
+      - name: Install locked deployment tooling
+        working-directory: backend/storage
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Verify deployment credential is configured
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.STUDIO_CLOUDFLARE_API_TOKEN }}
@@ -44,5 +48,6 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.STUDIO_CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: a9e6f5645954b0f0396a99486a0a47d2
         run: |
-          npx --yes wrangler@4 deploy --config backend/storage/wrangler.jsonc --dry-run
-          npx --yes wrangler@4 deploy --config backend/storage/wrangler.jsonc
+          backend/storage/node_modules/.bin/wrangler deploy --config backend/storage/wrangler.jsonc --dry-run
+          backend/storage/node_modules/.bin/wrangler deploy --config backend/storage/wrangler.jsonc
+

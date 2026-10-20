@@ -8,7 +8,7 @@ import vm from 'node:vm';
 import fs from 'node:fs';
 
 const digest=s=>createHash('sha256').update(s).digest('hex');
-const credential='a'.repeat(64), origin='https://www.jameskull.com';
+const credential='a'.repeat(64), githubToken='ghp_'+'a'.repeat(36), origin='https://www.jameskull.com';
 const empty=()=>({books:[],photography:[],writings:[]});
 const image=Uint8Array.from([255,216,255,224,0,16,255,217]);
 const imageURL='https://jameskull-studio-storage.fitzykull.workers.dev/photos/'+digest(image)+'.jpg';
@@ -17,11 +17,12 @@ class MemoryStorage {
   data=new Map(); queue=Promise.resolve();
   get=async key=>structuredClone(this.data.get(key));
   put=async(key,value)=>this.data.set(key,structuredClone(value));
+  delete=async key=>this.data.delete(key);
   transaction(fn) {const run=this.queue.then(()=>fn(this));this.queue=run.catch(()=>{});return run;}
 }
 function setup() {
   const objects=new Map(),calls=[];
-  const env={ALLOWED_ORIGINS:origin,STUDIO_AUTH_SHA256:digest(credential),SESSION_SECRET:'test-only-session-secret-with-sufficient-length',GITHUB_TOKEN:'test-only',LOGIN_LIMITER:{limit:async()=>({success:true})},PHOTOS:{
+  const env={REQUIRE_CHECKS:'false',READ_LIMITER:{limit:async()=>({success:true})},ALLOWED_ORIGINS:origin,STUDIO_AUTH_SHA256:digest(credential),SESSION_SECRET:'test-only-session-secret-with-sufficient-length',GITHUB_TOKEN:'test-only',LOGIN_LIMITER:{limit:async()=>({success:true})},PHOTOS:{
     head:async key=>objects.get(key)||null,
     put:async(key,bytes)=>objects.set(key,{size:bytes.length}),
     list:async()=>({objects:[...objects.values()],truncated:false})
@@ -30,6 +31,8 @@ function setup() {
   env.BUDGET={idFromName:name=>name,get:()=>budget};
   env.PHOTOS.get=async key=>objects.has(key)?{body:image,httpEtag:'etag'}:null;
   const handler=createHandler(async(url,options)=>{
+    if(url==='https://api.github.com/user')return options.headers.Authorization==='Bearer '+githubToken?Response.json({login:'jkull04'}):Response.json({error:'bad token'},{status:401});
+    if(url==='https://api.github.com/repos/jkull04/personal_site')return Response.json({permissions:{push:true}});
     const path=url.replace('https://api.github.com/repos/jkull04/personal_site','');calls.push({path,...options});
     let value;
     if(path==='/git/ref/heads/main')value={object:{sha:'head'}};
@@ -39,7 +42,7 @@ function setup() {
     return Response.json(value);
   });
   const call=(path,body,token,method=body===undefined?'GET':'POST',requestOrigin=origin)=>handler(new Request('https://jameskull-studio-storage.fitzykull.workers.dev'+path,{method,headers:{Origin:requestOrigin,...(token?{Authorization:'Bearer '+token}:{}),'Content-Type':body instanceof Uint8Array?'image/jpeg':'application/json'},body:body===undefined?undefined:body instanceof Uint8Array?body:JSON.stringify(body)}),env);
-  const login=async()=>{const response=await call('/session',{credential});assert.equal(response.status,200);return (await response.json()).token;};
+  const login=async()=>{const response=await call('/session',{githubToken});assert.equal(response.status,200);return (await response.json()).token;};
   return {call,login,env,objects,calls,storage,budget,handler};
 }
 test('storage rejects unauthorized origins, missing sessions and invalid credentials',async()=>{
@@ -68,7 +71,7 @@ test('shared media and API host exposes only canonical photo paths without authe
 test('login rate limits and incomplete setup fail closed',async()=>{
   const {call,env}=setup();env.LOGIN_LIMITER.limit=async()=>({success:false});
   assert.equal((await call('/session',{credential})).status,429);
-  delete env.STUDIO_AUTH_SHA256;
+  delete env.SESSION_SECRET;
   assert.equal((await call('/session',{credential})).status,503);
 });
 test('photo uploads are content-addressed and safe to retry; invalid bytes fail',async()=>{
@@ -100,7 +103,7 @@ test('collections exceeding the old 1,000-entry and 1MB thresholds remain readab
   assert.deepEqual(await core.readCollection(async()=>books,'/contents/data/books.json'),books);
 });
 function browser(fetcher) {
-  const context={window:{},fetch:fetcher,sessionStorage:{getItem:()=>null,setItem(){},removeItem(){}},StudioAccess:{serviceCredential:async()=>credential},StudioCore:core,Blob,Uint8Array,atob,Map,Error,Boolean,encodeURIComponent};
+  const context={window:{},fetch:fetcher,sessionStorage:{getItem:()=>'session',setItem(){},removeItem(){}},StudioAccess:{serviceCredential:async()=>credential},StudioCore:core,Blob,Uint8Array,atob,Map,Error,Boolean,encodeURIComponent};
   vm.runInNewContext(fs.readFileSync(new URL('../js/studio-storage.js',import.meta.url),'utf8'),context);
   return context.window.StudioStorage;
 }
@@ -146,6 +149,7 @@ test('upload and image-read limits stop operations, not merely warn',async()=>{
   const {storage,call,login,env,handler,objects}=setup();const token=await login();
   await storage.put('daily',{day:new Date().toISOString().slice(0,10),writes:LIMITS.writesPerDay,reads:LIMITS.readsPerDay});
   assert.equal((await call('/photos',image,token)).status,429);assert.equal(objects.size,0);
+  await storage.put('object:'+new URL(imageURL).pathname.slice(1),{size:image.length,complete:true});
   assert.equal((await handler(new Request(imageURL),env)).status,429);
 });
 test('failed R2 uploads retain their budget reservation and retries do not double count bytes',async()=>{
@@ -196,4 +200,40 @@ test('retry after network failure reuses successful uploads and reports draft sa
  const args={data:{...empty(),photography:[photo()]},baseline:empty(),images:{'assets/photography/p.jpg':Buffer.from(image).toString('base64'),'assets/photography/p-thumb.jpg':Buffer.from(image).toString('base64')}};
  await assert.rejects(()=>service.publish(args),/draft and uploaded photos are safe/);assert.equal(uploads,2);
  await service.publish(args);assert.equal(uploads,2);assert.equal(Object.keys(args.images).length,2);assert.equal(args.data.photography[0].src,'/assets/photography/p.jpg');
+});
+
+
+test('security: nonexistent photos cannot exhaust the gallery allowance',async()=>{
+ const {call,login,env,storage,handler}=setup();await call('/photos',image,await login());
+ await storage.put('daily',{day:new Date().toISOString().slice(0,10),reads:LIMITS.readsPerDay-1,writes:1});
+ for(const digit of ['0','1','2'])assert.equal((await handler(new Request(new URL('/photos/'+digit.repeat(64)+'.jpg',imageURL)),env)).status,404);
+ assert.equal((await storage.get('daily')).reads,LIMITS.readsPerDay-1);
+ assert.equal((await handler(new Request(imageURL),env)).status,200);
+});
+test('security: read throttling rejects before R2 or the global allowance',async()=>{
+ const {handler,env,storage}=setup();env.READ_LIMITER.limit=async()=>({success:false});
+ env.PHOTOS.get=async()=>{throw Error('Must not reach R2');};
+ assert.equal((await handler(new Request(imageURL),env)).status,429);
+ assert.equal(await storage.get('daily'),undefined);
+});
+test('security: old password credentials no longer authorize publishing',async()=>{
+ const {call}=setup();assert.equal((await call('/session',{credential})).status,401);
+});
+test('security: disconnect revokes captured sessions and removes encrypted credentials',async()=>{
+ const {call,login,storage}=setup();const token=await login();
+ const record=JSON.parse(atob(token.split('.')[0]));
+ assert.ok(!JSON.stringify(await storage.get('session:'+record.sid)).includes(githubToken));
+ assert.equal((await call('/logout',{},token)).status,200);
+ assert.equal(await storage.get('session:'+record.sid),undefined);
+ assert.equal((await call('/usage',undefined,token)).status,401);
+});
+test('security: auth-version rotation revokes every previous session',async()=>{
+ const {call,login,env}=setup();const token=await login();env.AUTH_VERSION='3';
+ assert.equal((await call('/usage',undefined,token)).status,401);
+});
+test('security: publishing uses the connecting token, never broader service credentials',async()=>{
+ const {call,login,calls}=setup();const token=await login();
+ const data={...empty(),books:[{id:'book',title:'Title',author:'Author',status:'Read'}]};
+ assert.equal((await call('/publish',{data,baseline:empty()},token)).status,200);
+ assert.ok(calls.every(c=>c.headers.Authorization==='Bearer '+githubToken));
 });

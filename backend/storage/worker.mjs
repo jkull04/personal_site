@@ -1,3 +1,4 @@
+import {github} from './github.mjs';
 import '../../js/writing-data.js';
 import '../../js/studio-core.js';
 export {StorageBudget} from './quota.mjs';
@@ -10,10 +11,17 @@ const hex=b=>Array.from(new Uint8Array(b),v=>v.toString(16).padStart(2,'0')).joi
 const unhex=s=>Uint8Array.from(s.match(/../g)||[],v=>parseInt(v,16));
 const hash=async value=>hex(await crypto.subtle.digest('SHA-256',typeof value==='string'?encoder.encode(value):value));
 const failure=(message,status=400)=>Object.assign(Error(message),{status});
-function equal(a,b) {if(typeof a!=='string'||typeof b!=='string'||a.length!==b.length)return false;let diff=0;for(let i=0;i<a.length;i++)diff|=a.charCodeAt(i)^b.charCodeAt(i);return diff===0;}
 async function signingKey(env) {return crypto.subtle.importKey('raw',encoder.encode(env.SESSION_SECRET),{name:'HMAC',hash:'SHA-256'},false,['sign','verify']);}
-async function session(env) {
-  const payload=btoa(JSON.stringify({exp:Date.now()+12*60*60*1000,nonce:crypto.randomUUID()}));
+async function credentialKey(env) {
+  return crypto.subtle.importKey('raw',await crypto.subtle.digest('SHA-256',encoder.encode('studio-session-credential-v2:'+env.SESSION_SECRET)),{name:'AES-GCM'},false,['encrypt','decrypt']);
+}
+async function session(env,githubToken) {
+  const iv=crypto.getRandomValues(new Uint8Array(12));
+  const encrypted=await crypto.subtle.encrypt({name:'AES-GCM',iv},await credentialKey(env),encoder.encode(githubToken));
+  const credential={iv:hex(iv),data:hex(encrypted)};
+  const exp=Date.now()+12*60*60*1000, sid=crypto.randomUUID();
+  await budget(env,{action:'session-create',sessionId:sid,expires:exp,credential,authVersion:env.AUTH_VERSION||'2'});
+  const payload=btoa(JSON.stringify({v:2,exp,sid}));
   return payload+'.'+hex(await crypto.subtle.sign('HMAC',await signingKey(env),encoder.encode(payload)));
 }
 async function authorized(request,env) {
@@ -21,7 +29,11 @@ async function authorized(request,env) {
   const [payload,signature,...extra]=token.split('.');
   if(extra.length || !payload || !/^[a-f0-9]{64}$/.test(signature||'')) return false;
   if(!await crypto.subtle.verify('HMAC',await signingKey(env),unhex(signature),encoder.encode(payload))) return false;
-  try {const value=JSON.parse(atob(payload));return value.exp>Date.now() && value.exp<=Date.now()+12*60*60*1000;} catch {return false;}
+  let value;try {value=JSON.parse(atob(payload));}catch{return false;}
+  if(value.v!==2 || !Number.isSafeInteger(value.exp) || value.exp<=Date.now() || value.exp>Date.now()+12*60*60*1000 || !/^[a-f0-9-]{36}$/.test(value.sid||''))return false;
+  const record=await budget(env,{action:'session-check',sessionId:value.sid,authVersion:env.AUTH_VERSION||'2'});
+  try {value.githubToken=new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:unhex(record.credential.iv)},await credentialKey(env),unhex(record.credential.data)));}catch{return false;}
+  return value;
 }
 async function readBody(request,max) {
   if(Number(request.headers.get('Content-Length'))>max) throw failure('Request too large.',413);
@@ -31,13 +43,6 @@ async function readBody(request,max) {
   const bytes=new Uint8Array(total);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}return bytes;
 }
 async function jsonBody(request,max) {try {return JSON.parse(new TextDecoder().decode(await readBody(request,max)));} catch(error) {if(error.status)throw error;throw failure('Invalid request.');}}
-function github(env,fetcher) {
-  return async(path,method='GET',body)=>{
-    const response=await fetcher(repo+path,{method,headers:{Authorization:'Bearer '+env.GITHUB_TOKEN,Accept:path.startsWith('/contents/')?'application/vnd.github.raw+json':'application/vnd.github+json','User-Agent':'JamesKull-Studio','Content-Type':'application/json','X-GitHub-Api-Version':'2022-11-28'},body:body===undefined?undefined:JSON.stringify(body)});
-    if(!response.ok) throw failure(response.status===409||response.status===422?'The site changed while publishing. Reload published content after backing up your draft.':'GitHub publishing is unavailable. Your draft is safe.',response.status===409||response.status===422?409:502);
-    return response.json();
-  };
-}
 async function budget(env,body) {
   if(!env.BUDGET) throw failure('Storage budget unavailable. Requests are paused for safety.',503);
   const stub=env.BUDGET.get(env.BUDGET.idFromName('photos-v1'));
@@ -53,7 +58,10 @@ async function servePhoto(request,env,ctx) {
   const cached=cache && await cache.match(cacheKey);
   if(cached)return request.method==='HEAD'?new Response(null,cached):cached;
   try {
-    await budget(env,{action:'read'});
+    if(!env.READ_LIMITER)throw failure('Photo protection unavailable.',503);
+    const limit=await env.READ_LIMITER.limit({key:request.headers.get('CF-Connecting-IP')||'unknown'});
+    if(!limit.success)throw failure('Too many photo requests. Try again shortly.',429);
+    await budget(env,{action:'read',key});
     const object=await env.PHOTOS.get(key);
     if(!object)return new Response('Not found',{status:404});
     const headers={'Content-Type':'image/jpeg','Cache-Control':'public, max-age=31536000, immutable','X-Content-Type-Options':'nosniff','Access-Control-Allow-Origin':'*'};
@@ -76,16 +84,23 @@ export function createHandler(fetcher=fetch) {
     if(request.method==='OPTIONS') return new Response(null,{status:204,headers:{...headers,'Access-Control-Allow-Methods':'GET, POST, OPTIONS','Access-Control-Allow-Headers':'Content-Type, Authorization','Access-Control-Max-Age':'600'}});
     try {
       if(env.PAUSED==='true')throw failure('Cloud storage is temporarily paused.',503);
-      if(!env.STUDIO_AUTH_SHA256 || !env.SESSION_SECRET || !env.GITHUB_TOKEN || !env.PHOTOS || !env.LOGIN_LIMITER || !env.BUDGET) throw failure('Cloud storage setup is incomplete.',503);
+      if(!env.SESSION_SECRET || !env.PHOTOS || !env.LOGIN_LIMITER || !env.BUDGET) throw failure('Cloud storage setup is incomplete.',503);
       const path=new URL(request.url).pathname;
       if(path==='/session' && request.method==='POST') {
         const limit=await env.LOGIN_LIMITER.limit({key:request.headers.get('CF-Connecting-IP')||'unknown'});
         if(!limit.success) throw failure('Too many sign-in attempts. Wait a minute and try again.',429);
-        const body=await jsonBody(request,1024);
-        if(!/^[a-f0-9]{64}$/.test(body.credential||'') || !equal(await hash(body.credential),env.STUDIO_AUTH_SHA256)) throw failure('Studio could not authorize cloud storage.',401);
-        return respond({token:await session(env)});
+        const body=await jsonBody(request,2048);
+        if(typeof body.githubToken!=='string' || !/^(?:github_pat_[A-Za-z0-9_]{20,}|ghp_[A-Za-z0-9]{20,})$/.test(body.githubToken))throw failure('Connect using a repository-scoped GitHub token.',401);
+        const options={headers:{Authorization:'Bearer '+body.githubToken,Accept:'application/vnd.github+json','User-Agent':'JamesKull-Studio'},redirect:'error'};
+        const identity=await fetcher('https://api.github.com/user',options);
+        if(!identity.ok || (await identity.json()).login!=='jkull04')throw failure('Only the site owner can connect Studio.',401);
+        const access=await fetcher(repo,options);
+        if(!access.ok || !(await access.json()).permissions?.push)throw failure('The token must have write access to personal_site.',403);
+        return respond({token:await session(env,body.githubToken)});
       }
-      if(!await authorized(request,env)) throw failure('Sign in to Studio again.',401);
+      const identity=await authorized(request,env);
+      if(!identity) throw failure('Connect GitHub to Studio again.',401);
+      if(path==='/logout' && request.method==='POST'){await budget(env,{action:'session-revoke',sessionId:identity.sid});return respond({revoked:true});}
       if(path==='/photos' && request.method==='POST') {
         if(request.headers.get('Content-Type')!=='image/jpeg') throw failure('Only optimized JPEG photos are supported.');
         const bytes=await readBody(request,12*1024*1024);
@@ -110,7 +125,7 @@ export function createHandler(fetcher=fetch) {
         const fresh=[...needed].filter(url=>url.startsWith(media+'/')&&!previous.has(url));
         if(fresh.length>900) throw failure('Publish at most 450 new photos in one batch.');
         if(fresh.length)await budget(env,{action:'known',keys:fresh.map(url=>url.slice(media.length+1))});
-        const result=await globalThis.StudioCore.publish({data:body.data,baseline:body.baseline,images:{},api:github(env,fetcher)});
+        const result=await globalThis.StudioCore.publish({data:body.data,baseline:body.baseline,images:{},api:github({...env,GITHUB_TOKEN:identity.githubToken},fetcher)});
         return respond(result);
       }
       if(path==='/usage' && request.method==='GET') {
@@ -121,3 +136,4 @@ export function createHandler(fetcher=fetch) {
   };
 }
 export default {fetch:createHandler()};
+

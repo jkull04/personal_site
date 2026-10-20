@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://covers.openlibrary.org https://jameskull-studio-storage.fitzykull.workers.dev; connect-src 'self' https://api.github.com https://openlibrary.org https://jameskull-studio-storage.fitzykull.workers.dev; object-src 'none'; base-uri 'self'; form-action 'none'" />
     <title>James Kull | Studio</title>
     <meta name="description" content="Private workspace for managing writings, books, and photographs." />
     <link rel="icon" type="image/png" href="/assets/icons/favicon-32.png" />
@@ -17,20 +18,20 @@
     <link rel="stylesheet" href="/css/dinos.css?v=20261020-approved-dinos-v2" />
     <script defer src="/js/dinos.js?v=20261020-approved-dinos-v2"></script>
     <link rel="stylesheet" href="/css/collections.css" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://covers.openlibrary.org https://jameskull-studio-storage.fitzykull.workers.dev; connect-src 'self' https://api.github.com https://openlibrary.org https://jameskull-studio-storage.fitzykull.workers.dev; object-src 'none'; base-uri 'self'; form-action 'none'" />
     <meta name="robots" content="noindex,nofollow" />
     <meta name="referrer" content="no-referrer" />
     <link rel="stylesheet" href="/css/studio.css?v=photo-workflow-1" />
-    <script defer src="/js/studio-storage.js?v=photo-workflow-1"></script>
-    <script defer src="/js/studio-access.js?v=r2-1"></script>
+    <script defer src="/js/studio-storage.js?v=security-20261020"></script>
+    <script defer src="/js/studio-backup.js?v=security-20261020"></script>
+    <script defer src="/js/studio-access.js?v=security-20261020"></script>
     <link rel="stylesheet" href="/css/writing.css?v=r2-1" />
     <script defer src="/js/writing-data.js?v=r2-1"></script>
     <script defer src="/js/writing-editor.js?v=r2-1"></script>
-    <script defer src="/js/studio-core.js?v=photo-workflow-1"></script>
+    <script defer src="/js/studio-core.js?v=security-20261020"></script>
     <script defer src="/js/book-data.js?v=book-editions-1"></script>
     <script defer src="/js/photo-data.js?v=gallery-balanced-1"></script>
     <script defer src="/js/studio-photos.js?v=photo-workflow-1"></script>
-    <script defer src="/js/studio.js?v=photo-workflow-1"></script>
+    <script defer src="/js/studio.js?v=security-20261020"></script>
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
@@ -53,7 +54,7 @@
 
     <main id="main" class="site-shell studio">
       <header class="collection-intro"><p class="eyebrow">Owner’s desk</p><h1>Studio</h1><p class="hero-lead">A place for your writings, reading shelf, and photographs.</p></header>
-      <section id="studio-gate" class="studio-panel studio-gate" aria-labelledby="unlock-heading">
+      <section id="studio-gate" hidden class="studio-panel studio-gate" aria-labelledby="unlock-heading">
         <h2 id="unlock-heading">Unlock Studio</h2>
         <p>Enter your password to manage writings, books, and photographs. Studio stays unlocked for this tab’s session.</p>
         <form id="studio-login">
@@ -68,10 +69,10 @@
       <section class="studio-panel" aria-labelledby="publish-heading">
         <h2 id="publish-heading">Save here. Publish when ready.</h2>
         <p>Changes are saved as drafts in this browser. Publish safely combines the latest site changes with your draft, then sends the included entries to your website. Uploaded images stay in your draft if publishing fails. Keep a backup before switching devices.</p>
-        <div class="studio-actions"><button id="publish" type="button" disabled>Publish updates</button><button id="backup" type="button" disabled>Download backup</button><label class="studio-button" for="restore">Restore backup</label><input id="restore" class="sr-only" type="file" accept="application/json,.json" /><button id="reload" type="button" disabled>Reload published content</button></div>
+        <div class="studio-actions"><button id="publish" type="button" disabled>Publish updates</button><button id="backup" type="button" disabled>Download encrypted backup</button><label class="studio-button" for="restore">Restore backup</label><input id="restore" class="sr-only" type="file" accept="application/json,.json" /><button id="reload" type="button" disabled>Reload published content</button></div>
         <p id="draft-summary"></p><button id="check-photo-publish" type="button" hidden>Check live photo status</button><p id="publish-result" role="status"></p>
-        <aside id="cloud-storage" class="studio-panel" hidden><p>Cloud publishing is connected. Your Studio password authorizes uploads and publishing; no GitHub token is needed here.</p><p id="storage-status" role="status">Cloud photo storage connected.</p><div class="studio-actions"><button id="storage-refresh" type="button">Refresh storage usage</button><button id="storage-migrate" type="button">Move existing photos to cloud storage</button></div></aside>
-        <details id="connection"><summary>GitHub connection</summary><p>One-time setup: <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">create a fine-grained token</a> for <strong>jkull04 / personal_site only</strong>, with <strong>Contents: Read and write</strong>. Choose an expiration. Paste it here when publishing; the token is held in memory only and cleared when you leave this page.</p><label for="github-token">GitHub token</label><div class="studio-actions"><input id="github-token" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your repository token" /><button id="disconnect" type="button">Clear token</button></div></details>
+        <aside id="cloud-storage" class="studio-panel" hidden><p>Your password protects local drafts. Connect your GitHub account below to authorize uploads and publishing for this tab. Lock Studio to revoke that connection.</p><p id="storage-status" role="status">Cloud photo storage connected.</p><div class="studio-actions"><button id="storage-refresh" type="button">Refresh storage usage</button><button id="storage-migrate" type="button">Move existing photos to cloud storage</button></div></aside>
+        <details id="connection"><summary>GitHub connection</summary><p>One-time setup: <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">create a fine-grained token</a> for <strong>jkull04 / personal_site only</strong>, with <strong>Contents: Read and write</strong>. Choose an expiration. Connect once per tab session. The token is cleared from this page after connecting and held encrypted by the service for this session. Disconnect removes it. It is never saved in drafts or backups.</p><label for="github-token">GitHub token</label><div class="studio-actions"><input id="github-token" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your repository token" /><button id="connect-github" type="button">Connect GitHub</button><button id="disconnect" type="button">Disconnect</button></div></details>
       </section>
       <div class="studio-tabs" role="group" aria-label="Edit collection"><button type="button" data-tab="books" aria-pressed="true">Books</button><button type="button" data-tab="photography" aria-pressed="false">Photos</button><button type="button" data-tab="writings" aria-pressed="false">Writings</button></div>
       <section id="books-editor" aria-labelledby="books-heading"><div class="studio-section-head"><div><h2 id="books-heading">Reading shelf</h2><p>Finished books appear as covers, grouped by the year you read them.</p></div><button id="add-book" type="button" disabled>Add manually</button></div><section class="shelf-panel" aria-labelledby="shelf-count"><h3 id="shelf-count">Your added books</h3><p>Click a cover to edit. “Not published” books are saved in this browser until you publish.</p><div id="shelf-overview" class="shelf-overview"></div></section><div class="catalog-search">
@@ -120,4 +121,5 @@
     </footer>
   </body>
 </html>
+
 

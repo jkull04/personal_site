@@ -378,7 +378,7 @@ Pipeline steps:
 
 1. Checkout repository.
 2. Setup Python 3.13.
-3. Install Pillow (`python -m pip install --upgrade pip pillow`).
+3. Install the pinned Pillow build (`python -m pip install --require-hashes --only-binary=:all: -r scripts/requirements-build.txt`).
 4. Run `python scripts/optimize_runtime_images.py --check`.
 5. Configure Pages.
 6. Upload full repository artifact.
@@ -590,17 +590,19 @@ static hosting, arena, Substack pipeline, and domain are unchanged.
    entries remain only in the browser draft, not in the public repository.
 5. Expand GitHub connection. Create a fine-grained GitHub token scoped to
    `jkull04/personal_site` with **Contents: Read and write**, choose an expiration,
-   and paste it into Studio. No OAuth service or paid CMS is required. The token
-   is never saved in IndexedDB, backups, localStorage, or the repository. Clear
-   it when done; leaving the page also clears it.
-6. Choose **Publish updates**. This makes one atomic Git commit to `main`,
+   and click **Connect GitHub** in Studio. The service holds the token encrypted
+   for a revocable 12-hour session. It is never included in drafts or backups.
+   Use **Disconnect** or **Lock Studio** to revoke the session.
+6. Choose **Publish updates**. Security checks run on the proposed commit
+   before it advances `main` without force,
    triggering the existing GitHub Pages deployment. Follow the deployment link
    for completion; a saved commit is not the same as a completed deployment.
 
 Drafts autosave in IndexedDB in the current browser. Download a backup before
-changing devices or clearing browser data. Backups contain unpublished entries
-and pending image uploads, but not a GitHub token. Already published photographs
-remain in the repository. Restore a backup in Studio to continue editing.
+changing devices or clearing browser data. Exports are encrypted with the Studio
+draft key and contain unpublished entries and pending uploads, but no GitHub
+token. Unlock Studio with the same password to restore. Existing plaintext
+backups remain importable. See `SECURITY.md` for deployment controls.
 
 The editor reads the latest GitHub commit, compares both published collections
 with its saved baseline, and refuses to overwrite newer content. If another
@@ -659,3 +661,4 @@ it does not verify publication or read private Substack drafts.
 
 Verification: `node --test tests/*.test.js` includes publishing, draft exclusion,
 page removal, crosspost matching, conflict rejection, and rendering safety.
+

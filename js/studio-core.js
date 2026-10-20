@@ -112,6 +112,7 @@
     published.photography.forEach(p=>onPhoto({id:p.id,phase:'publishing'}));
     const createdTree = await api('/git/trees','POST',{base_tree:commit.tree.sha,tree});
     const createdCommit = await api('/git/commits','POST',{message:'Update writings, books and photography from Studio',tree:createdTree.sha,parents:[head]});
+    if(api.checkCommit) await api.checkCommit(createdCommit.sha);
     // Non-forced update is atomic; a concurrent commit rejects this operation.
     await api('/git/refs/heads/main','PATCH',{sha:createdCommit.sha,force:false});
     return {sha:createdCommit.sha,published};
@@ -120,3 +121,4 @@
   root.StudioCore = core;
   if (typeof module !== 'undefined') module.exports = core;
 })(globalThis);
+

@@ -6,7 +6,9 @@
   "workers_dev": true,
   "vars": {
     "ALLOWED_ORIGINS": "https://www.jameskull.com,https://jameskull.com",
-    "PAUSED": "false"
+    "PAUSED": "false",
+    "AUTH_VERSION": "2",
+    "REQUIRE_CHECKS": "true"
   },
   "r2_buckets": [
     {
@@ -20,6 +22,14 @@
       "namespace_id": "1001",
       "simple": {
         "limit": 10,
+        "period": 60
+      }
+    },
+    {
+      "name": "READ_LIMITER",
+      "namespace_id": "1002",
+      "simple": {
+        "limit": 120,
         "period": 60
       }
     }

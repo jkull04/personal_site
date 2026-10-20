@@ -99,7 +99,7 @@ def _commit_and_push(
     print(f"✓ Committed data changes for '{slug}'")
 
     if push:
-        _run_git(["push"], cwd=cwd)
+        subprocess.run([sys.executable, str(Path(__file__).with_name("push_checked.py")), "--cwd", str(cwd)], check=True)
         print("✓ Pushed to remote")
     else:
         print("  (skipping push — run 'git push' when ready)")
@@ -218,3 +218,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

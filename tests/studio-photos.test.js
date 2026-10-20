@@ -27,7 +27,7 @@ test('photo statuses distinguish private, changed, failed, and not-yet-deployed 
 async function storageHarness(failUploadAt=0,failPublish=false) {
  const counters={uploads:0,publishes:0}, bodies=[];let failed=false;
  const response=body=>({ok:true,status:200,json:async()=>body});
- const sandbox={window:{},Map,Blob,Uint8Array,atob,JSON,StudioCore:Core,StudioAccess:{serviceCredential:async()=> 'fixture-only'},sessionStorage:{getItem:()=>null,setItem:()=>{},removeItem:()=>{}},fetch:async(url,options)=>{
+ const sandbox={window:{},Map,Blob,Uint8Array,atob,JSON,StudioCore:Core,StudioAccess:{serviceCredential:async()=> 'fixture-only'},sessionStorage:{getItem:()=>'fixture-session',setItem:()=>{},removeItem:()=>{}},fetch:async(url,options)=>{
   if(url==='/data/studio-storage.json')return response({enabled:true,apiOrigin:'https://jameskull-studio-storage.fitzykull.workers.dev',mediaOrigin:'https://jameskull-studio-storage.fitzykull.workers.dev'});
   if(url.endsWith('/session'))return response({token:'fixture-only'});
   if(url.endsWith('/photos')){counters.uploads++;if(counters.uploads===failUploadAt)throw TypeError('offline');return response({url:'https://jameskull-studio-storage.fitzykull.workers.dev/photos/'+String(counters.uploads).padStart(64,'0')+'.jpg'});}

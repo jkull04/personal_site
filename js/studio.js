@@ -371,8 +371,9 @@
     finally {setBusy(false);event.target.value='';}
   };
 
-  function downloadBackup() {
-    const blob = new Blob([JSON.stringify(state)],{type:'application/json'});
+  async function downloadBackup() {
+    const backup=await StudioBackup.encode(state,StudioAccess);
+    const blob = new Blob([JSON.stringify(backup)],{type:'application/json'});
     const url = URL.createObjectURL(blob); const a = document.createElement('a');
     a.href=url; a.download='jameskull-studio-'+new Date().toISOString().slice(0,10)+'.json'; a.click();
     setTimeout(()=>URL.revokeObjectURL(url),1000);
@@ -490,19 +491,27 @@
   $('lock-studio').onclick=async()=>{
     if(busy) return;
     setBusy(true);
+    try { await saveQueue; }
+    catch { status('Draft could not be saved. Download a backup before locking.'); setBusy(false); return; }
     try {
-      await saveQueue;
-      $('github-token').value=''; StudioStorage.clear(); StudioAccess.lock(); location.reload();
-    } catch { status('Draft could not be saved. Download a backup before locking.'); setBusy(false); }
+      await StudioStorage.logout(); $('github-token').value=''; StudioAccess.lock(); location.reload();
+    } catch { status('Could not revoke the publishing session. Check your connection, then try Lock Studio again.'); setBusy(false); }
   };
-  $('backup').onclick=downloadBackup;
-  $('disconnect').onclick=()=>{ $('github-token').value=''; status('GitHub token cleared. Your draft is still saved.'); };
+  $('backup').onclick=()=>downloadBackup().catch(error=>status('Backup failed: '+error.message));
+  $('connect-github').onclick=async()=>{
+    const input=$('github-token'); const value=input.value.trim();
+    if(!value){input.focus();status('Paste a token for jkull04 / personal_site to connect.');return;}
+    setBusy(true);
+    try {await StudioStorage.connect(value);input.value='';$('connection').open=false;status('GitHub connected for this tab.');await refreshStorage();}
+    catch(error){status(error.message);}finally{input.value='';setBusy(false);}
+  };
+  $('disconnect').onclick=async()=>{try{await StudioStorage.logout();$('github-token').value='';status('Publishing session revoked. Your draft is still saved.');}catch(error){status(error.message);}};
   window.addEventListener('pagehide',()=>{ $('github-token').value=''; });
   $('restore').onchange=async event=>{
     const file=event.target.files[0]; if (!file || busy) return;
     try {
       if(file.size>70*1024*1024) throw Error('Backup is too large.');
-      const imported=JSON.parse(await file.text());
+      const imported=await StudioBackup.decode(JSON.parse(await file.text()),StudioAccess);
       if(imported.version!==1 || !imported.images || typeof imported.images!=='object') throw Error('Unsupported backup.');
       await upgradeWritings(imported,state);
       StudioCore.validate(imported.data); StudioCore.validate(imported.baseline);
@@ -520,7 +529,7 @@
   async function publishUpdates(migrate=false) {
     if(busy)return;
     try {await StudioStorage.ready;} catch(error) {status(error.message);return;}
-    if(!StudioStorage.enabled && !$('github-token').value.trim()) { $('connection').open=true; $('github-token').focus(); status('Connect GitHub below to publish.'); return; }
+    if(StudioStorage.enabled ? !StudioStorage.connected : !$('github-token').value.trim()) { $('connection').open=true; $('github-token').focus(); status('Connect GitHub below to publish.'); return; }
     activePhotoPublish.clear();
     state.photoTransfers ||= {};
     state.data.photography.filter(p=>p.published!==false && (migrate || StudioPhotos.baseStatus(p,state.data.photography,state.baseline.photography).phase==='pending')).forEach(p=>{
@@ -589,9 +598,10 @@
   }
   $('storage-refresh').onclick=refreshStorage;
   StudioStorage.ready.then(config=>{
-    $('connection').hidden=config.enabled;
+    $('connection').hidden=false;
+    $('connect-github').hidden=!config.enabled;
     $('cloud-storage').hidden=!config.enabled;
-    if(config.enabled) refreshStorage();
+    if(config.enabled && StudioStorage.connected) refreshStorage();
   }).catch(error=>status(error.message));
   const selection = {books:new Set(), photography:new Set()};
   let undoDraft = null;
@@ -928,3 +938,4 @@
   setBusy(true);
   init();
 })();
+

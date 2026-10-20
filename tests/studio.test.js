@@ -54,6 +54,12 @@ test('concurrent commits reject safely, never force overwriting',async()=>{
   await assert.rejects(()=>publish({data:{books:[book()],photography:[]},baseline:empty(),images:{},api}),/Concurrent/);
   assert.equal(calls.at(-1).body.force,false);
 });
+test('a failed required check prevents the production ref update',async()=>{
+  const {api,calls}=mockApi();
+  api.checkCommit=async sha=>{assert.equal(sha,'new-commit');throw Error('Checks failed');};
+  await assert.rejects(()=>publish({data:{books:[book()],photography:[]},baseline:empty(),images:{},api}),/Checks failed/);
+  assert.ok(!calls.some(c=>c.path==='/git/refs/heads/main'));
+});
 test('validation rejects missing descriptions, invalid paths, and duplicate IDs',()=>{
   assert.throws(()=>validate({books:[book(),book()],photography:[]}),/unique/);
   assert.throws(()=>validate({books:[],photography:[{id:'p',src:'https://evil.test/x.jpg',thumb:'/assets/photography/p.jpg'}]}),/path/);
@@ -73,3 +79,4 @@ test('replacement covers publish atomically, excluding private and unused upload
  const saved=JSON.parse(tree[0].content)[0];assert.equal(saved.rating,'5');assert.equal(saved.finished,'2026-09-01');
  assert.throws(()=>validate({books:[{...book(),coverSrc:'https://evil.test/c.jpg'}],photography:[]}),/cover path/);
 });
+

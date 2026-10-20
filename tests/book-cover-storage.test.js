@@ -8,7 +8,7 @@ test('cloud publishing uploads only included custom covers and substitutes retur
  else if(url.endsWith('/publish'))data={published:JSON.parse(options.body).data};
  else throw Error(url);
  return {ok:true,status:200,json:async()=>data};};
- const context={window:{},fetch,StudioCore:require('../js/studio-core.js'),StudioAccess:{serviceCredential:async()=> 'test'},sessionStorage:{getItem(){},setItem(){}},Blob,Uint8Array,atob,Map};
+ const context={window:{},fetch,StudioCore:require('../js/studio-core.js'),StudioAccess:{serviceCredential:async()=> 'test'},sessionStorage:{getItem(){return 'session';},setItem(){}},Blob,Uint8Array,atob,Map};
  vm.runInNewContext(fs.readFileSync(require.resolve('../js/studio-storage.js'),'utf8'),context);
  const service=context.window.StudioStorage;await service.ready;
  const book={id:'book',title:'Title',author:'Author',status:'Read',rating:'5',finished:'2026-09-01',coverSrc:'/assets/photography/book-cover-1.jpg'};
@@ -16,3 +16,4 @@ test('cloud publishing uploads only included custom covers and substitutes retur
  assert.equal(calls.filter(c=>c.url.endsWith('/photos')).length,1);
  assert.equal(result.published.books.length,1);assert.match(result.published.books[0].coverSrc,/photos\/a{64}\.jpg$/);assert.equal(result.published.books[0].rating,'5');assert.equal(book.coverSrc,'/assets/photography/book-cover-1.jpg');
 });
+

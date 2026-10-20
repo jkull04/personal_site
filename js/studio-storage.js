@@ -1,9 +1,10 @@
 /* Optional R2 service. Disabled configurations retain the existing GitHub workflow. */
 (() => {
   'use strict';
+  if(window.top !== window.self) return;
   let config, token;
   const uploadedImages=new Map();
-  const sessionKey = 'jameskull-storage-session-v1';
+  const sessionKey = 'jameskull-storage-session-v2';
   const ready = fetch('/data/studio-storage.json', {cache:'no-store'})
     .then(r => { if (!r.ok) throw Error('Cannot load photo storage settings. Reload Studio before publishing.'); return r.json(); })
     .then(value => {
@@ -19,22 +20,30 @@
   async function request(path, options={}, retry=true) {
     await ready;
     if (!config.enabled) throw Error('Cloud photo storage is not connected yet.');
-    if (!token) await login();
+    if (!token) throw Error('Connect GitHub to authorize publishing. Your local draft is safe.');
     const response=await networkFetch(config.apiOrigin+path,{...options,headers:{...options.headers,Authorization:'Bearer '+token},credentials:'omit',cache:'no-store'},path==='/publish'?'Publishing':path==='/photos'?'Photo upload':'Cloud storage');
-    if (response.status===401 && retry) { clear(); return request(path,options,false); }
+    if (response.status===401) { clear(); throw Error('Your publishing session expired. Connect GitHub again; your draft is safe.'); }
     let result;try {result=await response.json();}catch {throw Error('Cloud storage returned an incomplete response. Your draft and photos are safe. Retry publishing.');}
     if (!response.ok) throw Error(result.error || 'Photo storage request failed. Your browser draft is safe.');
     return result;
   }
-  async function login() {
-    const credential=await StudioAccess.serviceCredential();
-    const response=await networkFetch(config.apiOrigin+'/session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({credential}),credentials:'omit',cache:'no-store'},'Cloud storage sign-in');
+  async function connect(githubToken) {
+    await ready;
+    if(!config.enabled) throw Error('Cloud publishing is not enabled.');
+    const response=await networkFetch(config.apiOrigin+'/session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({githubToken}),credentials:'omit',cache:'no-store'},'Cloud storage sign-in');
     let result;try {result=await response.json();}catch {throw Error('Cloud storage returned an incomplete response. Your draft and photos are safe. Retry publishing.');}
     if(!response.ok) throw Error(result.error || 'Storage sign-in failed.');
     token=result.token;
     try {sessionStorage.setItem(sessionKey,token);} catch {}
   }
   function clear() {token=null;try {sessionStorage.removeItem(sessionKey);} catch {}}
+  async function logout() {
+    await ready;
+    if(!token){clear();return;}
+    const response=await networkFetch(config.apiOrigin+'/logout',{method:'POST',headers:{Authorization:'Bearer '+token},credentials:'omit',cache:'no-store'},'Session revocation');
+    if(!response.ok && response.status!==401)throw Error('Could not revoke publishing access. Please retry Disconnect or Lock Studio.');
+    clear();
+  }
   async function upload(blob) {
     return (await request('/photos',{method:'POST',headers:{'Content-Type':'image/jpeg'},body:blob})).url;
   }
@@ -78,5 +87,6 @@
   const usage=()=>request('/usage');
   // Install a rejection handler immediately; callers still receive configuration errors.
   ready.catch(()=>{});
-  window.StudioStorage={ready,get enabled(){return Boolean(config?.enabled);},publish,clear,usage};
+  window.StudioStorage={ready,get enabled(){return Boolean(config?.enabled);},publish,connect,logout,clear,usage,get connected(){return Boolean(token);}};
 })();
+

@@ -61,7 +61,10 @@ def refresh(repository: str = REPOSITORY, *, publish: bool = False) -> bool:
             "-m", "chore: refresh Substack content",
         ], checkout)
         # A concurrent production update rejects this push rather than being overwritten.
-        run(["git", "push", "origin", "HEAD:main"], checkout)
+        if repository == REPOSITORY:
+            run([sys.executable, "scripts/push_checked.py"], checkout)
+        else:
+            run(["git", "push", "origin", "HEAD:main"], checkout)
         commit = run(["git", "rev-parse", "HEAD"], checkout).stdout.strip()
         print(f"Published Substack content: {commit}")
         return True
@@ -84,3 +87,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
