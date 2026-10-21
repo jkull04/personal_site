@@ -30,7 +30,7 @@
     busy = value;
     document.querySelectorAll('#studio-editor button, #studio-editor input, #studio-editor textarea, #studio-editor select').forEach(el=>el.disabled=value);
     renderBatch();
-    if(state) { refreshManagerOptions(); managedKinds.forEach(updateSelectionControls); refreshPhotoStatuses(); }
+    if(state) { refreshManagerOptions(); managedKinds.forEach(updateSelectionControls); refreshPhotoStatuses(); newsletterEditor.syncControls(); }
   }
   async function api(path, method='GET', body) {
     StudioAccess.requireUnlocked();
@@ -96,6 +96,7 @@
     }
     writingEditor.render();
     showcaseEditor.render();
+    newsletterEditor.render();
     refreshBookOverview();
     if(catalogMatches.length) showCatalog(catalogMatches,false);
     renderBatch();
@@ -387,8 +388,9 @@
   document.querySelectorAll('[data-tab]').forEach(button=>button.onclick=()=>{
     if (busy) return;
     document.querySelectorAll('[data-tab]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));
-    $('books-editor').hidden=button.dataset.tab!=='books'; $('photography-editor').hidden=button.dataset.tab!=='photography'; $('writings-editor').hidden=button.dataset.tab!=='writings'; $('showcase-editor').hidden=button.dataset.tab!=='showcase';
+    $('books-editor').hidden=button.dataset.tab!=='books'; $('photography-editor').hidden=button.dataset.tab!=='photography'; $('writings-editor').hidden=button.dataset.tab!=='writings'; $('showcase-editor').hidden=button.dataset.tab!=='showcase'; $('newsletter-editor').hidden=button.dataset.tab!=='newsletter';
     if(button.dataset.tab==='showcase')showcaseEditor.load();
+    if(button.dataset.tab==='newsletter')newsletterEditor.load();
   });
   document.querySelector('main').addEventListener('input',event=>{
     if (busy || !event.target.dataset.key) return;
@@ -524,14 +526,14 @@
       StudioCore.validate(imported.data); StudioCore.validate(imported.baseline);
       for(const [path,content] of Object.entries(imported.images)) if(!StudioCore.imagePath.test(path) || typeof content!=='string' || !/^[A-Za-z0-9+/=]+$/.test(content)) throw Error('Invalid image in backup.');
       if(!confirm('Replace this browser’s draft with the backup? Download the current draft first if you want to keep it.')) return;
-      state={version:1,data:imported.data,baseline:imported.baseline,images:imported.images,photoFingerprints:imported.photoFingerprints || {}}; undoDraft=null;managedKinds.forEach(k=>selection[k].clear());render(); await save(); setBusy(false);
+      state={version:1,data:imported.data,baseline:imported.baseline,images:imported.images,photoFingerprints:imported.photoFingerprints || {},newsletter:NewsletterData.normalize(imported.newsletter || state.newsletter)}; undoDraft=null;managedKinds.forEach(k=>selection[k].clear());render(); await save(); setBusy(false);
     } catch(error) { status('Could not restore: '+error.message); }
     event.target.value='';
   };
   $('reload').onclick=async()=>{
     if(!confirm('Replace your local draft with the published collections? Download a backup first to keep unpublished edits and photos.')) return;
     setBusy(true);
-    try { const next=await fetchPublished(); state=next;undoDraft=null;managedKinds.forEach(k=>selection[k].clear());render(); await save(); status('Loaded the latest published content.'); } catch(error) {status(error.message);} finally {setBusy(false);}
+    try { const next=await fetchPublished(); next.newsletter=NewsletterData.normalize(state.newsletter); state=next;undoDraft=null;managedKinds.forEach(k=>selection[k].clear());render(); await save(); status('Loaded the latest published content.'); } catch(error) {status(error.message);} finally {setBusy(false);}
   };
   async function publishUpdates(migrate=false) {
     if(busy)return;
@@ -939,6 +941,7 @@
       state.images[path]=image.full.content;return '/'+path;
     } finally {setBusy(false);}
   }});
+  const newsletterEditor=createNewsletterEditor({getState:()=>state,save,isBusy:()=>busy});
   setupManagers();
 
   async function init() {
@@ -948,6 +951,7 @@
       state=await StudioAccess.open(state);
       if(!state) state=await fetchPublished();
       await upgradeWritings(state);
+      state.newsletter=NewsletterData.normalize(state.newsletter);
       state.photoTransfers ||= {};
       for(const transfer of Object.values(state.photoTransfers))if(['queued','uploading','uploaded','publishing'].includes(transfer.phase)){transfer.phase='waiting';transfer.error='Publishing was interrupted. Your draft is saved; retry when ready.';}
       StudioCore.validate(state.data);

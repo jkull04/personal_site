@@ -662,3 +662,61 @@ it does not verify publication or read private Substack drafts.
 Verification: `node --test tests/*.test.js` includes publishing, draft exclusion,
 page removal, crosspost matching, conflict rejection, and rendering safety.
 
+## Free monthly email updates
+
+The homepage invitation and collection footers link to `/updates/`. It uses the
+existing `jameskull.substack.com` publication: the official hosted subscribe link
+and optional iframe signup. Subscriber addresses go directly to Substack and
+are never collected by this repository, Studio, or the storage Worker. No paid
+plan, new service credential, mailing API, or scheduled sender is introduced.
+Substack's free publishing has no subscriber-count fee; keep the publication
+free. The optional iframe has a hosted-link fallback when embedding is blocked.
+
+In **Studio → Monthly update**:
+
+1. Use **Choose from all published** for a first issue, or **Draft from new
+   content** thereafter. The builder fetches the live public JSON, not local
+   drafts or a commit still waiting to deploy. Failed loads stop composition.
+2. Select highlights, edit the subject, introduction, summaries, and sign-off,
+   and choose whether to include a collection photograph. Preview matches the
+   HTML copied to Substack; email-client styling can differ.
+3. Copy the subject and body into a new free Substack post. Review, send a test
+   using Substack, and send or schedule there. Download email is a clipboard
+   fallback. These Studio controls never send email or mark an issue as sent.
+4. After sending, paste the published issue URL and use **Record sent issue**.
+   Only selected highlights are recorded. The next draft excludes those items;
+   omitted new items remain available. The record is an owner acknowledgement,
+   not an API verification of Substack delivery.
+
+The initial `data/newsletter-baseline.json` contains public content identities
+present when this feature was installed, preventing an accidental announcement
+of the entire archive. Identity-based tracking ignores wording edits, reorder,
+and renamed photo collections; a newly published photo is detected even when its
+date-taken is old. Photos are combined into one highlight per collection.
+Linked Studio/Substack copies are deduplicated. With nothing new, skip the month.
+
+Email drafts and sent history live in the existing encrypted browser draft,
+outside `state.data`, so **Publish updates** never publishes them. Encrypted
+Studio backups include them; restore a backup to transfer that history between
+devices. Reload published content preserves the newsletter state. No cross-device
+sync is implied. Browser-local history retains the latest 24 issue links and up
+to 20,000 covered content keys.
+
+For a monthly-only cadence, publish individual Substack posts with **Send via
+email and Substack app inbox** unchecked, and email only the roundup. The signup
+uses the existing publication list, not a separate monthly-only section; readers
+already subscribed do not need to join again. Substack manages subscriptions and
+unsubscribe links. No first issue is sent by installing this feature.
+
+References:
+- https://support.substack.com/hc/en-us/articles/360037607131-How-much-does-Substack-cost
+- https://support.substack.com/hc/en-us/articles/360041759232-Can-I-embed-a-signup-form-for-my-Substack-publication
+- https://support.substack.com/hc/en-us/articles/360037831771-How-do-I-publish-a-new-post-on-Substack
+
+Verification: `node --test tests/newsletter.test.js` checks private-content
+exclusion, new-item detection, crosspost deduplication, safe rendering, empty
+months, and explicit sent-history updates. Also run the repository security
+checks before advancing main. At initial implementation, Substack returned
+“Site Unavailable” to the development environment, so no subscriber was added
+and external signup/delivery could not be tested end to end.
+

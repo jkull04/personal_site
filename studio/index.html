@@ -33,7 +33,10 @@
     <script defer src="/js/book-data.js?v=book-editions-1"></script>
     <script defer src="/js/photo-data.js?v=gallery-balanced-1"></script>
     <script defer src="/js/studio-photos.js?v=photo-workflow-1"></script>
-    <script defer src="/js/studio.js?v=discovery-1"></script>
+    <link rel="stylesheet" href="/css/newsletter-editor.css?v=1" />
+    <script defer src="/js/newsletter-data.js?v=1"></script>
+    <script defer src="/js/newsletter-editor.js?v=1"></script>
+    <script defer src="/js/studio.js?v=newsletter-1"></script>
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
@@ -76,7 +79,30 @@
         <aside id="cloud-storage" class="studio-panel" hidden><p>Your password protects local drafts. Connect your GitHub account below to authorize uploads and publishing for this tab. Lock Studio to revoke that connection.</p><p id="storage-status" role="status">Cloud photo storage connected.</p><div class="studio-actions"><button id="storage-refresh" type="button">Refresh storage usage</button><button id="storage-migrate" type="button">Move existing photos to cloud storage</button></div></aside>
         <details id="connection"><summary>GitHub connection</summary><p>One-time setup: <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">create a fine-grained token</a> for <strong>jkull04 / personal_site only</strong>, with <strong>Contents: Read and write</strong>. Choose an expiration. Connect once per tab session. The token is cleared from this page after connecting and held encrypted by the service for this session. Disconnect removes it. It is never saved in drafts or backups.</p><label for="github-token">GitHub token</label><div class="studio-actions"><input id="github-token" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your repository token" /><button id="connect-github" type="button">Connect GitHub</button><button id="disconnect" type="button">Disconnect</button></div></details>
       </section>
-      <div class="studio-tabs" role="group" aria-label="Edit collection"><button type="button" data-tab="books" aria-pressed="true">Books</button><button type="button" data-tab="photography" aria-pressed="false">Photos</button><button type="button" data-tab="writings" aria-pressed="false">Writings</button><button type="button" data-tab="showcase" aria-pressed="false">Homepage &amp; projects</button></div>
+      <div class="studio-tabs" role="group" aria-label="Edit collection"><button type="button" data-tab="books" aria-pressed="true">Books</button><button type="button" data-tab="photography" aria-pressed="false">Photos</button><button type="button" data-tab="writings" aria-pressed="false">Writings</button><button type="button" data-tab="showcase" aria-pressed="false">Homepage &amp; projects</button><button type="button" data-tab="newsletter" aria-pressed="false">Monthly update</button></div>
+      <section id="newsletter-editor" aria-labelledby="newsletter-heading" hidden>
+        <div class="studio-section-head"><div><h2 id="newsletter-heading">Monthly update</h2><p>A short letter with what’s new. Draft here, send through your free Substack.</p></div><a href="/updates/" target="_blank" rel="noopener noreferrer">View signup ↗</a></div>
+        <div class="studio-panel">
+          <p id="newsletter-summary">Open this tab to load published content.</p>
+          <div class="studio-actions"><button id="newsletter-new" type="button" disabled>Draft from new content</button><button id="newsletter-all" type="button" disabled>Choose from all published</button><button id="newsletter-refresh" type="button">Refresh live content</button></div>
+          <p id="newsletter-status" role="status" aria-live="polite"></p>
+          <p class="catalog-help">Only live content is included. Small edits and reordering do not create new highlights; new photographs are grouped by collection. For your first issue, use Choose from all published. Drafts and sent history are kept in this browser and included in your encrypted Studio backup.</p>
+        </div>
+        <div id="newsletter-compose" hidden>
+          <div class="newsletter-workspace">
+            <div><label for="newsletter-subject">Email subject<input id="newsletter-subject" maxlength="160" /></label><label for="newsletter-intro">A note from you<textarea id="newsletter-intro" maxlength="5000" rows="4"></textarea></label><h3>Choose your highlights</h3><div id="newsletter-items"></div><label for="newsletter-closing">Sign-off<textarea id="newsletter-closing" maxlength="2000" rows="3"></textarea></label></div>
+            <div><h3>Email preview</h3><p id="newsletter-count" role="status"></p><article class="newsletter-preview" aria-label="Email draft preview"><h4 class="newsletter-subject" id="newsletter-preview-subject"></h4><div id="newsletter-preview-body"></div></article></div>
+          </div>
+          <section class="studio-panel newsletter-handoff" aria-labelledby="newsletter-send-heading">
+            <h3 id="newsletter-send-heading">Review, then send</h3>
+            <ol><li>Copy the subject and body into a new Substack post. Review the links and photograph.</li><li>Choose your free subscribers, send yourself a preview in Substack, then send or schedule the issue there.</li><li>Return here with the published issue link and record it to keep those highlights out of the next digest.</li></ol>
+            <div class="studio-actions"><button id="newsletter-copy-subject" type="button" disabled>Copy subject</button><button id="newsletter-copy" type="button" disabled>Copy email body</button><button id="newsletter-download" type="button" disabled>Download email</button><a href="https://jameskull.substack.com/publish" target="_blank" rel="noopener noreferrer">Open Substack ↗</a></div>
+            <p class="catalog-help">For monthly-only emails, leave “Send via email and Substack app inbox” unchecked when publishing individual posts. This editor does not send emails or change your subscribers. Substack supplies the unsubscribe link.</p>
+            <label for="newsletter-sent-url">Published issue link<input id="newsletter-sent-url" type="url" placeholder="https://jameskull.substack.com/p/…" maxlength="1000" /></label><button id="newsletter-record" type="button" disabled>Record sent issue</button>
+          </section>
+        </div>
+        <details><summary>Recorded issues</summary><ul class="newsletter-history" id="newsletter-history"></ul><p>History is local to this browser. Download and restore your encrypted Studio backup when moving devices.</p></details>
+      </section>
       <section id="showcase-editor" aria-labelledby="showcase-heading" hidden>
         <div class="studio-section-head"><div><h2 id="showcase-heading">Selected things</h2><p>The homepage automatically shows your latest book, photo collection, and project.</p></div><a href="/" target="_blank" rel="noopener">View homepage ↗</a></div>
         <div class="studio-panel"><p id="homepage-selection-preview"></p><p>Selections use the book’s finish date, the collection’s newest photo date, and the project’s date. Only finished books and public entries appear. Publish your changes to update the homepage.</p></div>
