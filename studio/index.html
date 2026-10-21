@@ -34,8 +34,8 @@
     <script defer src="/js/photo-data.js?v=gallery-balanced-1"></script>
     <script defer src="/js/studio-photos.js?v=photo-workflow-1"></script>
     <link rel="stylesheet" href="/css/newsletter-editor.css?v=1" />
-    <script defer src="/js/newsletter-data.js?v=1"></script>
-    <script defer src="/js/newsletter-editor.js?v=1"></script>
+    <script defer src="/js/newsletter-data.js?v=2"></script>
+    <script defer src="/js/newsletter-editor.js?v=2"></script>
     <script defer src="/js/studio.js?v=newsletter-1"></script>
   </head>
   <body>
@@ -81,12 +81,12 @@
       </section>
       <div class="studio-tabs" role="group" aria-label="Edit collection"><button type="button" data-tab="books" aria-pressed="true">Books</button><button type="button" data-tab="photography" aria-pressed="false">Photos</button><button type="button" data-tab="writings" aria-pressed="false">Writings</button><button type="button" data-tab="showcase" aria-pressed="false">Homepage &amp; projects</button><button type="button" data-tab="newsletter" aria-pressed="false">Monthly update</button></div>
       <section id="newsletter-editor" aria-labelledby="newsletter-heading" hidden>
-        <div class="studio-section-head"><div><h2 id="newsletter-heading">Monthly update</h2><p>A short letter with what’s new. Draft here, send through your free Substack.</p></div><a href="/updates/" target="_blank" rel="noopener noreferrer">View signup ↗</a></div>
+        <div class="studio-section-head"><div><h2 id="newsletter-heading">Monthly update</h2><p>Your monthly draft, ready to review and copy to Substack.</p></div><a href="/#subscribe" target="_blank" rel="noopener noreferrer">View signup ↗</a></div>
         <div class="studio-panel">
           <p id="newsletter-summary">Open this tab to load published content.</p>
-          <div class="studio-actions"><button id="newsletter-new" type="button" disabled>Draft from new content</button><button id="newsletter-all" type="button" disabled>Choose from all published</button><button id="newsletter-refresh" type="button">Refresh live content</button></div>
+          <div class="studio-actions"><button id="newsletter-auto" type="button" disabled>Load monthly draft</button><button id="newsletter-new" type="button" disabled>Draft from new content</button><button id="newsletter-all" type="button" disabled>Choose from all published</button><button id="newsletter-refresh" type="button">Refresh live content</button></div>
           <p id="newsletter-status" role="status" aria-live="polite"></p>
-          <p class="catalog-help">Only live content is included. Small edits and reordering do not create new highlights; new photographs are grouped by collection. For your first issue, use Choose from all published. Drafts and sent history are kept in this browser and included in your encrypted Studio backup.</p>
+          <p class="catalog-help">A draft arrives automatically after each month with new or updated essays, projects, and photos. Quiet months are skipped. Your edits stay in this browser and are never overwritten; use Load monthly draft when you’re ready for the next one.</p>
         </div>
         <div id="newsletter-compose" hidden>
           <div class="newsletter-workspace">

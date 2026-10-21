@@ -7,6 +7,7 @@
   const publication='https://jameskull.substack.com';
   const esc=writing.esc;
   const text=(value,max=2000)=>typeof value==='string'?value.slice(0,max):'';
+  const month=value=>typeof value==='string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(value)?value:'';
   function url(value,image=false) {
     if(typeof value!=='string' || !value || value.length>2000 || /[\u0000-\u001f\\]/.test(value))return '';
     try {
@@ -27,14 +28,15 @@
   }
   function normalize(value={}) {
     if(!value || typeof value!=='object')value={};
-    const history=Array.isArray(value.history)?value.history.filter(h=>h && typeof h==='object').slice(-24).map(h=>({subject:text(h.subject,160),url:writing.substackURL(h.url),sentAt:text(h.sentAt,40),keys:keys(h.keys)})):[];
+    const history=Array.isArray(value.history)?value.history.filter(h=>h && typeof h==='object').slice(-24).map(h=>({subject:text(h.subject,160),url:writing.substackURL(h.url),sentAt:text(h.sentAt,40),keys:keys(h.keys),month:month(h.month)})):[];
     const draft=value.draft && typeof value.draft==='object'?{
-      subject:text(value.draft.subject,160),intro:text(value.draft.intro,5000),closing:text(value.draft.closing,2000),
+      subject:text(value.draft.subject,160),intro:text(value.draft.intro,5000),closing:text(value.draft.closing,2000),month:month(value.draft.month),
       items:Array.isArray(value.draft.items)?value.draft.items.slice(0,500).map(item).filter(Boolean):[]
     }:null;
     return {version:1,sentKeys:keys(value.sentKeys),history,draft};
   }
   function inventory({local=[],writings=[],projects=[],photography=[]}) {
+    writings=writings.filter(e=>e.published!==false);projects=projects.filter(e=>e.published!==false);
     const included=local.filter(e=>e.published!==false);
     const key=e=>'writing:'+(writing.substackURL(e.substackUrl)||writing.substackURL(e.href)||(e.links||[]).map(l=>writing.substackURL(l.href)).find(Boolean)||e.id);
     const texts=writing.listing(included,writings).map(e=>({id:key(e),keys:[key(e)],kind:e.type==='blog'?'note':'essay',title:e.title,summary:e.abstract||e.subtitle||'',href:e.href,date:e.date}));
@@ -54,6 +56,25 @@
   function candidates(entries,baseline=[],sent=[]) {
     const seen=new Set([...keys(baseline),...keys(sent)]);
     return entries.map(e=>({...e,newKeys:e.keys.filter(k=>!seen.has(k))})).filter(e=>e.newKeys.length);
+  }
+  function liveDraft(draftValue,entries) {
+    const d=normalize({draft:draftValue}).draft;if(!d)return null;
+    const current=new Map(entries.flatMap(e=>e.keys.map(k=>[k,e])));
+    d.items=d.items.flatMap(e=>{
+      const live=current.get(e.keys.find(k=>current.has(k)));if(!live)return [];
+      const covered=e.keys.filter(k=>live.keys.includes(k));
+      return covered.length?[{...e,href:live.href,image:live.image,alt:live.alt,keys:covered}]:[];
+    });
+    return d;
+  }
+  function monthlyDraft(feed,entries,newsletter={}) {
+    const recorded=new Set(normalize(newsletter).history.map(h=>h.month));
+    if(!feed || feed.version!==1 || !Array.isArray(feed.issues))return null;
+    for(const issue of [...feed.issues].filter(i=>i && month(i.month) && !recorded.has(i.month)).sort((a,b)=>b.month.localeCompare(a.month))) {
+      const d=liveDraft(issue.draft,entries);
+      if(d && render(d).count)return {...d,month:issue.month};
+    }
+    return null;
   }
   function draft(entries,date=new Date(),select=true) {
     let featured=false;
@@ -86,10 +107,10 @@
     if(next.history.some(h=>h.url===valid))throw Error('That issue is already recorded.');
     const covered=keys(next.draft.items.filter(e=>e.selected).flatMap(e=>e.keys));
     next.sentKeys=keys([...next.sentKeys,...covered]);
-    next.history.push({subject:next.draft.subject,url:valid,sentAt:now.toISOString(),keys:covered});
+    next.history.push({subject:next.draft.subject,url:valid,sentAt:now.toISOString(),keys:covered,month:month(next.draft.month)});
     next.history=next.history.slice(-24);next.draft=null;
     return next;
   }
-  const api={site,publication,url,normalize,inventory,candidates,draft,render,recordSent,keys};
+  const api={site,publication,url,normalize,inventory,candidates,draft,render,recordSent,keys,liveDraft,monthlyDraft};
   root.NewsletterData=api;if(typeof module!=='undefined')module.exports=api;
 })(globalThis);

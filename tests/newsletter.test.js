@@ -68,8 +68,7 @@ test('empty months have nothing to send; one photo is featured by default',()=>{
   assert.equal(d.items.filter(e=>e.featured).length,1);assert.equal((N.render(d).html.match(/<img /g)||[]).length,1);
 });
 test('signup never collects addresses in site code and editor has no send request',()=>{
-  const page=fs.readFileSync(require.resolve('../updates/index.html'),'utf8');
-  assert.match(page,/https:\/\/jameskull.substack.com\/subscribe/);
+  const page=fs.readFileSync(require.resolve('../index.html'),'utf8');
   assert.match(page,/https:\/\/jameskull.substack.com\/embed/);
   assert.ok(!page.includes('<input'));
   const editor=fs.readFileSync(require.resolve('../js/newsletter-editor.js'),'utf8');
@@ -79,7 +78,7 @@ test('signup never collects addresses in site code and editor has no send reques
 test('the real editor loads live content, creates a draft and preserves other Studio work',async()=>{
   const vm=require('node:vm'),W=require('../js/writing-data.js');
   const elements=new Map(),get=id=>{if(!elements.has(id))elements.set(id,{value:'',textContent:'',innerHTML:'',disabled:false,hidden:false,handlers:{},addEventListener(k,fn){this.handlers[k]=fn;}});return elements.get(id);};
-  const source={ '/data/writings-local.json':[essay], '/data/writings.json':[], '/data/works-substack.json':[], '/data/photography.json':[], '/data/newsletter-baseline.json':{keys:[]} };
+  const source={ '/data/writings-local.json':[essay], '/data/writings.json':[], '/data/works-substack.json':[], '/data/photography.json':[], '/data/newsletter-baseline.json':{keys:[]}, '/data/newsletter-monthly.json':{version:1,issues:[]} };
   const state={data:{books:[{id:'private-book',note:'Keep this draft'}]},images:{pending:'untouched'}};
   let saves=0,fail=false;
   const context={window:{},document:{getElementById:get},NewsletterData:N,WritingData:W,URL,Blob,Date,setTimeout,confirm:()=>true,navigator:{},fetch:async path=>({ok:!fail,json:async()=>source[path]})};

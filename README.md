@@ -664,59 +664,57 @@ page removal, crosspost matching, conflict rejection, and rendering safety.
 
 ## Free monthly email updates
 
-The homepage invitation and collection footers link to `/updates/`. It uses the
-existing `jameskull.substack.com` publication: the official hosted subscribe link
-and optional iframe signup. Subscriber addresses go directly to Substack and
-are never collected by this repository, Studio, or the storage Worker. No paid
-plan, new service credential, mailing API, or scheduled sender is introduced.
-Substack's free publishing has no subscriber-count fee; keep the publication
-free. The optional iframe has a hosted-link fallback when embedding is blocked.
+The homepage embeds the existing `jameskull.substack.com` signup widget, with one
+short line about monthly emails. No separate signup page. Email addresses go
+directly to Substack; this site never collects or stores them.
 
-In **Studio → Monthly update**:
+A monthly ChatGPT automation runs the repository's draft builder on the first of
+the month. It uses the previous completed UTC calendar month, comparing public
+content at month boundaries in main's Git history. The first period starts at the
+October 21, 2026 mailing-list setup, so the existing archive is not re-announced.
+New and updated essays, projects, and photos are included. Dates taken, ordering,
+and infrastructure-only changes do not create highlights. Photo changes are
+grouped by collection. Empty months have no email draft.
 
-1. Use **Choose from all published** for a first issue, or **Draft from new
-   content** thereafter. The builder fetches the live public JSON, not local
-   drafts or a commit still waiting to deploy. Failed loads stop composition.
-2. Select highlights, edit the subject, introduction, summaries, and sign-off,
-   and choose whether to include a collection photograph. Preview matches the
-   HTML copied to Substack; email-client styling can differ.
-3. Copy the subject and body into a new free Substack post. Review, send a test
-   using Substack, and send or schedule there. Download email is a clipboard
-   fallback. These Studio controls never send email or mark an issue as sent.
-4. After sending, paste the published issue URL and use **Record sent issue**.
-   Only selected highlights are recorded. The next draft excludes those items;
-   omitted new items remain available. The record is an owner acknowledgement,
-   not an API verification of Substack delivery.
+The generator requires a full checkout and no external credentials or paid API:
 
-The initial `data/newsletter-baseline.json` contains public content identities
-present when this feature was installed, preventing an accidental announcement
-of the entire archive. Identity-based tracking ignores wording edits, reorder,
-and renamed photo collections; a newly published photo is detected even when its
-date-taken is old. Photos are combined into one highlight per collection.
-Linked Studio/Substack copies are deduplicated. With nothing new, skip the month.
+```sh
+node scripts/build_monthly_newsletter.cjs
+# Rebuild a specific completed month if a run was missed:
+node scripts/build_monthly_newsletter.cjs --month 2026-10
+```
 
-Email drafts and sent history live in the existing encrypted browser draft,
-outside `state.data`, so **Publish updates** never publishes them. Encrypted
-Studio backups include them; restore a backup to transfer that history between
-devices. Reload published content preserves the newsletter state. No cross-device
-sync is implied. Browser-local history retains the latest 24 issue links and up
-to 20,000 covered content keys.
+It changes only `data/newsletter-monthly.json`. That file contains up to 24 months
+of generated starter drafts from already-public content; it is public. Each run
+is idempotent. The automation follows the checked-publication flow in
+`SECURITY.md`: run tests, stage a `studio-check/**` commit, await its successful
+Security checks, then advance main without force and verify Pages deployment.
+It does not send email or write to Substack. If access or checks fail, the task
+reports the failure instead of bypassing protection. The schedule is managed in
+ChatGPT Tasks; keeping it enabled and GitHub connected is required.
 
-For a monthly-only cadence, publish individual Substack posts with **Send via
-email and Substack app inbox** unchecked, and email only the roundup. The signup
-uses the existing publication list, not a separate monthly-only section; readers
-already subscribed do not need to join again. Substack manages subscriptions and
-unsubscribe links. No first issue is sent by installing this feature.
+In **Studio → Monthly update**, the latest unsent monthly draft opens
+automatically when there is no personal draft. Existing edits are always kept;
+**Load monthly draft** explicitly replaces one. Removed/unpublished content is
+filtered against the live site before preview or copying. Manual selection from
+new or all published content remains available.
 
-References:
-- https://support.substack.com/hc/en-us/articles/360037607131-How-much-does-Substack-cost
-- https://support.substack.com/hc/en-us/articles/360041759232-Can-I-embed-a-signup-form-for-my-Substack-publication
-- https://support.substack.com/hc/en-us/articles/360037831771-How-do-I-publish-a-new-post-on-Substack
+Review the subject, introduction, highlights, and photo. Copy the subject and
+body into a free Substack post, review and send there. **Download email** is a
+clipboard fallback. After sending, record the published issue link in Studio.
+Recorded months will not reopen automatically in that browser.
 
-Verification: `node --test tests/newsletter.test.js` checks private-content
-exclusion, new-item detection, crosspost deduplication, safe rendering, empty
-months, and explicit sent-history updates. Also run the repository security
-checks before advancing main. At initial implementation, Substack returned
-“Site Unavailable” to the development environment, so no subscriber was added
-and external signup/delivery could not be tested end to end.
+Personal edits and sent history stay in encrypted browser storage and encrypted
+Studio backups, outside `state.data`. **Publish updates** does not publish your
+edited email. Restore a backup to transfer edits/history between devices.
 
+For monthly-only emails, publish individual Substack posts with **Send via email
+and Substack app inbox** unchecked, then email only the roundup. This widget uses
+the existing publication list; it does not create a separate monthly-only list.
+Substack manages unsubscribe links. No paid service or subscription is added.
+
+Run the repository security checks before publication. Newsletter tests cover
+month boundaries, public-only changes, idempotency, empty months, edited-draft
+preservation, safe rendering, and explicit sent-history updates. Substack is
+unavailable from this development environment, so external signup and delivery
+cannot be tested here.

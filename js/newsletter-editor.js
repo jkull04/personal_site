@@ -1,16 +1,18 @@
 window.createNewsletterEditor = ({getState,save,isBusy}) => {
   const $=id=>document.getElementById(id),N=NewsletterData,esc=WritingData.esc;
-  let entries=[],baseline=[],loaded=false,loading=false;
+  let entries=[],baseline=[],feed=null,loaded=false,loading=false;
   const state=()=>getState().newsletter ||= N.normalize();
   const status=message=>$('newsletter-status').textContent=message;
   const persist=()=>save().catch(()=>status('Could not save this draft. Download an encrypted Studio backup before leaving.'));
   const pending=()=>N.candidates(entries,baseline,state().sentKeys);
+  const monthly=()=>N.monthlyDraft(feed,entries,state());
   function syncControls() {
     const d=getState()?.newsletter?.draft,count=d?N.render(d).count:0;
     for(const id of ['newsletter-copy-subject','newsletter-copy','newsletter-download','newsletter-record'])$(id).disabled=isBusy()||loading||!loaded||!count||!d.subject.trim();
     $('newsletter-new').disabled=isBusy()||loading||!loaded||!pending().length;
     $('newsletter-all').disabled=isBusy()||loading||!loaded;
     $('newsletter-refresh').disabled=isBusy()||loading;
+    $('newsletter-auto').disabled=isBusy()||loading||!loaded||!monthly();
   }
   function preview() {
     const d=state().draft,result=N.render(d);
@@ -27,7 +29,8 @@ window.createNewsletterEditor = ({getState,save,isBusy}) => {
     $('newsletter-intro').value=d?.intro||'';
     $('newsletter-closing').value=d?.closing||'';
     const fresh=loaded?pending().length:0;
-    $('newsletter-summary').textContent=!loaded?'Open this tab to load published content.':fresh?`${fresh} new ${fresh===1?'highlight':'highlights'} since ${s.history.length?'your recorded emails':'the mailing-list setup'}.`:'No new essays, projects, or photos to announce. Quiet months can stay quiet.';
+    const automatic=loaded?monthly():null;
+    $('newsletter-summary').textContent=!loaded?'Open this tab to load published content.':automatic?`${automatic.subject} is ready. ${d?'Your current draft is kept until you choose to replace it.':''}`:fresh?`${fresh} new ${fresh===1?'highlight':'highlights'} so far. Your monthly draft will arrive after the month ends.`:'No monthly draft waiting. Quiet months stay quiet.';
     $('newsletter-items').innerHTML=(d?.items||[]).map((e,i)=>`<article class="newsletter-item" data-newsletter-item="${i}"><p class="newsletter-kind">${e.kind==='photo'?'Photo collection':esc(e.kind)}</p><label class="checkbox"><input type="checkbox" data-newsletter-field="selected" ${e.selected?'checked':''}><strong>${esc(e.title)}</strong></label><a href="${esc(e.href)}" target="_blank" rel="noopener noreferrer">View on site ↗</a><label>Title<input data-newsletter-field="title" maxlength="300" value="${esc(e.title)}"></label><label>A sentence about it<textarea data-newsletter-field="summary" maxlength="2000" rows="3">${esc(e.summary)}</textarea></label>${e.kind==='photo'&&e.image?`<label class="checkbox"><input type="checkbox" data-newsletter-field="featured" ${e.featured?'checked':''}>Include a photograph</label>`:''}</article>`).join('');
     $('newsletter-history').innerHTML=s.history.slice().reverse().map(h=>`<li>${h.url?`<a href="${esc(h.url)}" target="_blank" rel="noopener noreferrer">${esc(h.subject)}</a>`:esc(h.subject)} <small>— recorded ${esc(h.sentAt.slice(0,10))}</small></li>`).join('')||'<li>No sent issues recorded in this browser.</li>';
     preview();
@@ -37,16 +40,13 @@ window.createNewsletterEditor = ({getState,save,isBusy}) => {
     loading=true;syncControls();status('Checking what is live on the site…');
     try {
       const read=async path=>{const r=await fetch(path,{cache:'no-store',credentials:'omit'});if(!r.ok)throw Error('Could not load the live site. Your draft is safe; try Refresh again.');const d=await r.json();return d;};
-      const [local,writings,projects,photography,initial]=await Promise.all(['/data/writings-local.json','/data/writings.json','/data/works-substack.json','/data/photography.json','/data/newsletter-baseline.json'].map(read));
-      if(![local,writings,projects,photography].every(Array.isArray)||!Array.isArray(initial.keys))throw Error('The site content could not be read. Your draft is unchanged.');
+      const [local,writings,projects,photography,initial,monthlyFeed]=await Promise.all(['/data/writings-local.json','/data/writings.json','/data/works-substack.json','/data/photography.json','/data/newsletter-baseline.json','/data/newsletter-monthly.json'].map(read));
+      if(![local,writings,projects,photography].every(Array.isArray)||!Array.isArray(initial.keys)||monthlyFeed?.version!==1||!Array.isArray(monthlyFeed.issues))throw Error('The site content could not be read. Your draft is unchanged.');
       entries=N.inventory({local,writings,projects,photography});baseline=N.keys(initial.keys);
+      feed=monthlyFeed;
       getState().newsletter=N.normalize(getState().newsletter);
-      const d=state().draft;
-      if(d) {
-        // Never announce removed/private content or mark photos added after drafting as covered.
-        const current=new Map(entries.map(e=>[e.id,e]));
-        d.items=d.items.filter(e=>current.has(e.id)).map(e=>{const live=current.get(e.id);return {...e,href:live.href,image:live.image,alt:live.alt,keys:e.keys.filter(k=>live.keys.includes(k))};}).filter(e=>e.keys.length);
-      }
+      // Import automatically only when no personal draft exists. Never overwrite edits.
+      state().draft=state().draft?N.liveDraft(state().draft,entries):monthly();
       loaded=true;
       await save();
       status('Live content loaded. Unpublished Studio drafts are never included.');
@@ -61,6 +61,12 @@ window.createNewsletterEditor = ({getState,save,isBusy}) => {
     render();persist();status(all?'Choose a few published highlights for your first issue.':'New highlights added. Edit the introduction and summaries before sending.');
   }
   $('newsletter-new').onclick=()=>create();
+  $('newsletter-auto').onclick=()=>{
+    if(isBusy()||!loaded)return;
+    const d=monthly();if(!d)return;
+    if(state().draft && !confirm('Replace the current email draft with '+d.subject+'?'))return;
+    state().draft=d;render();persist();status('Monthly draft loaded. Review it, then copy to Substack.');
+  };
   $('newsletter-all').onclick=()=>create(true);
   $('newsletter-refresh').onclick=load;
   for(const key of ['subject','intro','closing'])$('newsletter-'+key).addEventListener('input',event=>{
