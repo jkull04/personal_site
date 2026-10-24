@@ -56,3 +56,27 @@ test('project screenshots and homepage settings publish atomically alongside boo
  assert.equal(JSON.parse(tree[0].content)[0].rating,'4.5');assert.equal(JSON.parse(tree[0].content)[0].recommended,true);
  assert.deepEqual(calls.at(-1).body,{sha:'new',force:false});
 });
+test('image-only changes regenerate project articles and removing the image removes its markup',async()=>{
+ const project={id:'demo',type:'project',title:'Demo',date:'2026-10-24',problem:'Why',approach:'How',output:'Result',published:true};
+ for(const remove of [false,true]) {
+  const baseline={...empty(),writings:[project],showcase:remove?[display()]:[]};
+  const data={...baseline,showcase:remove?[display({imageSrc:'',imageAlt:''})]:[display()]},calls=[];
+  const api=async(path,method='GET',body)=>{
+   calls.push({path,method,body});
+   if(path==='/git/ref/heads/main')return {object:{sha:'head'}};
+   if(path.startsWith('/contents/'))return path.includes('showcase')?baseline.showcase:path.includes('writings-local')?baseline.writings:[];
+   if(path==='/git/commits/head')return {tree:{sha:'base'}};
+   return {sha:'new'};
+  };
+  await Core.publish({data,baseline,images:remove?{}:{'assets/photography/project-demo.jpg':'YWJj'},api});
+  const tree=calls.find(c=>c.path==='/git/trees').body.tree;
+  const page=tree.find(e=>e.path==='writings/posts/demo/index.html').content;
+  assert.equal(page.includes('<figure class="writing-project-image">'),!remove);
+  assert.equal(tree.some(e=>e.path==='data/writings-local.json'),false);
+  if(!remove)assert.ok(tree.some(e=>e.path==='assets/photography/project-demo.jpg'));
+ }
+});
+test('switching a project to an essay keeps its unused presentation out of publication',()=>{
+ const data={...empty(),writings:[{id:'demo',type:'essay',published:true}],showcase:[display()]};
+ assert.equal(Core.publicData(data).showcase.length,0);
+});

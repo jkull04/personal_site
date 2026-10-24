@@ -718,3 +718,16 @@ month boundaries, public-only changes, idempotency, empty months, edited-draft
 preservation, safe rendering, and explicit sent-history updates. Substack is
 unavailable from this development environment, so external signup and delivery
 cannot be tested here.
+
+### Project images in Studio
+
+In **Writings**, open a draft and select **Project**. Use **Project image → Add
+image** to choose JPEG, PNG, or WebP, then review the image description. The image
+is resized, stored with the encrypted draft, and uploaded only when the project
+is included in publication. It appears on the project card and full article.
+Replace/remove it in the same form; the presentation tab shares these settings.
+Image-only changes regenerate the article on the next publish.
+
+The publishing Worker uses manual redirect handling for GitHub identity, content,
+and check requests. Unexpected redirects stop the request without forwarding
+credentials, while preserving the browser draft for retry.

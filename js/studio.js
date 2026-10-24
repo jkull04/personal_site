@@ -389,6 +389,7 @@
     if (busy) return;
     document.querySelectorAll('[data-tab]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));
     $('books-editor').hidden=button.dataset.tab!=='books'; $('photography-editor').hidden=button.dataset.tab!=='photography'; $('writings-editor').hidden=button.dataset.tab!=='writings'; $('showcase-editor').hidden=button.dataset.tab!=='showcase'; $('newsletter-editor').hidden=button.dataset.tab!=='newsletter';
+    if(button.dataset.tab==='writings')writingEditor.render();
     if(button.dataset.tab==='showcase')showcaseEditor.load();
     if(button.dataset.tab==='newsletter')newsletterEditor.load();
   });
@@ -933,14 +934,15 @@
       $('photo-organize-status').textContent=action==='preview'?'Category preview saved. Publish to update the site.':'This group will use a varied selection of included photos from its subgroups.';
     }catch(error){$('photo-organize-status').textContent=error.message;}
   });
-  const writingEditor=createWritingEditor({getState:()=>state,save,isBusy:()=>busy,onChange:()=>{undoDraft=null;managedKinds.forEach(updateSelectionControls);}});
-  const showcaseEditor=createShowcaseEditor({getState:()=>state,save,isBusy:()=>busy,onChange:()=>{undoDraft=null;},uploadImage:async file=>{
+  async function uploadProjectImage(file) {
     StudioAccess.requireUnlocked();setBusy(true);
     try {const image=await resizePhoto(file);const path='assets/photography/project-'+crypto.randomUUID()+'.jpg';
       if(Object.values(state.images).reduce((n,v)=>n+v.length,0)+image.full.content.length>45*1024*1024)throw Error('Publish your pending images before adding more.');
       state.images[path]=image.full.content;return '/'+path;
     } finally {setBusy(false);}
-  }});
+  }
+  const writingEditor=createWritingEditor({getState:()=>state,save,isBusy:()=>busy,uploadImage:uploadProjectImage,onChange:()=>{undoDraft=null;managedKinds.forEach(updateSelectionControls);}});
+  const showcaseEditor=createShowcaseEditor({getState:()=>state,save,isBusy:()=>busy,onChange:()=>{undoDraft=null;},uploadImage:uploadProjectImage});
   const newsletterEditor=createNewsletterEditor({getState:()=>state,save,isBusy:()=>busy});
   setupManagers();
 

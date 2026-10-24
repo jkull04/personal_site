@@ -92,10 +92,12 @@ export function createHandler(fetcher=fetch) {
         if(!limit.success) throw failure('Too many sign-in attempts. Wait a minute and try again.',429);
         const body=await jsonBody(request,2048);
         if(typeof body.githubToken!=='string' || !/^(?:github_pat_[A-Za-z0-9_]{20,}|ghp_[A-Za-z0-9]{20,})$/.test(body.githubToken))throw failure('Connect using a repository-scoped GitHub token.',401);
-        const options={headers:{Authorization:'Bearer '+body.githubToken,Accept:'application/vnd.github+json','User-Agent':'JamesKull-Studio'},redirect:'error'};
+        const options={headers:{Authorization:'Bearer '+body.githubToken,Accept:'application/vnd.github+json','User-Agent':'JamesKull-Studio'},redirect:'manual'};
         const identity=await fetcher('https://api.github.com/user',options);
+        if(identity.status>=300 && identity.status<400)throw failure('GitHub returned an unexpected redirect. Reconnect later; your draft is safe.',502);
         if(!identity.ok || (await identity.json()).login!=='jkull04')throw failure('Only the site owner can connect Studio.',401);
         const access=await fetcher(repo,options);
+        if(access.status>=300 && access.status<400)throw failure('GitHub returned an unexpected redirect. Reconnect later; your draft is safe.',502);
         if(!access.ok || !(await access.json()).permissions?.push)throw failure('The token must have write access to personal_site.',403);
         return respond({token:await session(env,body.githubToken)});
       }

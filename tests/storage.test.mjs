@@ -31,6 +31,7 @@ function setup() {
   env.BUDGET={idFromName:name=>name,get:()=>budget};
   env.PHOTOS.get=async key=>objects.has(key)?{body:image,httpEtag:'etag'}:null;
   const handler=createHandler(async(url,options)=>{
+    assert.equal(options.redirect,'manual');
     if(url==='https://api.github.com/user')return options.headers.Authorization==='Bearer '+githubToken?Response.json({login:'jkull04'}):Response.json({error:'bad token'},{status:401});
     if(url==='https://api.github.com/repos/jkull04/personal_site')return Response.json({permissions:{push:true}});
     const path=url.replace('https://api.github.com/repos/jkull04/personal_site','');calls.push({path,...options});
@@ -246,4 +247,29 @@ test('security: publishing uses the connecting token, never broader service cred
  const data={...empty(),books:[{id:'book',title:'Title',author:'Author',status:'Read'}]};
  assert.equal((await call('/publish',{data,baseline:empty()},token)).status,200);
  assert.ok(calls.every(c=>c.headers.Authorization==='Bearer '+githubToken));
+});
+test('GitHub session redirects never receive a followed token or create a session',async()=>{
+ for(const target of ['https://api.github.com/user','https://api.github.com/repos/jkull04/personal_site']) {
+  const {env}=setup(),calls=[];
+  const handler=createHandler(async(url,options)=>{
+   assert.equal(options.redirect,'manual');calls.push(url);
+   return url===target?new Response(null,{status:302,headers:{Location:'https://unexpected.example/'}}):Response.json({login:'jkull04'});
+  });
+  const response=await handler(new Request(origin+'/session',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify({githubToken})}),env);
+  assert.equal(response.status,502);assert.match((await response.json()).error,/redirect/);
+  assert.equal(calls.at(-1),target);
+ }
+});
+test('project image publication verifies uploaded media and renders it in the article',async()=>{
+ const {call,login,calls}=setup(),token=await login();
+ const project={id:'demo',type:'project',title:'Demo',date:'2026-10-24',problem:'Why',approach:'How',output:'Result',published:true};
+ const data={...empty(),writings:[project],showcase:[{id:'project-demo',projectId:'demo',imageSrc:imageURL,imageAlt:'Dashboard',demoUrl:''}]};
+ const args={data,baseline:{...empty(),showcase:[]}};
+ assert.equal((await call('/publish',args,token)).status,400);
+ assert.equal(calls.length,0);
+ await call('/photos',image,token);
+ const response=await call('/publish',args,token);assert.equal(response.status,200);
+ const tree=JSON.parse(calls.find(c=>c.path==='/git/trees').body).tree;
+ assert.ok(tree.find(e=>e.path==='writings/posts/demo/index.html').content.includes(imageURL));
+ assert.ok(calls.every(c=>c.redirect==='manual'));
 });

@@ -77,7 +77,7 @@
     return result;
   }
   function publicData(data) {
-    const privateProjects=new Set((data.writings||[]).filter(w=>w.type==='project'&&w.published===false).map(w=>w.id));
+    const privateProjects=new Set((data.writings||[]).filter(w=>w.type!=='project'||w.published===false).map(w=>w.id));
     return Object.fromEntries(Object.keys(paths).filter(k=>data[k]!==undefined).map(k=>[k,data[k].filter(e=>e.published!==false && (k!=='showcase'||e.id==='home'||!privateProjects.has(e.projectId)))]));
   }
   async function publish({data, baseline, images, api, onPhoto=()=>{}}) {
@@ -96,8 +96,8 @@
     if (!changed.length) return {unchanged:true, published};
     const commit = await api('/git/commits/'+head);
     const tree = changed.map(k=>({path:paths[k],mode:'100644',type:'blob',content:JSON.stringify(published[k],null,2)+'\n'}));
-    if(changed.includes('writings')) {
-      for(const entry of published.writings) tree.push({path:writing.href(entry).slice(1)+'index.html',mode:'100644',type:'blob',content:writing.page(entry)});
+    if(published.writings && (changed.includes('writings') || changed.includes('showcase'))) {
+      for(const entry of published.writings) tree.push({path:writing.href(entry).slice(1)+'index.html',mode:'100644',type:'blob',content:writing.page(entry,showcase.project(entry,published.showcase))});
       for(const entry of baseline.writings) {
         if(!published.writings.some(e=>e.id===entry.id)) {
           if(!/^[a-zA-Z0-9_-]+$/.test(entry.id)) throw Error('Invalid writing ID in baseline.');

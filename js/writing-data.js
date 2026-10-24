@@ -83,13 +83,19 @@
     const url='https://www.jameskull.com'+href(entry);
     return {html:markdown(articleBody(entry))+'\n<p>Originally published on <a href="'+url+'">jameskull.com</a>.</p>',text:articleBody(entry)+'\n\nOriginally published on jameskull.com: '+url};
   }
-  function page(entry) {
+  function projectImage(entry,presentation={}) {
+    if(entry.type!=='project')return '';
+    const showcase=root.ShowcaseData || (typeof require==='function'?require('./showcase-data.js'):null);
+    const src=showcase?.imageURL(presentation.imageSrc);
+    return src?'<figure class="writing-project-image"><img src="'+esc(src)+'" alt="'+esc(presentation.imageAlt||'')+'" decoding="async"></figure>':'';
+  }
+  function page(entry,presentation={}) {
     validate(entry,true);
     const url='https://www.jameskull.com'+href(entry);
     return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(entry.title)} | James Kull</title><meta name="description" content="${esc(entry.abstract||entry.subtitle||'Writing by James Kull')}"><link rel="canonical" href="${url}"><meta property="og:title" content="${esc(entry.title)}"><meta property="og:type" content="article"><meta property="og:url" content="${url}"><meta property="og:description" content="${esc(entry.abstract||entry.subtitle||'Writing by James Kull')}"><link rel="icon" href="/assets/icons/favicon-32.png"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&display=swap"><link rel="stylesheet" href="/css/base.css"><link rel="stylesheet" href="/css/components.css"><link rel="stylesheet" href="/css/writing.css"></head>
 <body><a class="skip-link" href="#main">Skip to content</a><header class="page-header site-shell"><nav class="top-nav" aria-label="Primary"><a class="brand" href="/">JFK</a><ul class="nav-links"><li><a href="/">Home</a></li><li><a ${entry.type==='project'?'class="is-active"':''} href="/projects/">Projects</a></li><li><a ${entry.type!=='project'?'class="is-active"':''} href="/writings/">Writings</a></li><li><a href="/books/">Books</a></li><li><a href="/photography/">Photos</a></li><li><a href="/contact/">Contact</a></li></ul></nav></header>
-<main id="main" class="site-shell"><article class="writing-article"><a href="${entry.type==='project'?'/projects/':'/writings/'}">← All ${entry.type==='project'?'projects':'writings'}</a><header><p class="eyebrow">${entry.type==='project'?'Project':entry.type==='blog'?'Note':'Essay'} · <time datetime="${esc(entry.date)}">${esc(entry.date)}</time></p><h1>${esc(entry.title)}</h1>${entry.subtitle?'<p class="writing-subtitle">'+esc(entry.subtitle)+'</p>':''}<p class="meta-line">James Kull</p></header><div class="writing-prose">${markdown(articleBody(entry))}</div>${entry.substackUrl?'<p class="writing-crosspost"><a href="'+esc(substackURL(entry.substackUrl))+'" target="_blank" rel="noopener noreferrer">Also on Substack ↗</a></p>':''}</article></main><footer class="footer site-shell"><p>James Kull | Classics and Economics, Washington and Lee University.</p></footer></body></html>\n`;
+<main id="main" class="site-shell"><article class="writing-article"><a href="${entry.type==='project'?'/projects/':'/writings/'}">← All ${entry.type==='project'?'projects':'writings'}</a><header><p class="eyebrow">${entry.type==='project'?'Project':entry.type==='blog'?'Note':'Essay'} · <time datetime="${esc(entry.date)}">${esc(entry.date)}</time></p><h1>${esc(entry.title)}</h1>${entry.subtitle?'<p class="writing-subtitle">'+esc(entry.subtitle)+'</p>':''}<p class="meta-line">James Kull</p></header>${projectImage(entry,presentation)}<div class="writing-prose">${markdown(articleBody(entry))}</div>${entry.substackUrl?'<p class="writing-crosspost"><a href="'+esc(substackURL(entry.substackUrl))+'" target="_blank" rel="noopener noreferrer">Also on Substack ↗</a></p>':''}</article></main><footer class="footer site-shell"><p>James Kull | Classics and Economics, Washington and Lee University.</p></footer></body></html>\n`;
   }
   const api={esc,href,markdown,validate,listing,projects,articleBody,page,substackURL,bodyForSubstack};root.WritingData=api;
   if(typeof module!=='undefined')module.exports=api;

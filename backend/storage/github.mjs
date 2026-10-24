@@ -6,7 +6,8 @@ const failure=(message,status=502)=>Object.assign(Error(message),{status});
 export function github(env,fetcher,wait=ms=>new Promise(resolve=>setTimeout(resolve,ms))) {
   let stagedBranch;
   async function call(path,method='GET',body,optional=false) {
-    const response=await fetcher(root+path,{method,headers:{Authorization:'Bearer '+env.GITHUB_TOKEN,Accept:path.startsWith('/contents/')?'application/vnd.github.raw+json':'application/vnd.github+json','User-Agent':'JamesKull-Studio','Content-Type':'application/json','X-GitHub-Api-Version':'2022-11-28'},body:body===undefined?undefined:JSON.stringify(body),redirect:'error'});
+    const response=await fetcher(root+path,{method,headers:{Authorization:'Bearer '+env.GITHUB_TOKEN,Accept:path.startsWith('/contents/')?'application/vnd.github.raw+json':'application/vnd.github+json','User-Agent':'JamesKull-Studio','Content-Type':'application/json','X-GitHub-Api-Version':'2022-11-28'},body:body===undefined?undefined:JSON.stringify(body),redirect:'manual'});
+    if(response.status>=300 && response.status<400)throw failure('GitHub returned an unexpected redirect. Your draft is safe; retry publishing later.');
     if(optional && response.status===404)return null;
     if(!response.ok)throw failure(response.status===409||response.status===422?'The site changed while publishing. Your draft is safe; retry publishing.':'GitHub publishing is unavailable. Your draft is safe.',response.status===409||response.status===422?409:502);
     return response.status===204?null:response.json();
@@ -34,7 +35,8 @@ export function github(env,fetcher,wait=ms=>new Promise(resolve=>setTimeout(reso
   if(env.REQUIRE_CHECKS!=='false')api.checkCommit=async sha=>{
     for(let attempt=0;attempt<22;attempt++) {
       // Checks on this public repository are readable without exposing the write token.
-      const response=await fetcher(root+'/commits/'+sha+'/check-runs',{headers:{Accept:'application/vnd.github+json','User-Agent':'JamesKull-Studio'},redirect:'error'});
+      const response=await fetcher(root+'/commits/'+sha+'/check-runs',{headers:{Accept:'application/vnd.github+json','User-Agent':'JamesKull-Studio'},redirect:'manual'});
+      if(response.status>=300 && response.status<400)throw failure('GitHub redirected publication checks. Nothing was published; your draft is safe.');
       if(!response.ok)throw failure('Could not verify publication checks. Your draft is safe. Retry shortly.');
       const checks=(await response.json()).check_runs||[];
       const check=checks.find(c=>c.name==='Security checks' && c.app?.slug==='github-actions' && c.head_sha===sha);

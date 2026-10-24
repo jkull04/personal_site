@@ -23,3 +23,23 @@ test('a retry reuses the verified proposed tree and parent instead of restarting
   assert.deepEqual(await api('/git/commits','POST',{tree:'tree',parents:['head']}),{sha:'pending'});
   assert.ok(calls.every(c=>c.options.method==='GET'));
 });
+test('GitHub API and check requests use edge-compatible manual redirects',async()=>{
+ const calls=[];
+ const api=github({GITHUB_TOKEN:'test'},async(url,options)=>{
+  assert.equal(options.redirect,'manual');calls.push(url);
+  return Response.json(url.endsWith('/check-runs')?{check_runs:[{name:'Security checks',head_sha:'proposed',status:'completed',conclusion:'success',app:{slug:'github-actions'}}]}:{object:{sha:'head'}});
+ });
+ await api('/git/ref/heads/main');await api.checkCommit('proposed');assert.equal(calls.length,2);
+});
+test('redirect responses stop publication and checks without following the Location',async()=>{
+ for(const status of [301,302,303,307,308]) {
+  let requests=0;
+  const api=github({GITHUB_TOKEN:'test'},async(url,options)=>{
+   requests++;assert.equal(options.redirect,'manual');
+   return new Response(null,{status,headers:{Location:'https://unexpected.example/token-trap'}});
+  },async()=>{});
+  await assert.rejects(()=>api('/git/ref/heads/main'),/redirect/);
+  await assert.rejects(()=>api.checkCommit('proposed'),/redirect/);
+  assert.equal(requests,2);
+ }
+});

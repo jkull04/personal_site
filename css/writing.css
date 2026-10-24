@@ -15,3 +15,6 @@
 .writing-prose pre { padding: 16px; overflow: auto; background: var(--surface); font-size: .9rem; }
 .writing-prose a { text-decoration: underline; }
 .writing-crosspost { border-top: 1px solid var(--border-soft); margin-top: 40px; padding-top: 24px; }
+
+.writing-project-image { margin: 1.5rem 0; }
+.writing-project-image img { display: block; width: 100%; height: auto; max-height: 36rem; object-fit: contain; }
