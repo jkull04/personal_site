@@ -1,1 +1,17 @@
-[]
+[
+  {
+    "id": "d21b9e28-3d6e-4c2b-94f9-2e37eda666b6",
+    "title": "Bandon Scoring Project",
+    "subtitle": "",
+    "abstract": "",
+    "date": "2026-10-24",
+    "type": "project",
+    "tags": "UI, Vibe-Coded",
+    "body": "Every year, my Dad brings a rotating cast of friends to the Oregon coast for a week of golf. This year, my Dad decided to use AI to create a fun Ryder Cup style competition format. A great idea, but we realized that the myriad of competitions would be hard to score and might end up taking away from our overall experience. A week before we left, ChatGPT launched Sites. Using this new feature, I built a custom website without ever opening my computer. We used the site to score throughout the week, and it ended up being a huge boost to our trip’s competitive energy. There were a few bugs, but all I had to do was hop on my phone and tell my agent to fix them. It was surreal.\n\nFor months and months people have been talking about personal software as being one of the main things that will come out of AI, but this was my first time experiencing it as this level of an enhancement. Because of this project, I now have several other things in the pipeline that are just meant to make my life better. Perhaps ChatGPT Dots and other similar fully agentic will expedite the Bespoke Software Revolution, but it is Sites that closed the loop for me and made be a believer. Attaching a couple screenshots of the UI below.",
+    "substackUrl": "https://jameskull.substack.com/p/bandon-dunes-scoring-project?r=2imjl0&utm_campaign=post-expanded-share&utm_medium=web",
+    "published": true,
+    "problem": "My Dad’s AI-generated competitive format was overly complicated, and it would have been a pain to score.",
+    "approach": "I used the Sites integration in ChatGPT to generate a custom scoring site just for our trip",
+    "output": "A scoring app that shows live leaderboards and scoring across matches and keeps records across days. Also, a fun stat sheet at the end of the trip."
+  }
+]
