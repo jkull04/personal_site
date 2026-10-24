@@ -35,9 +35,19 @@ export function github(env,fetcher,wait=ms=>new Promise(resolve=>setTimeout(reso
   if(env.REQUIRE_CHECKS!=='false')api.checkCommit=async sha=>{
     for(let attempt=0;attempt<22;attempt++) {
       // Checks on this public repository are readable without exposing the write token.
-      const response=await fetcher(root+'/commits/'+sha+'/check-runs',{headers:{Accept:'application/vnd.github+json','User-Agent':'JamesKull-Studio'},redirect:'manual'});
+      const url=root+'/commits/'+sha+'/check-runs';
+      const options={headers:{Accept:'application/vnd.github+json','User-Agent':'JamesKull-Studio','X-GitHub-Api-Version':'2022-11-28'},redirect:'manual'};
+      let response=await fetcher(url,options);
+      // Shared edge IPs can exhaust GitHub's anonymous quota. The same owner's
+      // token can still read checks if it has Checks: read permission.
+      if([401,403,429].includes(response.status) && env.GITHUB_TOKEN) {
+        const authenticated=await fetcher(url,{...options,headers:{...options.headers,Authorization:'Bearer '+env.GITHUB_TOKEN}});
+        if(authenticated.status!==403 || authenticated.headers.get('x-ratelimit-remaining')==='0')response=authenticated;
+      }
       if(response.status>=300 && response.status<400)throw failure('GitHub redirected publication checks. Nothing was published; your draft is safe.');
-      if(!response.ok)throw failure('Could not verify publication checks. Your draft is safe. Retry shortly.');
+      if(!response.ok)throw failure(response.status===429 || response.headers.get('x-ratelimit-remaining')==='0'
+        ? 'GitHub’s publication-check rate limit was reached. Your draft is safe. Retry later, or reconnect a token with Checks: read access.'
+        : 'Could not verify publication checks (GitHub HTTP '+response.status+'). Your draft is safe. Retry shortly.');
       const checks=(await response.json()).check_runs||[];
       const check=checks.find(c=>c.name==='Security checks' && c.app?.slug==='github-actions' && c.head_sha===sha);
       if(check?.status==='completed') {

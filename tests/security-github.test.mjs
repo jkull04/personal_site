@@ -43,3 +43,20 @@ test('redirect responses stop publication and checks without following the Locat
   assert.equal(requests,2);
  }
 });
+test('anonymous check throttling can fall back to the owner token while preserving check verification',async()=>{
+ const calls=[];
+ const api=github({GITHUB_TOKEN:'test-owner-token'},async(url,options)=>{
+  calls.push({url,options});assert.equal(options.redirect,'manual');
+  return options.headers.Authorization?Response.json({check_runs:[{name:'Security checks',head_sha:'proposed',status:'completed',conclusion:'success',app:{slug:'github-actions'}}]}):Response.json({message:'Rate limit exceeded'},{status:403,headers:{'x-ratelimit-remaining':'0'}});
+ });
+ await api.checkCommit('proposed');
+ assert.equal(calls.length,2);assert.equal(calls[0].url,calls[1].url);assert.equal(calls[1].options.headers.Authorization,'Bearer test-owner-token');
+});
+test('a token without check permission retains the rate-limit explanation and never approves publication',async()=>{
+ const api=github({GITHUB_TOKEN:'test'},async(url,options)=>Response.json({},options.headers.Authorization?{status:403}:{status:403,headers:{'x-ratelimit-remaining':'0'}}),async()=>{});
+ await assert.rejects(()=>api.checkCommit('proposed'),/rate limit/);
+});
+test('authenticated fallback still rejects failed checks',async()=>{
+ const api=github({GITHUB_TOKEN:'test'},async(url,options)=>options.headers.Authorization?Response.json({check_runs:[{name:'Security checks',head_sha:'proposed',status:'completed',conclusion:'failure',app:{slug:'github-actions'}}]}):new Response(null,{status:429}),async()=>{});
+ await assert.rejects(()=>api.checkCommit('proposed'),/did not pass/);
+});
